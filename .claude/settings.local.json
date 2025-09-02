@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pg_isready:*)",
+      "Bash(psql:*)",
+      "Bash(set PGPASSWORD=Chahar@36910)",
+      "Bash(npm install)",
+      "Bash(npm run migrate:*)",
+      "Bash(npm run seed:*)",
+      "Bash(npm run dev:*)",
+      "Bash(start http://localhost:3000/leads/660e8400-e29b-41d4-a716-446655440001)",
+      "Bash(start http://localhost:3000/pipeline)",
+      "Bash(npx knex seed:run:*)",
+      "Bash(npx knex raw:*)",
+      "Bash(node:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
