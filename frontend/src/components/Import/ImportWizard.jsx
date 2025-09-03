@@ -1,14 +1,15 @@
 import React, { useState, useRef } from 'react';
 import importService from '../../services/importService';
 
-const ImportWizard = ({ isOpen, onClose, onImportComplete }) => {
+const ImportWizard = ({ isOpen, onClose, onImportComplete, initialStageId }) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [file, setFile] = useState(null);
   const [filePreview, setFilePreview] = useState(null);
   const [fieldMapping, setFieldMapping] = useState({});
   const [importOptions, setImportOptions] = useState({
     skipDuplicates: true,
-    updateExisting: false
+    updateExisting: false,
+    pipelineStageId: initialStageId || null
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -89,7 +90,8 @@ const ImportWizard = ({ isOpen, onClose, onImportComplete }) => {
     setFieldMapping({});
     setImportOptions({
       skipDuplicates: true,
-      updateExisting: false
+      updateExisting: false,
+      pipelineStageId: initialStageId || null
     });
     setError('');
     setImportResult(null);
@@ -239,14 +241,19 @@ const ImportWizard = ({ isOpen, onClose, onImportComplete }) => {
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="">Skip this field</option>
-                        <option value="name">Name</option>
+                        <option value="first_name">First Name</option>
+                        <option value="last_name">Last Name</option>
                         <option value="email">Email</option>
                         <option value="phone">Phone</option>
                         <option value="company">Company</option>
-                        <option value="position">Position</option>
-                        <option value="source">Source</option>
+                        <option value="job_title">Job Title</option>
+                        <option value="lead_source">Lead Source</option>
                         <option value="status">Status</option>
                         <option value="notes">Notes</option>
+                        <option value="deal_value">Deal Value</option>
+                        <option value="probability">Probability</option>
+                        <option value="expected_close_date">Expected Close Date</option>
+                        <option value="priority">Priority</option>
                       </select>
                     </div>
                     <div className="w-1/3">

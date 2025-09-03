@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { AuthProvider } from './context/AuthContext'
+import { LeadProvider } from './context/LeadContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import ErrorBoundary from './components/ErrorBoundary'
 import Login from './pages/Login'
@@ -20,7 +21,8 @@ function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <div className="min-h-screen bg-gray-50">
+        <LeadProvider>
+          <div className="min-h-screen bg-gray-50">
           <Routes>
             {/* Public routes */}
             <Route path="/login" element={<Login />} />
@@ -73,7 +75,8 @@ function App() {
               },
             }}
           />
-        </div>
+          </div>
+        </LeadProvider>
       </AuthProvider>
     </ErrorBoundary>
   )

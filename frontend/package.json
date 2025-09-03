@@ -1,5 +1,6 @@
 {
   "name": "crm-frontend",
+  "description": "CRM Frontend React App - Backend uses POSTGRESQL ONLY (NO SQLITE3)",
   "private": true,
   "version": "1.0.0",
   "type": "module",

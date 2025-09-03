@@ -19,7 +19,7 @@ const enhancedConfig = {
     propagateCreateError: false
   },
   acquireConnectionTimeout: 30000,
-  debug: process.env.NODE_ENV === 'development'
+  debug: false // Disabled to prevent excessive logging
 };
 
 const db = knex(enhancedConfig);

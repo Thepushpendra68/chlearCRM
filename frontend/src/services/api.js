@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 // Create axios instance
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
-  timeout: 10000,
+  timeout: 30000, // Increased to 30 seconds
   headers: {
     'Content-Type': 'application/json',
   },
@@ -80,8 +80,12 @@ api.interceptors.response.use(
           toast.error(data?.message || 'An error occurred. Please try again.');
       }
     } else if (error.request) {
-      // Network error
-      toast.error('Network error. Please check your connection.');
+      // Network error - add retry logic for network failures
+      if (error.code === 'ECONNABORTED' || error.code === 'NETWORK_ERROR') {
+        toast.error('Network timeout. Please check your connection and try again.');
+      } else {
+        toast.error('Network error. Please check your connection.');
+      }
     } else {
       // Other error
       toast.error('An unexpected error occurred.');

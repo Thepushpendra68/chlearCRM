@@ -81,6 +81,9 @@ jspm_packages/
 *.swo
 *~
 
+# Claude AI settings (may contain sensitive data)
+.claude/
+
 # OS generated files
 .DS_Store
 .DS_Store?
@@ -90,9 +93,9 @@ jspm_packages/
 ehthumbs.db
 Thumbs.db
 
-# Database files
-*.sqlite
-*.db
+# Database files - PostgreSQL only, no SQLite
+# *.sqlite - NEVER USE SQLITE3 - THIS PROJECT USES POSTGRESQL ONLY
+# *.db - NEVER USE SQLITE3 - THIS PROJECT USES POSTGRESQL ONLY
 
 # Temporary files
 tmp/

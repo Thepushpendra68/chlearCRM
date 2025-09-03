@@ -21,10 +21,10 @@ class ImportService {
       }
 
       // Validate leads data
-      const validatedLeads = await this.validateLeads(leads);
+      const validationResult = await this.validateLeads(leads);
       
       // Import leads to database
-      const importResult = await this.bulkInsertLeads(validatedLeads, userId);
+      const importResult = await this.bulkInsertLeads(validationResult.validatedLeads, userId);
       
       // Log import history
       await this.logImportHistory({
@@ -33,10 +33,13 @@ class ImportService {
         total_records: leads.length,
         successful_imports: importResult.successful,
         failed_imports: importResult.failed,
-        errors: importResult.errors
+        errors: importResult.errors.concat(validationResult.errors || [])
       });
 
-      return importResult;
+      return {
+        ...importResult,
+        validationErrors: validationResult.errors || []
+      };
     } catch (error) {
       if (error instanceof ApiError) throw error;
       throw new ApiError('Failed to import leads', 500);
@@ -54,16 +57,16 @@ class ImportService {
       const lead = leads[i];
       const rowErrors = [];
 
-      // Required field validation
-      if (!lead.name || lead.name.trim() === '') {
-        rowErrors.push('Name is required');
+      // Required field validation - first_name and last_name are required
+      if (!lead.first_name || lead.first_name.trim() === '') {
+        rowErrors.push('First name is required');
       }
 
-      if (!lead.email || lead.email.trim() === '') {
-        rowErrors.push('Email is required');
+      if (!lead.last_name || lead.last_name.trim() === '') {
+        rowErrors.push('Last name is required');
       }
 
-      // Email format validation
+      // Email format validation (if provided)
       if (lead.email && !this.isValidEmail(lead.email)) {
         rowErrors.push('Invalid email format');
       }
@@ -73,10 +76,10 @@ class ImportService {
         rowErrors.push('Invalid phone format');
       }
 
-      // Check for duplicate email
+      // Check for duplicate email (if provided)
       if (lead.email) {
         const existingLead = await db('leads')
-          .where('email', lead.email)
+          .where('email', lead.email.trim().toLowerCase())
           .first();
         
         if (existingLead) {
@@ -84,16 +87,46 @@ class ImportService {
         }
       }
 
+      // Validate status if provided
+      if (lead.status && !['new', 'contacted', 'qualified', 'converted', 'lost'].includes(lead.status.toLowerCase())) {
+        rowErrors.push('Invalid status. Must be one of: new, contacted, qualified, converted, lost');
+      }
+
+      // Validate lead_source if provided
+      if (lead.lead_source && !['website', 'referral', 'cold_call', 'social_media', 'advertisement', 'other'].includes(lead.lead_source.toLowerCase())) {
+        rowErrors.push('Invalid lead source. Must be one of: website, referral, cold_call, social_media, advertisement, other');
+      }
+
+      // Validate priority if provided
+      if (lead.priority && !['low', 'medium', 'high', 'urgent'].includes(lead.priority.toLowerCase())) {
+        rowErrors.push('Invalid priority. Must be one of: low, medium, high, urgent');
+      }
+
+      // Validate deal_value if provided
+      if (lead.deal_value && (isNaN(parseFloat(lead.deal_value)) || parseFloat(lead.deal_value) < 0)) {
+        rowErrors.push('Deal value must be a positive number');
+      }
+
+      // Validate probability if provided
+      if (lead.probability && (isNaN(parseInt(lead.probability)) || parseInt(lead.probability) < 0 || parseInt(lead.probability) > 100)) {
+        rowErrors.push('Probability must be between 0 and 100');
+      }
+
       if (rowErrors.length === 0) {
         validatedLeads.push({
-          name: lead.name.trim(),
-          email: lead.email.trim().toLowerCase(),
+          first_name: lead.first_name.trim(),
+          last_name: lead.last_name.trim(),
+          email: lead.email ? lead.email.trim().toLowerCase() : null,
           phone: lead.phone ? lead.phone.trim() : null,
           company: lead.company ? lead.company.trim() : null,
-          position: lead.position ? lead.position.trim() : null,
-          source: lead.source ? lead.source.trim() : 'import',
-          status: lead.status ? lead.status.trim() : 'new',
+          job_title: lead.job_title ? lead.job_title.trim() : null,
+          lead_source: lead.lead_source ? lead.lead_source.trim().toLowerCase() : 'import',
+          status: lead.status ? lead.status.trim().toLowerCase() : 'new',
           notes: lead.notes ? lead.notes.trim() : null,
+          deal_value: lead.deal_value ? parseFloat(lead.deal_value) : null,
+          probability: lead.probability ? parseInt(lead.probability) : 0,
+          expected_close_date: lead.expected_close_date ? new Date(lead.expected_close_date) : null,
+          priority: lead.priority ? lead.priority.trim().toLowerCase() : 'medium',
           created_at: new Date(),
           updated_at: new Date()
         });
@@ -125,8 +158,14 @@ class ImportService {
       for (let i = 0; i < leads.length; i += batchSize) {
         const batch = leads.slice(i, i + batchSize);
         
+        // Add created_by to each lead in the batch
+        const batchWithUser = batch.map(lead => ({
+          ...lead,
+          created_by: userId
+        }));
+        
         try {
-          await db('leads').insert(batch);
+          await db('leads').insert(batchWithUser);
           result.successful += batch.length;
         } catch (error) {
           result.failed += batch.length;
@@ -148,6 +187,8 @@ class ImportService {
    */
   async exportLeads(filters = {}, format = 'csv') {
     try {
+      console.log('Starting export with filters:', filters, 'format:', format);
+      
       let query = db('leads')
         .select(
           'leads.*',
@@ -159,19 +200,19 @@ class ImportService {
         .leftJoin('pipeline_stages', 'leads.pipeline_stage_id', 'pipeline_stages.id');
 
       // Apply filters
-      if (filters.status) {
+      if (filters.status && filters.status !== 'All Status') {
         query = query.where('leads.status', filters.status);
       }
 
-      if (filters.source) {
-        query = query.where('leads.source', filters.source);
+      if (filters.lead_source && filters.lead_source !== 'All Sources') {
+        query = query.where('leads.lead_source', filters.lead_source);
       }
 
-      if (filters.assigned_to) {
+      if (filters.assigned_to && filters.assigned_to !== 'All Users') {
         query = query.where('leads.assigned_to', filters.assigned_to);
       }
 
-      if (filters.pipeline_stage_id) {
+      if (filters.pipeline_stage_id && filters.pipeline_stage_id !== 'All Stages') {
         query = query.where('leads.pipeline_stage_id', filters.pipeline_stage_id);
       }
 
@@ -184,17 +225,23 @@ class ImportService {
       }
 
       const leads = await query.orderBy('leads.created_at', 'desc');
+      console.log(`Found ${leads.length} leads for export`);
 
       // Format data for export
       const exportData = leads.map(lead => ({
-        'Name': lead.name,
-        'Email': lead.email,
+        'First Name': lead.first_name || '',
+        'Last Name': lead.last_name || '',
+        'Email': lead.email || '',
         'Phone': lead.phone || '',
         'Company': lead.company || '',
-        'Position': lead.position || '',
-        'Source': lead.source || '',
+        'Job Title': lead.job_title || '',
+        'Lead Source': lead.lead_source || '',
         'Status': lead.status || '',
         'Stage': lead.stage_name || '',
+        'Deal Value': lead.deal_value || '',
+        'Probability': lead.probability || '',
+        'Expected Close Date': lead.expected_close_date ? new Date(lead.expected_close_date).toLocaleDateString() : '',
+        'Priority': lead.priority || '',
         'Assigned To': lead.assigned_first_name && lead.assigned_last_name 
           ? `${lead.assigned_first_name} ${lead.assigned_last_name}` 
           : '',
@@ -203,9 +250,14 @@ class ImportService {
         'Notes': lead.notes || ''
       }));
 
+      console.log('Export data formatted successfully');
       return exportData;
     } catch (error) {
-      throw new ApiError('Failed to export leads', 500);
+      console.error('Export service error:', error);
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      throw new ApiError(`Failed to export leads: ${error.message}`, 500);
     }
   }
 
@@ -254,13 +306,18 @@ class ImportService {
   generateImportTemplate() {
     return [
       {
-        'Name': 'John Doe',
+        'First Name': 'John',
+        'Last Name': 'Doe',
         'Email': 'john.doe@example.com',
         'Phone': '+1234567890',
         'Company': 'Example Corp',
-        'Position': 'CEO',
-        'Source': 'Website',
-        'Status': 'New',
+        'Job Title': 'CEO',
+        'Lead Source': 'website',
+        'Status': 'new',
+        'Deal Value': '50000',
+        'Probability': '75',
+        'Expected Close Date': '2024-12-31',
+        'Priority': 'high',
         'Notes': 'Interested in our premium package'
       }
     ];

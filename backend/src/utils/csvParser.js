@@ -39,9 +39,10 @@ class CSVParser {
 
     // Default field mappings
     const defaultMappings = {
-      'name': 'name',
-      'full_name': 'name',
-      'first_name': 'name',
+      'name': 'first_name',
+      'full_name': 'first_name',
+      'first_name': 'first_name',
+      'last_name': 'last_name',
       'email': 'email',
       'email_address': 'email',
       'phone': 'phone',
@@ -50,16 +51,20 @@ class CSVParser {
       'company': 'company',
       'company_name': 'company',
       'organization': 'company',
-      'position': 'position',
-      'job_title': 'position',
-      'title': 'position',
-      'source': 'source',
-      'lead_source': 'source',
+      'position': 'job_title',
+      'job_title': 'job_title',
+      'title': 'job_title',
+      'source': 'lead_source',
+      'lead_source': 'lead_source',
       'status': 'status',
       'lead_status': 'status',
       'notes': 'notes',
       'comments': 'notes',
-      'description': 'notes'
+      'description': 'notes',
+      'deal_value': 'deal_value',
+      'probability': 'probability',
+      'expected_close_date': 'expected_close_date',
+      'priority': 'priority'
     };
 
     // Merge default mappings with custom mappings
@@ -116,7 +121,7 @@ class CSVParser {
       }
 
       // Check for required headers
-      const requiredHeaders = ['name', 'email'];
+      const requiredHeaders = ['first_name', 'last_name'];
       const missingHeaders = requiredHeaders.filter(header => 
         !headers.some(h => h.toLowerCase().includes(header))
       );

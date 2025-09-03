@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import pipelineService from '../../services/pipelineService';
 
-const StageManager = ({ isOpen, onClose, onStagesUpdated }) => {
+const StageManager = ({ isOpen, onClose, onStagesUpdated, editingStage: initialEditingStage }) => {
   const [stages, setStages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -16,8 +16,17 @@ const StageManager = ({ isOpen, onClose, onStagesUpdated }) => {
   useEffect(() => {
     if (isOpen) {
       fetchStages();
+      if (initialEditingStage) {
+        setEditingStage(initialEditingStage);
+        setFormData({
+          name: initialEditingStage.name,
+          color: initialEditingStage.color,
+          order_position: initialEditingStage.order_position
+        });
+        setShowAddForm(true);
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, initialEditingStage]);
 
   const fetchStages = async () => {
     try {

@@ -4,6 +4,7 @@ import Modal from './Modal';
 import leadService from '../services/leadService';
 import userService from '../services/userService';
 import pipelineService from '../services/pipelineService';
+import { useLeads } from '../context/LeadContext';
 import toast from 'react-hot-toast';
 
 const LeadForm = ({ lead = null, onClose, onSuccess, initialStageId = null, onSubmit, onCancel }) => {
@@ -12,6 +13,9 @@ const LeadForm = ({ lead = null, onClose, onSuccess, initialStageId = null, onSu
   const [stages, setStages] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [loadingStages, setLoadingStages] = useState(true);
+  
+  // Use the global leads context
+  const { addLead, updateLead } = useLeads();
 
   const {
     register,
@@ -94,15 +98,18 @@ const LeadForm = ({ lead = null, onClose, onSuccess, initialStageId = null, onSu
       
       if (lead) {
         // Update existing lead
-        await leadService.updateLead(lead.id, data);
+        const updatedLead = await leadService.updateLead(lead.id, data);
+        updateLead(updatedLead.data); // Update the global state
         toast.success('Lead updated successfully');
+        onSuccess?.(updatedLead.data);
       } else {
         // Create new lead
-        await leadService.createLead(data);
+        const newLead = await leadService.createLead(data);
+        addLead(newLead.data); // Add to the global state
         toast.success('Lead created successfully');
+        onSuccess?.(newLead.data);
       }
       
-      onSuccess?.();
       if (onSubmit) {
         onSubmit(data);
       } else {

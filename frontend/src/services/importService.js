@@ -36,6 +36,15 @@ class ImportService {
         }
       });
 
+      // Check if user is authenticated
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('You must be logged in to export leads');
+      }
+
+      console.log('Exporting leads with filters:', filters, 'format:', format);
+      console.log('Request URL:', `/import/export/leads?${params.toString()}`);
+
       const response = await api.get(`/import/export/leads?${params.toString()}`, {
         responseType: 'blob'
       });
@@ -55,7 +64,18 @@ class ImportService {
 
       return { success: true, filename };
     } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to export leads');
+      console.error('Export error:', error);
+      console.error('Error response:', error.response);
+      
+      if (error.response?.status === 401) {
+        throw new Error('Your session has expired. Please login again.');
+      } else if (error.response?.status === 403) {
+        throw new Error('You do not have permission to export leads.');
+      } else if (error.response?.status === 500) {
+        throw new Error('Server error occurred while exporting leads. Please try again later.');
+      } else {
+        throw new Error(error.response?.data?.error?.message || error.message || 'Failed to export leads');
+      }
     }
   }
 
@@ -190,22 +210,35 @@ class ImportService {
     headers.forEach(header => {
       const lowerHeader = header.toLowerCase();
       
-      if (lowerHeader.includes('name') && !lowerHeader.includes('company')) {
-        suggestions[header] = 'name';
+      if (lowerHeader.includes('first') && lowerHeader.includes('name')) {
+        suggestions[header] = 'first_name';
+      } else if (lowerHeader.includes('last') && lowerHeader.includes('name')) {
+        suggestions[header] = 'last_name';
+      } else if (lowerHeader.includes('name') && !lowerHeader.includes('company') && !lowerHeader.includes('first') && !lowerHeader.includes('last')) {
+        // If it's just "name", try to split it or map to first_name
+        suggestions[header] = 'first_name';
       } else if (lowerHeader.includes('email')) {
         suggestions[header] = 'email';
       } else if (lowerHeader.includes('phone') || lowerHeader.includes('mobile')) {
         suggestions[header] = 'phone';
       } else if (lowerHeader.includes('company') || lowerHeader.includes('organization')) {
         suggestions[header] = 'company';
-      } else if (lowerHeader.includes('position') || lowerHeader.includes('title')) {
-        suggestions[header] = 'position';
-      } else if (lowerHeader.includes('source')) {
-        suggestions[header] = 'source';
+      } else if (lowerHeader.includes('position') || lowerHeader.includes('title') || lowerHeader.includes('job')) {
+        suggestions[header] = 'job_title';
+      } else if (lowerHeader.includes('source') || lowerHeader.includes('lead_source')) {
+        suggestions[header] = 'lead_source';
       } else if (lowerHeader.includes('status')) {
         suggestions[header] = 'status';
       } else if (lowerHeader.includes('note') || lowerHeader.includes('comment')) {
         suggestions[header] = 'notes';
+      } else if (lowerHeader.includes('deal') && lowerHeader.includes('value')) {
+        suggestions[header] = 'deal_value';
+      } else if (lowerHeader.includes('probability')) {
+        suggestions[header] = 'probability';
+      } else if (lowerHeader.includes('close') && lowerHeader.includes('date')) {
+        suggestions[header] = 'expected_close_date';
+      } else if (lowerHeader.includes('priority')) {
+        suggestions[header] = 'priority';
       }
     });
 
