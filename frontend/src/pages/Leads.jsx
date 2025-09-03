@@ -4,7 +4,8 @@ import { PlusIcon, MagnifyingGlassIcon, ArrowDownTrayIcon, ArrowUpTrayIcon } fro
 import ImportWizard from '../components/Import/ImportWizard'
 import ExportModal from '../components/Export/ExportModal'
 import LeadForm from '../components/LeadForm'
-import leadService from '../services/leadService'
+import { useLeads } from '../context/LeadContext'
+import pipelineService from '../services/pipelineService'
 import toast from 'react-hot-toast'
 
 const Leads = () => {
@@ -12,27 +13,44 @@ const Leads = () => {
   const [showImportWizard, setShowImportWizard] = useState(false)
   const [showExportModal, setShowExportModal] = useState(false)
   const [showAddLeadForm, setShowAddLeadForm] = useState(false)
-  const [leads, setLeads] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [pipelineStages, setPipelineStages] = useState([])
+  
+  // Use the global leads context
+  const { leads, loading, fetchLeads, addLead, lastUpdated, refreshLeads } = useLeads()
 
-  // Fetch leads from API
-  const fetchLeads = async () => {
-    try {
-      setLoading(true)
-      const response = await leadService.getLeads()
-      setLeads(response.data || [])
-    } catch (error) {
-      console.error('Failed to fetch leads:', error)
-      toast.error('Failed to load leads')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // Load leads on component mount
+  // Load leads and pipeline stages on component mount
   useEffect(() => {
-    fetchLeads()
-  }, [])
+    const loadData = async () => {
+      await fetchLeads()
+      try {
+        const stagesResponse = await pipelineService.getStages()
+        if (stagesResponse.success) {
+          setPipelineStages(stagesResponse.data)
+        }
+      } catch (error) {
+        console.error('Failed to fetch pipeline stages:', error)
+      }
+    }
+    loadData()
+  }, []) // Remove fetchLeads dependency to prevent infinite loops
+
+  // Refresh pipeline stages when leads are updated (for better sync)
+  useEffect(() => {
+    const refreshStages = async () => {
+      try {
+        const stagesResponse = await pipelineService.getStages()
+        if (stagesResponse.success) {
+          setPipelineStages(stagesResponse.data)
+        }
+      } catch (error) {
+        console.error('Failed to refresh pipeline stages:', error)
+      }
+    }
+    
+    if (lastUpdated) {
+      refreshStages()
+    }
+  }, [lastUpdated])
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -66,12 +84,44 @@ const Leads = () => {
     }
   }
 
+  const getStageName = (stageId) => {
+    if (!stageId) return 'No Stage'
+    const stage = pipelineStages.find(s => s.id === stageId)
+    return stage ? stage.name : 'Unknown Stage'
+  }
+
+  const getStageColor = (stageId) => {
+    if (!stageId) return 'bg-gray-100 text-gray-800'
+    const stage = pipelineStages.find(s => s.id === stageId)
+    if (!stage) return 'bg-gray-100 text-gray-800'
+    
+    // Use predefined colors based on stage color
+    const colorMap = {
+      '#3B82F6': 'bg-blue-100 text-blue-800',
+      '#10B981': 'bg-green-100 text-green-800',
+      '#F59E0B': 'bg-yellow-100 text-yellow-800',
+      '#EF4444': 'bg-red-100 text-red-800',
+      '#8B5CF6': 'bg-purple-100 text-purple-800',
+      '#F97316': 'bg-orange-100 text-orange-800',
+      '#06B6D4': 'bg-cyan-100 text-cyan-800',
+      '#EC4899': 'bg-pink-100 text-pink-800'
+    }
+    
+    return colorMap[stage.color] || 'bg-gray-100 text-gray-800'
+  }
+
   // Handle lead creation success
-  const handleLeadCreated = () => {
+  const handleLeadCreated = (newLead) => {
     setShowAddLeadForm(false)
-    fetchLeads() // Refresh the leads list
+    addLead(newLead) // Add the new lead to the global state
     toast.success('Lead created successfully')
   }
+
+  // Debug: Log leads data
+  useEffect(() => {
+    console.log('Leads page - Current leads:', leads)
+    console.log('Leads page - Pipeline stages:', pipelineStages)
+  }, [leads, pipelineStages])
 
   return (
     <div>
@@ -83,6 +133,16 @@ const Leads = () => {
           </p>
         </div>
         <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex-none flex space-x-3">
+          <button
+            type="button"
+            onClick={() => refreshLeads()}
+            className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Refresh
+          </button>
           <button
             type="button"
             onClick={() => setShowImportWizard(true)}
@@ -151,6 +211,9 @@ const Leads = () => {
                     Source
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Pipeline Stage
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Created
                   </th>
                   <th className="relative px-6 py-3">
@@ -189,6 +252,11 @@ const Leads = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getSourceColor(lead.lead_source)}`}>
                         {lead.lead_source?.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) || '-'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStageColor(lead.pipeline_stage_id)}`}>
+                        {getStageName(lead.pipeline_stage_id)}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

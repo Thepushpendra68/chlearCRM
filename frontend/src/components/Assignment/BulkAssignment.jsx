@@ -6,7 +6,9 @@ import userService from '../../services/userService';
 const BulkAssignment = ({ 
   isOpen = true, 
   onClose, 
-  isEmbedded = false 
+  isEmbedded = false,
+  stageId = null,
+  leads: initialLeads = []
 }) => {
   const [leads, setLeads] = useState([]);
   const [users, setUsers] = useState([]);
@@ -25,9 +27,14 @@ const BulkAssignment = ({
 
   useEffect(() => {
     if (isOpen) {
-      fetchData();
+      if (initialLeads.length > 0) {
+        setLeads(initialLeads);
+        fetchUsers();
+      } else {
+        fetchData();
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, initialLeads]);
 
   const fetchData = async () => {
     try {
@@ -56,6 +63,20 @@ const BulkAssignment = ({
       setError('Failed to load data');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchUsers = async () => {
+    try {
+      const usersResponse = await userService.getUsers();
+      if (usersResponse.success) {
+        const usersData = usersResponse.data.users || usersResponse.data || [];
+        const usersArray = Array.isArray(usersData) ? usersData : [];
+        setUsers(usersArray.filter(user => user.role !== 'admin'));
+      }
+    } catch (err) {
+      console.error('Error fetching users:', err);
+      setError('Failed to load users');
     }
   };
 

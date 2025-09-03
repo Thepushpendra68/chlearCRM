@@ -59,11 +59,58 @@ class ImportController {
   /**
    * Export leads to various formats
    */
-  async exportLeads(req, res, next) {
+  exportLeads = async (req, res, next) => {
     try {
       const { format = 'csv', ...filters } = req.query;
       
+      console.log('Export request received:', { format, filters, user: req.user?.id });
+      
+      // Validate format
+      if (!['csv', 'excel'].includes(format)) {
+        throw new ApiError('Invalid export format. Supported formats: csv, excel', 400);
+      }
+      
       const exportData = await importService.exportLeads(filters, format);
+      console.log('Export data retrieved:', exportData.length, 'records');
+      
+      if (exportData.length === 0) {
+        // Instead of throwing an error, create an empty export with headers
+        const emptyExport = [{
+          'First Name': '',
+          'Last Name': '',
+          'Email': '',
+          'Phone': '',
+          'Company': '',
+          'Job Title': '',
+          'Lead Source': '',
+          'Status': '',
+          'Stage': '',
+          'Deal Value': '',
+          'Probability': '',
+          'Expected Close Date': '',
+          'Priority': '',
+          'Assigned To': '',
+          'Created Date': '',
+          'Last Updated': '',
+          'Notes': ''
+        }];
+        
+        if (format === 'csv') {
+          res.setHeader('Content-Type', 'text/csv');
+          res.setHeader('Content-Disposition', `attachment; filename="leads_export_${new Date().toISOString().split('T')[0]}.csv"`);
+          
+          const csvContent = this.convertToCSV(emptyExport);
+          console.log('Empty CSV content generated');
+          return res.send(csvContent);
+        } else if (format === 'excel') {
+          res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+          res.setHeader('Content-Disposition', `attachment; filename="leads_export_${new Date().toISOString().split('T')[0]}.xlsx"`);
+          
+          const excelBuffer = await this.convertToExcel(emptyExport);
+          console.log('Empty Excel buffer created');
+          return res.send(excelBuffer);
+        }
+      }
       
       if (format === 'csv') {
         res.setHeader('Content-Type', 'text/csv');
@@ -71,13 +118,16 @@ class ImportController {
         
         // Convert to CSV format
         const csvContent = this.convertToCSV(exportData);
+        console.log('CSV content generated, length:', csvContent.length);
         res.send(csvContent);
       } else if (format === 'excel') {
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.setHeader('Content-Disposition', `attachment; filename="leads_export_${new Date().toISOString().split('T')[0]}.xlsx"`);
         
         // Convert to Excel format
+        console.log('Converting to Excel format...');
         const excelBuffer = await this.convertToExcel(exportData);
+        console.log('Excel buffer created, sending response...');
         res.send(excelBuffer);
       } else {
         res.json({
@@ -86,6 +136,8 @@ class ImportController {
         });
       }
     } catch (error) {
+      console.error('Export error:', error);
+      console.error('Error stack:', error.stack);
       next(error);
     }
   }
@@ -234,22 +286,35 @@ class ImportController {
     headers.forEach(header => {
       const lowerHeader = header.toLowerCase();
       
-      if (lowerHeader.includes('name') && !lowerHeader.includes('company')) {
-        suggestions[header] = 'name';
+      if (lowerHeader.includes('first') && lowerHeader.includes('name')) {
+        suggestions[header] = 'first_name';
+      } else if (lowerHeader.includes('last') && lowerHeader.includes('name')) {
+        suggestions[header] = 'last_name';
+      } else if (lowerHeader.includes('name') && !lowerHeader.includes('company') && !lowerHeader.includes('first') && !lowerHeader.includes('last')) {
+        // If it's just "name", try to split it or map to first_name
+        suggestions[header] = 'first_name';
       } else if (lowerHeader.includes('email')) {
         suggestions[header] = 'email';
       } else if (lowerHeader.includes('phone') || lowerHeader.includes('mobile')) {
         suggestions[header] = 'phone';
       } else if (lowerHeader.includes('company') || lowerHeader.includes('organization')) {
         suggestions[header] = 'company';
-      } else if (lowerHeader.includes('position') || lowerHeader.includes('title')) {
-        suggestions[header] = 'position';
-      } else if (lowerHeader.includes('source')) {
-        suggestions[header] = 'source';
+      } else if (lowerHeader.includes('position') || lowerHeader.includes('title') || lowerHeader.includes('job')) {
+        suggestions[header] = 'job_title';
+      } else if (lowerHeader.includes('source') || lowerHeader.includes('lead_source')) {
+        suggestions[header] = 'lead_source';
       } else if (lowerHeader.includes('status')) {
         suggestions[header] = 'status';
       } else if (lowerHeader.includes('note') || lowerHeader.includes('comment')) {
         suggestions[header] = 'notes';
+      } else if (lowerHeader.includes('deal') && lowerHeader.includes('value')) {
+        suggestions[header] = 'deal_value';
+      } else if (lowerHeader.includes('probability')) {
+        suggestions[header] = 'probability';
+      } else if (lowerHeader.includes('close') && lowerHeader.includes('date')) {
+        suggestions[header] = 'expected_close_date';
+      } else if (lowerHeader.includes('priority')) {
+        suggestions[header] = 'priority';
       }
     });
 

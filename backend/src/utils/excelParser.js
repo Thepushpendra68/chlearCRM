@@ -65,9 +65,10 @@ class ExcelParser {
 
     // Default field mappings
     const defaultMappings = {
-      'name': 'name',
-      'full_name': 'name',
-      'first_name': 'name',
+      'name': 'first_name',
+      'full_name': 'first_name',
+      'first_name': 'first_name',
+      'last_name': 'last_name',
       'email': 'email',
       'email_address': 'email',
       'phone': 'phone',
@@ -76,16 +77,20 @@ class ExcelParser {
       'company': 'company',
       'company_name': 'company',
       'organization': 'company',
-      'position': 'position',
-      'job_title': 'position',
-      'title': 'position',
-      'source': 'source',
-      'lead_source': 'source',
+      'position': 'job_title',
+      'job_title': 'job_title',
+      'title': 'job_title',
+      'source': 'lead_source',
+      'lead_source': 'lead_source',
       'status': 'status',
       'lead_status': 'status',
       'notes': 'notes',
       'comments': 'notes',
-      'description': 'notes'
+      'description': 'notes',
+      'deal_value': 'deal_value',
+      'probability': 'probability',
+      'expected_close_date': 'expected_close_date',
+      'priority': 'priority'
     };
 
     // Merge default mappings with custom mappings
@@ -138,7 +143,7 @@ class ExcelParser {
       }
 
       // Check for required headers
-      const requiredHeaders = ['name', 'email'];
+      const requiredHeaders = ['first_name', 'last_name'];
       const missingHeaders = requiredHeaders.filter(header => 
         !headers.some(h => h.toLowerCase().includes(header))
       );
@@ -166,13 +171,53 @@ class ExcelParser {
    */
   createExcel(data, sheetName = 'Leads') {
     try {
+      console.log('Creating Excel with data length:', data.length);
+      
+      // Handle empty data by creating a worksheet with just headers
+      if (!data || data.length === 0) {
+        console.log('Creating empty Excel file with headers only');
+        const emptyData = [{
+          'First Name': '',
+          'Last Name': '',
+          'Email': '',
+          'Phone': '',
+          'Company': '',
+          'Job Title': '',
+          'Lead Source': '',
+          'Status': '',
+          'Stage': '',
+          'Deal Value': '',
+          'Probability': '',
+          'Expected Close Date': '',
+          'Priority': '',
+          'Assigned To': '',
+          'Created Date': '',
+          'Last Updated': '',
+          'Notes': ''
+        }];
+        
+        const worksheet = XLSX.utils.json_to_sheet(emptyData);
+        const workbook = XLSX.utils.book_new();
+        
+        XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+        
+        const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+        console.log('Empty Excel buffer created, size:', buffer.length);
+        
+        return buffer;
+      }
+
       const worksheet = XLSX.utils.json_to_sheet(data);
       const workbook = XLSX.utils.book_new();
       
       XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
       
-      return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+      const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+      console.log('Excel buffer created, size:', buffer.length);
+      
+      return buffer;
     } catch (error) {
+      console.error('Excel creation error:', error);
       throw new Error(`Excel creation error: ${error.message}`);
     }
   }

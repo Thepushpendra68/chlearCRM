@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## ⚠️ CRITICAL DATABASE REQUIREMENT ⚠️
+**THIS PROJECT USES POSTGRESQL ONLY - NEVER INSTALL, USE, OR REFERENCE SQLITE3 IN ANY FORM**
+**ANY LLM WORKING ON THIS PROJECT MUST UNDERSTAND: DATABASE = POSTGRESQL ONLY**
+
 ## Development Commands
 
 ### Backend Development (Node.js/Express)
@@ -51,6 +55,7 @@ This is a full-stack CRM application with separated backend and frontend:
 ### Backend Architecture
 - **Express.js** REST API with JWT authentication
 - **PostgreSQL** database with **Knex.js** query builder
+- **⚠️ CRITICAL: THIS PROJECT USES POSTGRESQL ONLY - NEVER USE SQLITE3**
 - **MVC pattern**: Controllers → Services → Database
 - **Middleware**: Authentication, rate limiting, CORS, validation
 - **Structure**:
@@ -92,7 +97,7 @@ This is a full-stack CRM application with separated backend and frontend:
 ## Environment Setup
 
 Backend requires `.env` file with:
-- Database connection (PostgreSQL): `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`
+- Database connection (**POSTGRESQL ONLY - NO SQLITE3**): `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`
 - JWT configuration: `JWT_SECRET`, `JWT_EXPIRES_IN`
 - CORS configuration: `FRONTEND_URL`
 - Rate limiting: `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_MAX_REQUESTS`
@@ -167,6 +172,7 @@ Default login credentials after seeding:
 - **ApiError Class**: Custom error class with proper HTTP status codes and consistent error response format
 
 ### Database Constraints & Relationships
+- **DATABASE TYPE: POSTGRESQL ONLY - NEVER USE SQLITE3**
 - **Foreign Key Constraints**: `pipeline_stage_id` references `pipeline_stages.id`, `assigned_to` references `users.id`
 - **Migration Dependencies**: Always run `npm run migrate` after pulling changes - schema evolution tracked through sequential migrations
 - **Data Integrity**: Empty string validation converted to NULL prevents constraint violations during updates
@@ -183,12 +189,26 @@ Default login credentials after seeding:
 - **Modal Management**: Forms use modal overlays for create/edit operations with proper state management
 - **Toast Notifications**: react-hot-toast provides consistent user feedback across all operations
 
-## Recent Bug Fixes Applied
-- Lead update functionality now properly handles empty form fields
-- Phone number validation supports international formats  
-- Foreign key constraint handling prevents database errors
-- Improved error messaging and debugging capabilities
-- Lead detail page edit button now functional with proper form integration
+## Controller Method Binding Patterns
+
+### Critical Implementation Pattern
+- **Arrow Function Methods**: Use arrow functions for controller methods to maintain proper `this` binding in async contexts
+- **Example**: `exportLeads = async (req, res, next) => { ... }` instead of `async exportLeads(req, res, next) { ... }`
+- **Why**: Prevents `TypeError: Cannot read properties of undefined` when calling instance methods like `this.convertToCSV()`
+- **Affected Controllers**: ImportController methods must use arrow functions for proper context binding
+
+### Import/Export System Architecture
+- **File Processing**: CSV/Excel parsing with `csv-parser` and `xlsx` packages
+- **Export Flow**: Frontend request → Controller → ImportService → ExcelParser/CSV conversion → File download
+- **Error Handling**: Empty data gracefully handled by creating header-only files
+- **Method Dependencies**: Export methods call `this.convertToCSV()` and `this.convertToExcel()` requiring proper binding
+
+### Recent Critical Bug Fixes
+- **Export Functionality**: Fixed `this` binding issue in ImportController export methods by converting to arrow functions
+- **Excel Empty Data**: Modified ExcelParser to handle empty datasets by generating header-only files
+- **Lead Update Processing**: Backend automatically converts empty strings to `NULL` for UUID/date/numeric fields
+- **Phone Validation**: Flexible regex `^[\+]?[0-9\s\-\(\)]{0,20}$` supports international formats
+- **Foreign Key Handling**: Empty string validation prevents constraint violations during updates
 
 # important-instruction-reminders
 Do what has been asked; nothing more, nothing less.

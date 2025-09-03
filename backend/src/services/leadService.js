@@ -95,9 +95,23 @@ const getLeadById = async (id) => {
  */
 const createLead = async (leadData) => {
   try {
+    // Clean up empty strings for UUID and date fields
+    const cleanedData = { ...leadData };
+    
+    // Convert empty strings to null for UUID fields
+    if (cleanedData.assigned_to === '') cleanedData.assigned_to = null;
+    if (cleanedData.pipeline_stage_id === '') cleanedData.pipeline_stage_id = null;
+    if (cleanedData.created_by === '') cleanedData.created_by = null;
+    
+    // Convert empty strings to null for date fields
+    if (cleanedData.expected_close_date === '') cleanedData.expected_close_date = null;
+    
+    // Convert empty strings to null for numeric fields
+    if (cleanedData.deal_value === '' || cleanedData.deal_value === null) cleanedData.deal_value = null;
+
     const [lead] = await knex('leads')
       .insert({
-        ...leadData,
+        ...cleanedData,
         created_at: new Date(),
         updated_at: new Date()
       })

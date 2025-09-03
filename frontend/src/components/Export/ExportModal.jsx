@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import importService from '../../services/importService';
 import userService from '../../services/userService';
 import leadService from '../../services/leadService';
+import pipelineService from '../../services/pipelineService';
 
 const ExportModal = ({ isOpen, onClose }) => {
   const [filters, setFilters] = useState({
     status: '',
-    source: '',
+    lead_source: '',
     assigned_to: '',
     pipeline_stage_id: '',
     date_from: '',
@@ -47,7 +48,7 @@ const ExportModal = ({ isOpen, onClose }) => {
 
   const loadPipelineStages = async () => {
     try {
-      const response = await leadService.getPipelineStages();
+      const response = await pipelineService.getStages();
       setPipelineStages(response.data);
     } catch (error) {
       console.error('Failed to load pipeline stages:', error);
@@ -78,7 +79,7 @@ const ExportModal = ({ isOpen, onClose }) => {
   const clearFilters = () => {
     setFilters({
       status: '',
-      source: '',
+      lead_source: '',
       assigned_to: '',
       pipeline_stage_id: '',
       date_from: '',
@@ -173,10 +174,8 @@ const ExportModal = ({ isOpen, onClose }) => {
                 <option value="new">New</option>
                 <option value="contacted">Contacted</option>
                 <option value="qualified">Qualified</option>
-                <option value="proposal">Proposal</option>
-                <option value="negotiation">Negotiation</option>
-                <option value="closed_won">Closed Won</option>
-                <option value="closed_lost">Closed Lost</option>
+                <option value="converted">Converted</option>
+                <option value="lost">Lost</option>
               </select>
             </div>
 
@@ -186,17 +185,16 @@ const ExportModal = ({ isOpen, onClose }) => {
                 Source
               </label>
               <select
-                value={filters.source}
-                onChange={(e) => handleFilterChange('source', e.target.value)}
+                value={filters.lead_source}
+                onChange={(e) => handleFilterChange('lead_source', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">All Sources</option>
                 <option value="website">Website</option>
                 <option value="referral">Referral</option>
                 <option value="social_media">Social Media</option>
-                <option value="email_campaign">Email Campaign</option>
+                <option value="advertisement">Advertisement</option>
                 <option value="cold_call">Cold Call</option>
-                <option value="trade_show">Trade Show</option>
                 <option value="other">Other</option>
               </select>
             </div>

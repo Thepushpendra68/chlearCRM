@@ -2,13 +2,35 @@ import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'rea
 import PipelineColumn from './PipelineColumn';
 import { useDragAndDrop } from '../../hooks/useDragAndDrop';
 import pipelineService from '../../services/pipelineService';
-import leadService from '../../services/leadService';
+import { useLeads } from '../../context/LeadContext';
+import ImportWizard from '../Import/ImportWizard';
+import BulkAssignment from '../Assignment/BulkAssignment';
+import StageManager from './StageManager';
+import StageAnalyticsModal from './StageAnalyticsModal';
 
 const PipelineBoard = forwardRef(({ onLeadClick, onAddLead }, ref) => {
   const [stages, setStages] = useState([]);
-  const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  // Use the global leads context
+  const { leads, fetchLeads, moveLeadToStage } = useLeads();
+
+  // Debug: Log leads data
+  useEffect(() => {
+    console.log('PipelineBoard - Current leads:', leads)
+    console.log('PipelineBoard - Stages:', stages)
+  }, [leads, stages]);
+  
+  // Modal states
+  const [showImportWizard, setShowImportWizard] = useState(false);
+  const [showBulkAssignment, setShowBulkAssignment] = useState(false);
+  const [showStageManager, setShowStageManager] = useState(false);
+  const [showStageAnalytics, setShowStageAnalytics] = useState(false);
+  const [selectedStageForImport, setSelectedStageForImport] = useState(null);
+  const [selectedStageForBulk, setSelectedStageForBulk] = useState(null);
+  const [selectedStageForAnalytics, setSelectedStageForAnalytics] = useState(null);
+  const [selectedStageForSettings, setSelectedStageForSettings] = useState(null);
 
   const {
     draggedItem,
@@ -28,7 +50,7 @@ const PipelineBoard = forwardRef(({ onLeadClick, onAddLead }, ref) => {
   // Fetch pipeline data
   useEffect(() => {
     fetchPipelineData();
-  }, []);
+  }, []); // Remove dependencies to prevent infinite loops
 
   const fetchPipelineData = async () => {
     try {
@@ -36,17 +58,13 @@ const PipelineBoard = forwardRef(({ onLeadClick, onAddLead }, ref) => {
       setError(null);
 
       // Fetch pipeline overview and leads in parallel
-      const [pipelineResponse, leadsResponse] = await Promise.all([
+      const [pipelineResponse] = await Promise.all([
         pipelineService.getPipelineOverview(),
-        leadService.getLeads()
+        fetchLeads() // Use the global context to fetch leads
       ]);
 
       if (pipelineResponse.success) {
         setStages(pipelineResponse.data.stages);
-      }
-
-      if (leadsResponse.success) {
-        setLeads(leadsResponse.data.leads);
       }
     } catch (err) {
       console.error('Error fetching pipeline data:', err);
@@ -67,47 +85,20 @@ const PipelineBoard = forwardRef(({ onLeadClick, onAddLead }, ref) => {
   // Handle lead movement between stages
   const handleLeadMove = async (lead, sourceStageId, targetStageId) => {
     try {
-      // Optimistically update the UI
-      setLeads(prevLeads => {
-        if (!Array.isArray(prevLeads)) {
-          return [];
-        }
-        return prevLeads.map(l => 
-          l.id === lead.id 
-            ? { ...l, pipeline_stage_id: targetStageId }
-            : l
-        );
-      });
+      // Optimistically update the global state
+      moveLeadToStage(lead.id, targetStageId);
 
       // Make API call to move lead
       const response = await pipelineService.moveLeadToStage(lead.id, targetStageId);
       
       if (!response.success) {
         // Revert the optimistic update on error
-        setLeads(prevLeads => {
-          if (!Array.isArray(prevLeads)) {
-            return [];
-          }
-          return prevLeads.map(l => 
-            l.id === lead.id 
-              ? { ...l, pipeline_stage_id: sourceStageId }
-              : l
-          );
-        });
+        moveLeadToStage(lead.id, sourceStageId);
         throw new Error(response.error || 'Failed to move lead');
       }
 
-      // Update the lead with the response data
-      setLeads(prevLeads => {
-        if (!Array.isArray(prevLeads)) {
-          return [];
-        }
-        return prevLeads.map(l => 
-          l.id === lead.id 
-            ? { ...l, ...response.data.lead }
-            : l
-        );
-      });
+      // The global state is already updated optimistically
+      // No need to update again since the API call succeeded
     } catch (err) {
       console.error('Error moving lead:', err);
       setError('Failed to move lead. Please try again.');
@@ -135,6 +126,63 @@ const PipelineBoard = forwardRef(({ onLeadClick, onAddLead }, ref) => {
     if (onAddLead) {
       onAddLead(stageId);
     }
+  };
+
+  // Handle import leads
+  const handleImportLeads = (stageId) => {
+    setSelectedStageForImport(stageId);
+    setShowImportWizard(true);
+  };
+
+  // Handle bulk actions
+  const handleBulkActions = (stageId, leads) => {
+    setSelectedStageForBulk(stageId);
+    setShowBulkAssignment(true);
+  };
+
+  // Handle stage analytics
+  const handleStageAnalytics = (stageId, leads) => {
+    setSelectedStageForAnalytics(stageId);
+    setShowStageAnalytics(true);
+  };
+
+  // Handle stage settings
+  const handleStageSettings = (stage) => {
+    setSelectedStageForSettings(stage);
+    setShowStageManager(true);
+  };
+
+  // Handle modal close functions
+  const handleCloseImportWizard = () => {
+    setShowImportWizard(false);
+    setSelectedStageForImport(null);
+  };
+
+  const handleCloseBulkAssignment = () => {
+    setShowBulkAssignment(false);
+    setSelectedStageForBulk(null);
+  };
+
+  const handleCloseStageManager = () => {
+    setShowStageManager(false);
+    setSelectedStageForSettings(null);
+  };
+
+  const handleCloseStageAnalytics = () => {
+    setShowStageAnalytics(false);
+    setSelectedStageForAnalytics(null);
+  };
+
+  // Handle import completion
+  const handleImportComplete = (result) => {
+    console.log('Import completed:', result);
+    // Refresh leads data after import
+    fetchLeads();
+  };
+
+  // Handle stage updates
+  const handleStagesUpdated = () => {
+    fetchPipelineData();
   };
 
   if (loading) {
@@ -198,6 +246,10 @@ const PipelineBoard = forwardRef(({ onLeadClick, onAddLead }, ref) => {
             onDrop={onDrop}
             onLeadClick={onLeadClick}
             onAddLead={handleAddLeadToStage}
+            onImportLeads={handleImportLeads}
+            onBulkActions={handleBulkActions}
+            onStageAnalytics={handleStageAnalytics}
+            onStageSettings={handleStageSettings}
             isDragOver={dragOverColumn === stage.id}
           />
         ))}
@@ -241,6 +293,47 @@ const PipelineBoard = forwardRef(({ onLeadClick, onAddLead }, ref) => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Import Wizard Modal */}
+      {showImportWizard && (
+        <ImportWizard
+          isOpen={showImportWizard}
+          onClose={handleCloseImportWizard}
+          onImportComplete={handleImportComplete}
+          initialStageId={selectedStageForImport}
+        />
+      )}
+
+      {/* Bulk Assignment Modal */}
+      {showBulkAssignment && (
+        <BulkAssignment
+          isOpen={showBulkAssignment}
+          onClose={handleCloseBulkAssignment}
+          stageId={selectedStageForBulk}
+          leads={getLeadsByStage(selectedStageForBulk)}
+        />
+      )}
+
+      {/* Stage Manager Modal */}
+      {showStageManager && (
+        <StageManager
+          isOpen={showStageManager}
+          onClose={handleCloseStageManager}
+          onStagesUpdated={handleStagesUpdated}
+          editingStage={selectedStageForSettings}
+        />
+      )}
+
+      {/* Stage Analytics Modal */}
+      {showStageAnalytics && (
+        <StageAnalyticsModal
+          isOpen={showStageAnalytics}
+          onClose={handleCloseStageAnalytics}
+          stageId={selectedStageForAnalytics}
+          leads={getLeadsByStage(selectedStageForAnalytics)}
+          stage={stages.find(s => s.id === selectedStageForAnalytics)}
+        />
       )}
     </div>
   );
