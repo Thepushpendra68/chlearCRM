@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import activityService from '../../services/activityService';
+import leadService from '../../services/leadService';
 
 const ActivityForm = ({ 
   isOpen, 
   onClose, 
   onSubmit, 
   leadId, 
+  selectedLead = null,
   activity = null, 
   initialType = 'note' 
 }) => {
@@ -21,6 +23,10 @@ const ActivityForm = ({
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [leads, setLeads] = useState([]);
+  const [loadingLeads, setLoadingLeads] = useState(false);
+  const [internalLeadId, setInternalLeadId] = useState(leadId);
+  const [internalSelectedLead, setInternalSelectedLead] = useState(selectedLead);
 
   const activityTypes = [
     { value: 'call', label: 'Phone Call', icon: '📞' },
@@ -41,6 +47,19 @@ const ActivityForm = ({
     { value: 'proposal_sent', label: 'Proposal Sent' },
     { value: 'deal_closed', label: 'Deal Closed' }
   ];
+
+  // Fetch leads when component opens
+  useEffect(() => {
+    if (isOpen && leads.length === 0) {
+      fetchLeads();
+    }
+  }, [isOpen]);
+
+  // Update internal state when props change
+  useEffect(() => {
+    setInternalLeadId(leadId);
+    setInternalSelectedLead(selectedLead);
+  }, [leadId, selectedLead]);
 
   useEffect(() => {
     if (activity) {
@@ -64,7 +83,25 @@ const ActivityForm = ({
         is_completed: false
       });
     }
+    // Clear any previous errors when modal opens/closes
+    if (isOpen) {
+      setError(null);
+    }
   }, [activity, initialType, isOpen]);
+
+  const fetchLeads = async () => {
+    try {
+      setLoadingLeads(true);
+      const response = await leadService.getLeads();
+      if (response.success) {
+        setLeads(response.data);
+      }
+    } catch (error) {
+      console.error('Error fetching leads:', error);
+    } finally {
+      setLoadingLeads(false);
+    }
+  };
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -82,13 +119,18 @@ const ActivityForm = ({
       return;
     }
 
+    if (!internalLeadId || internalLeadId === '' || internalLeadId === 'null' || internalLeadId === 'undefined') {
+      setError('Please select a lead first');
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
 
       const activityData = {
         ...formData,
-        lead_id: leadId,
+        lead_id: internalLeadId,
         duration_minutes: formData.duration_minutes ? parseInt(formData.duration_minutes) : null,
         scheduled_at: formData.scheduled_at || null,
         is_completed: formData.is_completed || formData.activity_type === 'note'
@@ -102,9 +144,20 @@ const ActivityForm = ({
       }
 
       if (response.success) {
-        onSubmit && onSubmit(response.data);
+        console.log('Activity saved successfully:', response.data);
+        console.log('Calling onSubmit callback with data:', response.data);
+        console.log('onSubmit function exists:', !!onSubmit);
+        if (onSubmit) {
+          console.log('About to call onSubmit...');
+          onSubmit(response.data);
+          console.log('onSubmit called successfully');
+        } else {
+          console.error('onSubmit callback is not provided!');
+        }
+        console.log('Now closing form');
         onClose();
       } else {
+        console.error('Activity save failed:', response.error);
         setError(response.error || 'Failed to save activity');
       }
     } catch (err) {
@@ -121,13 +174,18 @@ const ActivityForm = ({
       return;
     }
 
+    if (!internalLeadId || internalLeadId === '' || internalLeadId === 'null' || internalLeadId === 'undefined') {
+      setError('Please select a lead first');
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
 
       const activityData = {
         ...formData,
-        lead_id: leadId,
+        lead_id: internalLeadId,
         is_completed: true,
         completed_at: new Date().toISOString(),
         duration_minutes: formData.duration_minutes ? parseInt(formData.duration_minutes) : null
@@ -136,9 +194,15 @@ const ActivityForm = ({
       const response = await activityService.createActivity(activityData);
 
       if (response.success) {
-        onSubmit && onSubmit(response.data);
+        console.log('Quick complete activity saved successfully:', response.data);
+        console.log('Calling onSubmit callback with data');
+        if (onSubmit) {
+          onSubmit(response.data);
+        }
+        console.log('onSubmit callback completed, now closing form');
         onClose();
       } else {
+        console.error('Quick complete activity save failed:', response.error);
         setError(response.error || 'Failed to save activity');
       }
     } catch (err) {
@@ -176,6 +240,45 @@ const ActivityForm = ({
           {error && (
             <div className="mb-4 bg-red-50 border border-red-200 rounded-md p-3">
               <p className="text-red-800 text-sm">{error}</p>
+            </div>
+          )}
+
+          {/* Lead Selection */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Select Lead *
+            </label>
+            {loadingLeads ? (
+              <div className="w-full px-3 py-2 text-gray-500">Loading leads...</div>
+            ) : (
+              <select
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                onChange={(e) => {
+                  const selectedLeadId = e.target.value;
+                  setInternalLeadId(selectedLeadId);
+                  const lead = leads.find(l => l.id === selectedLeadId);
+                  setInternalSelectedLead(lead);
+                  setError(null); // Clear any previous errors
+                }}
+                value={internalLeadId || ''}
+              >
+                <option value="">Choose a lead...</option>
+                {leads.map(lead => (
+                  <option key={lead.id} value={lead.id}>
+                    {lead.company || `${lead.first_name} ${lead.last_name}`} - {lead.email}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          {/* Lead Information */}
+          {internalSelectedLead && (
+            <div className="mb-4 bg-blue-50 border border-blue-200 rounded-md p-3">
+              <h3 className="text-sm font-medium text-blue-900">Creating activity for:</h3>
+              <p className="text-sm text-blue-800">
+                {internalSelectedLead.company || `${internalSelectedLead.first_name} ${internalSelectedLead.last_name}`} - {internalSelectedLead.email}
+              </p>
             </div>
           )}
 

@@ -139,12 +139,12 @@ const LeadForm = ({ lead = null, onClose, onSuccess, initialStageId = null, onSu
       title={lead ? 'Edit Lead' : 'Add New Lead'}
       size="lg"
     >
-
-        <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
+      <div className="bg-gradient-to-br from-gray-50 to-white rounded-lg p-1">
+        <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* First Name */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
                 First Name *
               </label>
               <input
@@ -160,11 +160,16 @@ const LeadForm = ({ lead = null, onClose, onSuccess, initialStageId = null, onSu
                     message: 'First name must not exceed 50 characters'
                   }
                 })}
-                className={`input ${errors.first_name ? 'border-red-500' : ''}`}
+                className={`block w-full px-4 py-3 border rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200 ${errors.first_name ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300'}`}
                 placeholder="Enter first name"
               />
               {errors.first_name && (
-                <p className="text-red-500 text-xs mt-1">{errors.first_name.message}</p>
+                <p className="text-red-500 text-xs mt-1 flex items-center">
+                  <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  {errors.first_name.message}
+                </p>
               )}
             </div>
 
@@ -450,24 +455,32 @@ const LeadForm = ({ lead = null, onClose, onSuccess, initialStageId = null, onSu
           </div>
 
           {/* Form Actions */}
-          <div className="flex justify-end space-x-3 pt-4">
+          <div className="flex justify-end space-x-4 pt-6 border-t border-gray-200">
             <button
               type="button"
               onClick={handleClose}
-              className="btn-secondary"
+              className="px-6 py-3 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all duration-200"
               disabled={loading}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="btn-primary"
+              className="px-8 py-3 border border-transparent rounded-lg text-sm font-medium text-white bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
               disabled={loading}
             >
-              {loading ? 'Saving...' : (lead ? 'Update Lead' : 'Create Lead')}
+              {loading ? (
+                <div className="flex items-center">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                  Saving...
+                </div>
+              ) : (
+                lead ? 'Update Lead' : 'Create Lead'
+              )}
             </button>
           </div>
         </form>
+      </div>
     </Modal>
   );
 };
