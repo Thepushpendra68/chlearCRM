@@ -67,6 +67,20 @@ exports.seed = async function(knex) {
     }
   ]).returning('*');
 
+  // Get pipeline stages to assign leads
+  const stages = await knex('pipeline_stages')
+    .select('*')
+    .where('is_active', true)
+    .orderBy('order_position', 'asc');
+
+  const stageMap = {
+    'New': stages.find(s => s.name === 'New')?.id,
+    'Contacted': stages.find(s => s.name === 'Contacted')?.id,
+    'Qualified': stages.find(s => s.name === 'Qualified')?.id,
+    'Won': stages.find(s => s.name === 'Won')?.id,
+    'Lost': stages.find(s => s.name === 'Lost')?.id
+  };
+
   // Create sample leads
   const leads = [
     {
@@ -79,6 +93,7 @@ exports.seed = async function(knex) {
       job_title: 'CTO',
       lead_source: 'website',
       status: 'new',
+      pipeline_stage_id: stageMap['New'],
       assigned_to: '550e8400-e29b-41d4-a716-446655440003',
       notes: 'Interested in our enterprise CRM solution. Very responsive to emails.',
       created_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 day ago
@@ -94,6 +109,7 @@ exports.seed = async function(knex) {
       job_title: 'Founder',
       lead_source: 'referral',
       status: 'contacted',
+      pipeline_stage_id: stageMap['Contacted'],
       assigned_to: '550e8400-e29b-41d4-a716-446655440003',
       notes: 'Referred by existing client. Looking for basic CRM features.',
       created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
@@ -109,6 +125,7 @@ exports.seed = async function(knex) {
       job_title: 'Sales Director',
       lead_source: 'cold_call',
       status: 'qualified',
+      pipeline_stage_id: stageMap['Qualified'],
       assigned_to: '550e8400-e29b-41d4-a716-446655440004',
       notes: 'High-value prospect. Budget approved for Q2. Schedule demo.',
       created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
@@ -124,6 +141,7 @@ exports.seed = async function(knex) {
       job_title: 'Operations Manager',
       lead_source: 'social_media',
       status: 'converted',
+      pipeline_stage_id: stageMap['Won'],
       assigned_to: '550e8400-e29b-41d4-a716-446655440003',
       notes: 'Converted to customer! Signed annual contract.',
       created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 7 days ago
@@ -139,6 +157,7 @@ exports.seed = async function(knex) {
       job_title: 'Partner',
       lead_source: 'advertisement',
       status: 'lost',
+      pipeline_stage_id: stageMap['Lost'],
       assigned_to: '550e8400-e29b-41d4-a716-446655440004',
       notes: 'Decided to go with competitor. Price was the main factor.',
       created_at: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000), // 10 days ago

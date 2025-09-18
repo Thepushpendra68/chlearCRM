@@ -64,7 +64,11 @@ if (process.env.NODE_ENV === 'production') {
 
 // CORS configuration
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: [
+    process.env.FRONTEND_URL || 'http://localhost:3000',
+    'http://localhost:3001', // Development frontend
+    'http://localhost:3000'  // Production frontend
+  ],
   credentials: true
 }));
 

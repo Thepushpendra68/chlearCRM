@@ -1,18 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { format, formatDistanceToNow } from 'date-fns';
-import activityService from '../../services/activityService';
 
 const ActivityList = ({ 
+  activities = [],
+  loading = false,
+  error = null,
   leadId, 
   userId, 
   filters = {}, 
   onActivityClick, 
   onEditActivity,
-  showFilters = true 
+  onRefresh,
+  showFilters = true
 }) => {
-  const [activities, setActivities] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [localFilters, setLocalFilters] = useState({
     activity_type: '',
     is_completed: '',
@@ -20,43 +20,48 @@ const ActivityList = ({
     date_to: '',
     ...filters
   });
+  const [filteredActivities, setFilteredActivities] = useState([]);
 
+  // Apply client-side filtering to activities
   useEffect(() => {
-    fetchActivities();
-  }, [leadId, userId, localFilters]);
-
-  const fetchActivities = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const queryFilters = {
-        ...localFilters,
-        ...(leadId && { lead_id: leadId }),
-        ...(userId && { user_id: userId })
-      };
-
-      // Remove empty filters
-      Object.keys(queryFilters).forEach(key => {
-        if (queryFilters[key] === '' || queryFilters[key] === null || queryFilters[key] === undefined) {
-          delete queryFilters[key];
-        }
-      });
-
-      const response = await activityService.getActivities(queryFilters);
-
-      if (response.success) {
-        setActivities(response.data);
-      } else {
-        setError(response.error || 'Failed to load activities');
-      }
-    } catch (err) {
-      console.error('Error fetching activities:', err);
-      setError('Failed to load activities');
-    } finally {
-      setLoading(false);
+    console.log('ActivityList filtering activities:', activities.length, 'total activities');
+    console.log('Activities received:', activities);
+    let filtered = [...activities];
+    
+    // Filter by leadId if provided
+    if (leadId) {
+      filtered = filtered.filter(activity => activity.lead_id === leadId);
     }
-  };
+    
+    // Filter by userId if provided
+    if (userId) {
+      filtered = filtered.filter(activity => activity.user_id === userId);
+    }
+    
+    // Apply local filters
+    if (localFilters.activity_type) {
+      filtered = filtered.filter(activity => activity.activity_type === localFilters.activity_type);
+    }
+    
+    if (localFilters.is_completed !== '') {
+      const isCompleted = localFilters.is_completed === 'true';
+      filtered = filtered.filter(activity => activity.is_completed === isCompleted);
+    }
+    
+    if (localFilters.date_from) {
+      const fromDate = new Date(localFilters.date_from);
+      filtered = filtered.filter(activity => new Date(activity.created_at) >= fromDate);
+    }
+    
+    if (localFilters.date_to) {
+      const toDate = new Date(localFilters.date_to);
+      toDate.setHours(23, 59, 59, 999); // Include the whole day
+      filtered = filtered.filter(activity => new Date(activity.created_at) <= toDate);
+    }
+    
+    console.log('ActivityList filtered to:', filtered.length, 'activities');
+    setFilteredActivities(filtered);
+  }, [activities, leadId, userId, localFilters]);
 
   const handleFilterChange = (key, value) => {
     setLocalFilters(prev => ({
@@ -159,12 +164,14 @@ const ActivityList = ({
     return (
       <div className="text-center py-8">
         <p className="text-red-600">{error}</p>
-        <button 
-          onClick={fetchActivities}
-          className="mt-2 text-blue-600 hover:text-blue-800 text-sm"
-        >
-          Try again
-        </button>
+        {onRefresh && (
+          <button 
+            onClick={onRefresh}
+            className="mt-2 text-blue-600 hover:text-blue-800 text-sm"
+          >
+            Try again
+          </button>
+        )}
       </div>
     );
   }
@@ -251,13 +258,13 @@ const ActivityList = ({
       )}
 
       {/* Activities List */}
-      {activities.length === 0 ? (
+      {filteredActivities.length === 0 ? (
         <div className="text-center py-8 text-gray-500">
           <p>No activities found</p>
         </div>
       ) : (
         <div className="space-y-4">
-          {activities.map((activity) => (
+          {filteredActivities.map((activity) => (
             <div
               key={activity.id}
               className={`bg-white border rounded-lg p-4 hover:shadow-sm transition-shadow ${getActivityColor(activity.activity_type)}`}
@@ -309,11 +316,14 @@ const ActivityList = ({
 
                       {/* Lead/User Info */}
                       <div className="mt-2 text-xs text-gray-500">
-                        {activity.company_name && (
-                          <span>Lead: {activity.company_name}</span>
+                        {activity.company && (
+                          <span>Lead: {activity.company}</span>
+                        )}
+                        {activity.contact_name && !activity.company && (
+                          <span>Contact: {activity.contact_name}</span>
                         )}
                         {activity.first_name && (
-                          <span className={activity.company_name ? 'ml-4' : ''}>
+                          <span className={activity.company || activity.contact_name ? 'ml-4' : ''}>
                             User: {activity.first_name} {activity.last_name}
                           </span>
                         )}

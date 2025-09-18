@@ -58,13 +58,16 @@ const PipelineBoard = forwardRef(({ onLeadClick, onAddLead }, ref) => {
       setError(null);
 
       // Fetch pipeline overview and leads in parallel
-      const [pipelineResponse] = await Promise.all([
+      const [pipelineResponse, leadsData] = await Promise.all([
         pipelineService.getPipelineOverview(),
         fetchLeads() // Use the global context to fetch leads
       ]);
 
       if (pipelineResponse.success) {
         setStages(pipelineResponse.data.stages);
+      } else {
+        console.error('Pipeline overview failed:', pipelineResponse.error);
+        setError('Failed to load pipeline stages');
       }
     } catch (err) {
       console.error('Error fetching pipeline data:', err);
