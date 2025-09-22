@@ -12,8 +12,10 @@ import Chart from '../components/Reports/Chart';
 import ReportBuilder from '../components/Reports/ReportBuilder';
 import ReportExport from '../components/Reports/ReportExport';
 import { reportService } from '../services/reportService';
+import { useAuth } from '../context/AuthContext';
 
 const Reports = () => {
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -67,10 +69,10 @@ const Reports = () => {
   ];
 
   useEffect(() => {
-    if (activeTab === 'overview') {
+    if (isAuthenticated && !authLoading && activeTab === 'overview') {
       loadOverviewData();
     }
-  }, [activeTab]);
+  }, [activeTab, isAuthenticated, authLoading]);
 
   const loadOverviewData = async () => {
     setLoading(true);
@@ -179,7 +181,9 @@ const Reports = () => {
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Avg Response Time</p>
               <p className="text-2xl font-semibold text-gray-900">
-                {reportData.leadPerformance?.responseTime?.avg_response_time_hours?.toFixed(1) || 0}h
+                {typeof reportData.leadPerformance?.responseTime?.avg_response_time_hours === 'number' 
+                  ? reportData.leadPerformance.responseTime.avg_response_time_hours.toFixed(1) 
+                  : 0}h
               </p>
             </div>
           </div>
@@ -298,6 +302,39 @@ const Reports = () => {
 
     return <Chart data={currentData} type={activeTab} />;
   };
+
+  // Show loading state while checking authentication
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show login prompt if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <ChartBarIcon className="mx-auto h-12 w-12 text-gray-400" />
+          <h3 className="mt-2 text-sm font-medium text-gray-900">Authentication Required</h3>
+          <p className="mt-1 text-sm text-gray-500">Please log in to view reports</p>
+          <div className="mt-6">
+            <a
+              href="/login"
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+            >
+              Go to Login
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

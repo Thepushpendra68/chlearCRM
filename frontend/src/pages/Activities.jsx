@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ActivityList from '../components/Activities/ActivityList';
 import ActivityForm from '../components/Activities/ActivityForm';
-import QuickActions from '../components/Activities/QuickActions';
-import leadService from '../services/leadService';
 import activityService from '../services/activityService';
 
 const Activities = () => {
@@ -10,18 +8,14 @@ const Activities = () => {
   const [selectedActivity, setSelectedActivity] = useState(null);
   const [selectedLeadId, setSelectedLeadId] = useState(null);
   const [activityType, setActivityType] = useState('note');
-  const [leads, setLeads] = useState([]);
-  const [loadingLeads, setLoadingLeads] = useState(false);
-  const [selectedLead, setSelectedLead] = useState(null);
   
   // Move activities state to parent for proper management
   const [activities, setActivities] = useState([]);
   const [activitiesLoading, setActivitiesLoading] = useState(true);
   const [activitiesError, setActivitiesError] = useState(null);
 
-  // Fetch leads and activities on component mount
+  // Fetch activities on component mount
   useEffect(() => {
-    fetchLeads();
     fetchActivities();
   }, []);
 
@@ -52,19 +46,6 @@ const Activities = () => {
     }
   };
 
-  const fetchLeads = async () => {
-    try {
-      setLoadingLeads(true);
-      const response = await leadService.getLeads();
-      if (response.success) {
-        setLeads(response.data);
-      }
-    } catch (error) {
-      console.error('Error fetching leads:', error);
-    } finally {
-      setLoadingLeads(false);
-    }
-  };
 
   const handleAddActivity = (leadId = null, type = 'note') => {
     setSelectedLeadId(leadId);
@@ -114,22 +95,14 @@ const Activities = () => {
     setShowActivityForm(false);
     setSelectedActivity(null);
     setSelectedLeadId(null);
-    setSelectedLead(null);
   };
 
   const handleCloseActivityForm = () => {
     setShowActivityForm(false);
     setSelectedActivity(null);
     setSelectedLeadId(null);
-    setSelectedLead(null);
   };
 
-  const handleQuickAction = (leadId, type) => {
-    setSelectedLeadId(leadId);
-    setActivityType(type);
-    setSelectedActivity(null);
-    setShowActivityForm(true);
-  };
 
   return (
     <div className="activities-page">
@@ -158,49 +131,6 @@ const Activities = () => {
           </div>
         </div>
 
-        {/* Quick Actions */}
-        <div className="mb-8">
-          <div className="bg-white border border-gray-200 rounded-lg p-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-4">Quick Actions</h2>
-            <p className="text-sm text-gray-600 mb-4">
-              Select a lead to perform quick actions, or use the full form below.
-            </p>
-            
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Select Lead
-              </label>
-              {loadingLeads ? (
-                <div className="w-full max-w-md px-3 py-2 text-gray-500">Loading leads...</div>
-              ) : (
-                <select
-                  className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  onChange={(e) => {
-                    const leadId = e.target.value;
-                    setSelectedLeadId(leadId);
-                    const lead = leads.find(l => l.id === leadId);
-                    setSelectedLead(lead);
-                  }}
-                  value={selectedLeadId || ''}
-                >
-                  <option value="">Choose a lead...</option>
-                  {leads.map(lead => (
-                    <option key={lead.id} value={lead.id}>
-                      {lead.company || `${lead.first_name} ${lead.last_name}`} - {lead.email}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-            
-            {selectedLeadId && (
-              <QuickActions 
-                leadId={selectedLeadId} 
-                onQuickAction={handleQuickAction}
-              />
-            )}
-          </div>
-        </div>
 
         {/* Activity Types Quick Buttons */}
         <div className="mb-6">
@@ -253,7 +183,6 @@ const Activities = () => {
             onClose={handleCloseActivityForm}
             onSubmit={handleActivityFormSubmit}
             leadId={selectedLeadId}
-            selectedLead={selectedLead}
             activity={selectedActivity}
             initialType={activityType}
           />

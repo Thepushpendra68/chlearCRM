@@ -49,7 +49,9 @@ const Chart = ({ data, type }) => {
             <div className="ml-3">
               <p className="text-sm font-medium text-purple-600">Avg Response Time</p>
               <p className="text-2xl font-bold text-purple-900">
-                {data.responseTime?.avg_response_time_hours?.toFixed(1) || 0}h
+                {typeof data.responseTime?.avg_response_time_hours === 'number' 
+                  ? data.responseTime.avg_response_time_hours.toFixed(1) 
+                  : 0}h
               </p>
             </div>
           </div>
@@ -207,7 +209,7 @@ const Chart = ({ data, type }) => {
                       {activity.completed_activities}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {Math.round((activity.completed_activities / activity.total_activities) * 100 || 0)}%
+                      {activity.total_activities > 0 ? Math.round((activity.completed_activities / activity.total_activities) * 100) : 0}%
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {Math.round(activity.avg_duration_minutes || 0)} min
@@ -307,7 +309,7 @@ const Chart = ({ data, type }) => {
                       {user.won_leads}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {Math.round((user.won_leads / (user.won_leads + user.lost_leads)) * 100 || 0)}%
+                      {(user.won_leads + user.lost_leads) > 0 ? Math.round((user.won_leads / (user.won_leads + user.lost_leads)) * 100) : 0}%
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       ${parseFloat(user.total_deal_value || 0).toLocaleString()}

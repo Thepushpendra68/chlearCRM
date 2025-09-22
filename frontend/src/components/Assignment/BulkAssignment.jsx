@@ -18,6 +18,7 @@ const BulkAssignment = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [filters, setFilters] = useState({
     status: '',
     source: '',
@@ -26,15 +27,16 @@ const BulkAssignment = ({
   });
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !isDataLoaded) {
       if (initialLeads.length > 0) {
         setLeads(initialLeads);
         fetchUsers();
+        setIsDataLoaded(true);
       } else {
         fetchData();
       }
     }
-  }, [isOpen, initialLeads]);
+  }, [isOpen, isDataLoaded]); // Add isDataLoaded to prevent multiple calls
 
   const fetchData = async () => {
     try {
@@ -50,6 +52,9 @@ const BulkAssignment = ({
         // Handle different possible response structures
         const leadsData = leadsResponse.data.leads || leadsResponse.data || [];
         setLeads(Array.isArray(leadsData) ? leadsData : []);
+      } else {
+        console.error('Failed to fetch leads:', leadsResponse.error);
+        setError('Failed to load leads data');
       }
 
       if (usersResponse.success) {
@@ -57,10 +62,15 @@ const BulkAssignment = ({
         const usersData = usersResponse.data.users || usersResponse.data || [];
         const usersArray = Array.isArray(usersData) ? usersData : [];
         setUsers(usersArray.filter(user => user.role !== 'admin'));
+      } else {
+        console.error('Failed to fetch users:', usersResponse.error);
+        setError('Failed to load users data');
       }
+
+      setIsDataLoaded(true);
     } catch (err) {
       console.error('Error fetching data:', err);
-      setError('Failed to load data');
+      setError('Failed to load data. Please check your connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -73,12 +83,29 @@ const BulkAssignment = ({
         const usersData = usersResponse.data.users || usersResponse.data || [];
         const usersArray = Array.isArray(usersData) ? usersData : [];
         setUsers(usersArray.filter(user => user.role !== 'admin'));
+      } else {
+        console.error('Failed to fetch users:', usersResponse.error);
+        setError('Failed to load users');
       }
     } catch (err) {
       console.error('Error fetching users:', err);
       setError('Failed to load users');
     }
   };
+
+  // Reset component state when closed
+  useEffect(() => {
+    if (!isOpen) {
+      setLeads([]);
+      setUsers([]);
+      setSelectedLeads([]);
+      setSelectedUser('');
+      setReason('');
+      setError(null);
+      setSuccess(null);
+      setIsDataLoaded(false);
+    }
+  }, [isOpen]);
 
   const handleLeadSelect = (leadId) => {
     setSelectedLeads(prev => {
@@ -203,11 +230,11 @@ const BulkAssignment = ({
     return user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email : 'Unknown';
   };
 
-  if (loading && (!leads || leads.length === 0)) {
+  if (loading && !isDataLoaded) {
     return (
       <div className="flex items-center justify-center py-8">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        <span className="ml-2 text-gray-600">Loading leads...</span>
+        <span className="ml-2 text-gray-600">Loading data...</span>
       </div>
     );
   }
