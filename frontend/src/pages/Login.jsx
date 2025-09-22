@@ -19,7 +19,7 @@ const Login = () => {
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
-      const from = location.state?.from?.pathname || '/dashboard'
+      const from = location.state?.from?.pathname || '/app/dashboard'
       navigate(from, { replace: true })
     }
   }, [isAuthenticated, navigate, location])
@@ -27,7 +27,7 @@ const Login = () => {
   const onSubmit = async (data) => {
     const result = await login(data.email, data.password)
     if (result.success) {
-      const from = location.state?.from?.pathname || '/dashboard'
+      const from = location.state?.from?.pathname || '/app/dashboard'
       navigate(from, { replace: true })
     }
   }

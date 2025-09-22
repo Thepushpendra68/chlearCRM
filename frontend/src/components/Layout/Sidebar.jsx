@@ -25,18 +25,18 @@ import {
 
 // Main navigation items (top section)
 const mainNavigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: HomeIcon, badge: null },
-  { name: 'Leads', href: '/leads', icon: UsersIcon, badge: 3 },
-  { name: 'Pipeline', href: '/pipeline', icon: Squares2X2Icon, badge: null },
-  { name: 'Activities', href: '/activities', icon: ClockIcon, badge: 2 },
+  { name: 'Dashboard', href: '/app/dashboard', icon: HomeIcon, badge: null },
+  { name: 'Leads', href: '/app/leads', icon: UsersIcon, badge: 3 },
+  { name: 'Pipeline', href: '/app/pipeline', icon: Squares2X2Icon, badge: null },
+  { name: 'Activities', href: '/app/activities', icon: ClockIcon, badge: 2 },
 ]
 
 // Utility/admin navigation items (bottom section)
 const utilityNavigation = [
-  { name: 'Assignments', href: '/assignments', icon: UserPlusIcon, badge: null },
-  { name: 'Tasks', href: '/tasks', icon: ClipboardDocumentListIcon, badge: 5 },
-  { name: 'Users', href: '/users', icon: UserGroupIcon, badge: null },
-  { name: 'Reports', href: '/reports', icon: DocumentChartBarIcon, badge: null },
+  { name: 'Assignments', href: '/app/assignments', icon: UserPlusIcon, badge: null },
+  { name: 'Tasks', href: '/app/tasks', icon: ClipboardDocumentListIcon, badge: 5 },
+  { name: 'Users', href: '/app/users', icon: UserGroupIcon, badge: null },
+  { name: 'Reports', href: '/app/reports', icon: DocumentChartBarIcon, badge: null },
 ]
 
 

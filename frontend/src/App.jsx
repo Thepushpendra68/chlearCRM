@@ -6,6 +6,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import ErrorBoundary from './components/ErrorBoundary'
 import Login from './pages/Login'
 import Register from './pages/Register'
+import Homepage from './pages/Homepage'
 import Dashboard from './pages/Dashboard'
 import Leads from './pages/Leads'
 import LeadDetail from './pages/LeadDetail'
@@ -26,16 +27,17 @@ function App() {
           <div className="min-h-screen bg-gray-50">
           <Routes>
             {/* Public routes */}
+            <Route path="/" element={<Homepage />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             
             {/* Protected routes */}
-            <Route path="/" element={
+            <Route path="/app" element={
               <ProtectedRoute>
                 <Layout />
               </ProtectedRoute>
             }>
-              <Route index element={<Navigate to="/dashboard" replace />} />
+              <Route index element={<Navigate to="/app/dashboard" replace />} />
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="leads" element={<Leads />} />
               <Route path="leads/:id" element={<LeadDetail />} />
@@ -49,7 +51,7 @@ function App() {
             </Route>
             
             {/* Catch all route */}
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           
           {/* Toast notifications */}
