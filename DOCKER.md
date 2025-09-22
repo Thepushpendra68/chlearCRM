@@ -1,12 +1,14 @@
 # 🐳 Docker Setup for CHLEAR CRM
 
-This guide will help you run the CHLEAR CRM application using Docker Desktop, eliminating port conflicts and providing a consistent development environment.
+This guide will help you run the modernized CHLEAR CRM application using Docker Desktop, featuring a sleek sidebar, optimized performance, and enhanced security.
 
 ## 🎯 What This Setup Provides
 
-- **PostgreSQL Database**: Containerized database with persistent data
-- **Backend API**: Node.js application running in container
-- **Frontend**: React application with nginx (production) or dev server (development)
+- **PostgreSQL Database**: Containerized database with persistent data and health checks
+- **Backend API**: Node.js application with optimized production builds
+- **Modern Frontend**: React application with modernized sidebar, nginx (production) or dev server (development)
+- **Enhanced Security**: Security headers, non-root users, and optimized configurations
+- **Performance Optimized**: Gzip compression, caching, and efficient builds
 - **No Port Conflicts**: All services run in isolated containers
 - **Easy Development**: Hot reload for both frontend and backend
 
@@ -14,6 +16,24 @@ This guide will help you run the CHLEAR CRM application using Docker Desktop, el
 
 1. **Docker Desktop**: Download and install from [docker.com](https://www.docker.com/products/docker-desktop/)
 2. **Git**: For cloning the repository (if not already done)
+
+## ✨ New Modernized Features
+
+### 🎨 Modern Sidebar
+- **Clean Design**: Minimal, modern interface with proper spacing
+- **Collapsible**: Toggle between full and icon-only view
+- **Smart Navigation**: Grouped main actions and utility functions
+- **Interactive Elements**: Hover effects, active states, and smooth transitions
+- **Quick Actions**: Floating + button for rapid record creation
+- **Search Integration**: Built-in search with keyboard shortcuts (Ctrl+K)
+- **Notification Badges**: Visual indicators for pending items
+
+### 🔧 Enhanced Performance
+- **Optimized Builds**: Multi-stage Docker builds for smaller images
+- **Gzip Compression**: Reduced bandwidth usage
+- **Smart Caching**: Optimized cache headers for static assets
+- **Security Headers**: Enhanced security with proper HTTP headers
+- **Health Checks**: Comprehensive monitoring for all services
 
 ## 🚀 Quick Start
 
@@ -152,6 +172,9 @@ DB_PASSWORD=crm_password_2024
 VITE_API_URL=http://localhost:5000/api
 VITE_APP_NAME=CHLEAR CRM
 VITE_APP_VERSION=1.0.0
+NODE_ENV=production
+CHOKIDAR_USEPOLLING=true
+WATCHPACK_POLLING=true
 ```
 
 ### Custom Ports
