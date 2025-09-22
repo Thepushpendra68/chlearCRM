@@ -3,8 +3,12 @@
  * @returns { Promise<void> } 
  */
 exports.seed = async function(knex) {
-  // Clear existing entries
-  await knex('activities').del();
+  // Check if activities already exist
+  const existingActivities = await knex('activities').select('id').limit(1);
+  if (existingActivities.length > 0) {
+    console.log('Activities already exist, skipping seed');
+    return;
+  }
 
   // Get some sample leads and users to reference
   const leads = await knex('leads').select('id').limit(10);

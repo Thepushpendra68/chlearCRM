@@ -5,8 +5,12 @@ const bcrypt = require('bcryptjs');
  * @returns { Promise<void> } 
  */
 exports.seed = async function(knex) {
-  // Deletes ALL existing entries
-  await knex('users').del();
+  // Check if users already exist
+  const existingUsers = await knex('users').select('email');
+  if (existingUsers.length > 0) {
+    console.log('Users already exist, skipping seed');
+    return;
+  }
   
   // Hash the default password
   const hashedPassword = await bcrypt.hash('Admin123!', 12);

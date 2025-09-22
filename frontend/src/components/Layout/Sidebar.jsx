@@ -4,11 +4,8 @@ import {
   XMarkIcon, 
   ChevronLeftIcon, 
   ChevronRightIcon,
-  MagnifyingGlassIcon,
-  PlusIcon,
   Cog6ToothIcon,
   UserCircleIcon,
-  BellIcon,
   SunIcon,
   MoonIcon
 } from '@heroicons/react/24/outline'
@@ -42,22 +39,11 @@ const utilityNavigation = [
   { name: 'Reports', href: '/reports', icon: DocumentChartBarIcon, badge: null },
 ]
 
-// Quick action items for the + button
-const quickActions = [
-  { name: 'New Lead', href: '/leads/new', icon: UsersIcon },
-  { name: 'New Task', href: '/tasks/new', icon: ClipboardDocumentListIcon },
-  { name: 'New Activity', href: '/activities/new', icon: ClockIcon },
-]
 
-const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
+const Sidebar = ({ sidebarOpen, setSidebarOpen, isCollapsed, setIsCollapsed }) => {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
-  const [isCollapsed, setIsCollapsed] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
   const [isDarkMode, setIsDarkMode] = useState(false)
-  const [showQuickActions, setShowQuickActions] = useState(false)
-  const searchRef = useRef(null)
-  const quickActionRef = useRef(null)
 
   // Handle keyboard navigation
   useEffect(() => {
@@ -66,32 +52,12 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
         e.preventDefault()
         setIsCollapsed(!isCollapsed)
       }
-      if (e.ctrlKey && e.key === 'k') {
-        e.preventDefault()
-        searchRef.current?.focus()
-      }
     }
 
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [isCollapsed])
+  }, [isCollapsed, setIsCollapsed])
 
-  // Close quick actions when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (quickActionRef.current && !quickActionRef.current.contains(event.target)) {
-        setShowQuickActions(false)
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
-
-  const handleQuickAction = (action) => {
-    navigate(action.href)
-    setShowQuickActions(false)
-  }
 
   // Navigation item component
   const NavItem = ({ item, isCollapsed, onClick }) => (
@@ -190,20 +156,6 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                     </div>
                   </div>
 
-                  {/* Search */}
-                  <div className="px-4 mb-6">
-                    <div className="relative">
-                      <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <input
-                        ref={searchRef}
-                        type="text"
-                        placeholder="Search... (Ctrl+K)"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm"
-                      />
-                    </div>
-                  </div>
 
                   {/* Main Navigation */}
                   <nav className="px-2 space-y-1 mb-6">
@@ -332,22 +284,6 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
               </button>
             </div>
 
-            {/* Search */}
-            {!isCollapsed && (
-              <div className="px-4 py-4 border-b border-gray-200">
-                <div className="relative">
-                  <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <input
-                    ref={searchRef}
-                    type="text"
-                    placeholder="Search... (Ctrl+K)"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm"
-                  />
-                </div>
-              </div>
-            )}
 
             {/* Navigation */}
             <div className="flex-1 overflow-y-auto py-4">
@@ -441,47 +377,6 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
         </div>
       </div>
 
-      {/* Quick Action Button */}
-      <div className="fixed bottom-6 right-6 z-30" ref={quickActionRef}>
-        <Menu as="div" className="relative">
-          <Menu.Button
-            onClick={() => setShowQuickActions(!showQuickActions)}
-            className="bg-primary-500 hover:bg-primary-600 text-white p-3 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
-            title="Quick Actions"
-          >
-            <PlusIcon className="h-6 w-6" />
-          </Menu.Button>
-          <Transition
-            as={Fragment}
-            enter="transition ease-out duration-100"
-            enterFrom="transform opacity-0 scale-95"
-            enterTo="transform opacity-100 scale-100"
-            leave="transition ease-in duration-75"
-            leaveFrom="transform opacity-100 scale-100"
-            leaveTo="transform opacity-0 scale-95"
-          >
-            <Menu.Items className="absolute bottom-full right-0 mb-2 w-48 bg-white rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-              <div className="py-1">
-                {quickActions.map((action) => (
-                  <Menu.Item key={action.name}>
-                    {({ active }) => (
-                      <button
-                        onClick={() => handleQuickAction(action)}
-                        className={`${
-                          active ? 'bg-gray-100' : ''
-                        } flex items-center w-full px-4 py-2 text-sm text-gray-700`}
-                      >
-                        <action.icon className="h-4 w-4 mr-3" />
-                        {action.name}
-                      </button>
-                    )}
-                  </Menu.Item>
-                ))}
-              </div>
-            </Menu.Items>
-          </Transition>
-        </Menu>
-      </div>
     </>
   )
 }

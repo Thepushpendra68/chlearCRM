@@ -1,9 +1,12 @@
 const bcrypt = require('bcryptjs');
 
 exports.seed = async function(knex) {
-  // Deletes ALL existing entries
-  await knex('leads').del();
-  await knex('users').del();
+  // Check if leads already exist
+  const existingLeads = await knex('leads').select('id').limit(1);
+  if (existingLeads.length > 0) {
+    console.log('Leads already exist, skipping seed');
+    return;
+  }
 
   // Inserts seed entries
   const saltRounds = 12;

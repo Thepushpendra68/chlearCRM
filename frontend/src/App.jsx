@@ -15,6 +15,7 @@ import Assignments from './pages/Assignments'
 import Users from './pages/Users'
 import Reports from './pages/Reports'
 import Tasks from './pages/Tasks'
+import SearchResults from './pages/SearchResults'
 import Layout from './components/Layout/Layout'
 
 function App() {
@@ -44,6 +45,7 @@ function App() {
               <Route path="users" element={<Users />} />
               <Route path="reports" element={<Reports />} />
               <Route path="tasks" element={<Tasks />} />
+              <Route path="search" element={<SearchResults />} />
             </Route>
             
             {/* Catch all route */}

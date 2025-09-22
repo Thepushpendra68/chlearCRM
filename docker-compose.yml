@@ -63,7 +63,7 @@ services:
     container_name: chlear-crm-frontend
     restart: unless-stopped
     environment:
-      VITE_API_URL: http://localhost:5000/api
+      VITE_API_URL: /api
       VITE_APP_NAME: CHLEAR CRM
       VITE_APP_VERSION: 1.0.0
       NODE_ENV: production

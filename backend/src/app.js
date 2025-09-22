@@ -40,6 +40,7 @@ const assignmentRoutes = require('./routes/assignmentRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const taskRoutes = require('./routes/taskRoutes');
 const importRoutes = require('./routes/importRoutes');
+const searchRoutes = require('./routes/searchRoutes');
 
 // Import middleware
 const errorHandler = require('./middleware/errorMiddleware');
@@ -96,6 +97,7 @@ app.use('/api/assignments', assignmentRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/import', importRoutes);
+app.use('/api/search', searchRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {

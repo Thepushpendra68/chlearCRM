@@ -178,11 +178,41 @@ const getLeadStats = async (req, res, next) => {
   }
 };
 
+/**
+ * @desc    Search leads
+ * @route   GET /api/leads/search
+ * @access  Private
+ */
+const searchLeads = async (req, res, next) => {
+  try {
+    const { q: query, limit = 5 } = req.query;
+
+    if (!query || query.trim().length < 2) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          message: 'Search query must be at least 2 characters long'
+        }
+      });
+    }
+
+    const results = await leadService.searchLeads(query, parseInt(limit));
+    
+    res.json({
+      success: true,
+      data: results
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getLeads,
   getLeadById,
   createLead,
   updateLead,
   deleteLead,
-  getLeadStats
+  getLeadStats,
+  searchLeads
 };

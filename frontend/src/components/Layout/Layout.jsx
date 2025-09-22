@@ -1,20 +1,31 @@
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import Header from './Header'
 import Sidebar from './Sidebar'
 import { useState } from 'react'
 
 const Layout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [isCollapsed, setIsCollapsed] = useState(false)
+  const location = useLocation()
 
   return (
     <div className="h-screen flex overflow-hidden bg-gray-50">
-      {/* Sidebar */}
-      <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+      {/* Sidebar - Fixed width, full height */}
+      <Sidebar 
+        sidebarOpen={sidebarOpen} 
+        setSidebarOpen={setSidebarOpen}
+        isCollapsed={isCollapsed}
+        setIsCollapsed={setIsCollapsed}
+      />
       
-      {/* Main content */}
+      {/* Main content area - Flexible width, no overlap with sidebar */}
       <div className="flex flex-col flex-1 overflow-hidden">
-        {/* Header */}
-        <Header setSidebarOpen={setSidebarOpen} />
+        {/* Header - Only spans content area, never overlaps sidebar */}
+        <Header 
+          setSidebarOpen={setSidebarOpen}
+          isCollapsed={isCollapsed}
+          currentPath={location.pathname}
+        />
         
         {/* Page content */}
         <main className="flex-1 relative overflow-y-auto focus:outline-none bg-white">

@@ -3,8 +3,12 @@
  * @returns { Promise<void> }
  */
 exports.seed = async function(knex) {
-  // Deletes ALL existing entries
-  await knex('pipeline_stages').del();
+  // Check if pipeline stages already exist
+  const existingStages = await knex('pipeline_stages').select('id').limit(1);
+  if (existingStages.length > 0) {
+    console.log('Pipeline stages already exist, skipping seed');
+    return;
+  }
   
   // Inserts seed entries
   await knex('pipeline_stages').insert([

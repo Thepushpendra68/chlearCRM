@@ -293,6 +293,39 @@ const getRecentLeads = async (currentUser, limit = 10) => {
   }
 };
 
+/**
+ * Search leads by query
+ */
+const searchLeads = async (query, limit = 5) => {
+  try {
+    const searchTerm = `%${query}%`;
+    
+    const leads = await knex('leads')
+      .leftJoin('users', 'leads.assigned_to', 'users.id')
+      .select(
+        'leads.*',
+        'users.first_name as assigned_user_first_name',
+        'users.last_name as assigned_user_last_name',
+        'users.email as assigned_user_email'
+      )
+      .where(function() {
+        this.where('leads.first_name', 'ilike', searchTerm)
+          .orWhere('leads.last_name', 'ilike', searchTerm)
+          .orWhere('leads.email', 'ilike', searchTerm)
+          .orWhere('leads.company', 'ilike', searchTerm)
+          .orWhere('leads.phone', 'ilike', searchTerm)
+          .orWhere('leads.notes', 'ilike', searchTerm);
+      })
+      .orderBy('leads.created_at', 'desc')
+      .limit(limit);
+
+    return leads;
+  } catch (error) {
+    console.error('Search leads error:', error);
+    throw new ApiError('Failed to search leads', 500);
+  }
+};
+
 module.exports = {
   getLeads,
   getLeadById,
@@ -300,5 +333,6 @@ module.exports = {
   updateLead,
   deleteLead,
   getLeadStats,
-  getRecentLeads
+  getRecentLeads,
+  searchLeads
 };

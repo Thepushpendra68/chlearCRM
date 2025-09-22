@@ -7,7 +7,8 @@ const {
   createLead,
   updateLead,
   deleteLead,
-  getLeadStats
+  getLeadStats,
+  searchLeads
 } = require('../controllers/leadController');
 const pipelineController = require('../controllers/pipelineController');
 
@@ -64,5 +65,12 @@ router.delete('/:id', deleteLead);
  * @access  Private
  */
 router.put('/:id/move-stage', pipelineController.moveLeadToStage);
+
+/**
+ * @route   GET /api/leads/search
+ * @desc    Search leads
+ * @access  Private
+ */
+router.get('/search', searchLeads);
 
 module.exports = router;

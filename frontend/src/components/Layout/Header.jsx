@@ -1,20 +1,43 @@
-import { Fragment } from 'react'
+import { Fragment, useState } from 'react'
 import { Menu, Transition } from '@headlessui/react'
-import { Bars3Icon, BellIcon, UserCircleIcon } from '@heroicons/react/24/outline'
+import { 
+  Bars3Icon, 
+  BellIcon, 
+  UserCircleIcon, 
+  MagnifyingGlassIcon,
+  PlusIcon,
+  Cog6ToothIcon,
+  XMarkIcon
+} from '@heroicons/react/24/outline'
 import { useAuth } from '../../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
+import Breadcrumbs from './Breadcrumbs'
+import GlobalSearch from '../Search/GlobalSearch'
 
-const Header = ({ setSidebarOpen }) => {
+const Header = ({ setSidebarOpen, isCollapsed, currentPath }) => {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const [showQuickActions, setShowQuickActions] = useState(false)
 
   const handleLogout = async () => {
     await logout()
     navigate('/login')
   }
 
+  const quickActions = [
+    { name: 'New Lead', href: '/leads/new', icon: '👤' },
+    { name: 'New Task', href: '/tasks/new', icon: '📋' },
+    { name: 'New Activity', href: '/activities/new', icon: '⏰' },
+  ]
+
+  const handleQuickAction = (action) => {
+    navigate(action.href)
+    setShowQuickActions(false)
+  }
+
   return (
-    <div className="relative z-10 flex-shrink-0 flex h-16 bg-white shadow">
+    <div className="relative flex-shrink-0 flex h-16 bg-white shadow border-b border-gray-200">
+      {/* Mobile hamburger button - only visible on mobile */}
       <button
         type="button"
         className="px-4 border-r border-gray-200 text-gray-500 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary-500 md:hidden"
@@ -24,38 +47,52 @@ const Header = ({ setSidebarOpen }) => {
         <Bars3Icon className="h-6 w-6" aria-hidden="true" />
       </button>
       
-      <div className="flex-1 px-4 flex justify-between">
-        <div className="flex-1 flex">
-          <div className="w-full flex md:ml-0">
-            <div className="relative w-full text-gray-400 focus-within:text-gray-600">
-              <div className="absolute inset-y-0 left-0 flex items-center pointer-events-none">
-                <span className="text-2xl font-bold text-primary-600">CRM</span>
-              </div>
+      {/* Header content - spans only the content area, never overlaps sidebar */}
+      <div className="flex-1 px-4 flex justify-between items-center">
+        {/* Left side - Breadcrumbs and branding */}
+        <div className="flex items-center space-x-4">
+          {/* Logo - only show on mobile when sidebar is closed */}
+          <div className="md:hidden flex items-center">
+            <div className="flex-shrink-0 w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold text-sm">C</span>
             </div>
+            <span className="ml-2 text-xl font-bold text-gray-900">CRM</span>
+          </div>
+          
+          {/* Breadcrumbs - hidden on mobile, shown on desktop */}
+          <div className="hidden md:block">
+            <Breadcrumbs currentPath={currentPath} />
           </div>
         </div>
         
-        <div className="ml-4 flex items-center md:ml-6">
-          {/* Notifications */}
+        {/* Center - Global search (desktop only) */}
+        <div className="hidden md:flex flex-1 max-w-lg mx-8">
+          <GlobalSearch
+            placeholder="Search leads, contacts, activities..."
+            className="w-full"
+          />
+        </div>
+        
+        {/* Right side - Actions and profile */}
+        <div className="flex items-center space-x-2">
+          {/* Mobile search button */}
           <button
             type="button"
-            className="bg-white p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+            className="md:hidden p-2 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-lg"
+            onClick={() => {/* TODO: Open mobile search modal */}}
           >
-            <span className="sr-only">View notifications</span>
-            <BellIcon className="h-6 w-6" aria-hidden="true" />
+            <MagnifyingGlassIcon className="h-5 w-5" />
           </button>
 
-          {/* Profile dropdown */}
-          <Menu as="div" className="ml-3 relative">
-            <div>
-              <Menu.Button className="max-w-xs bg-white flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
-                <span className="sr-only">Open user menu</span>
-                <UserCircleIcon className="h-8 w-8 text-gray-400" />
-                <span className="ml-2 text-sm font-medium text-gray-700">
-                  {user?.first_name} {user?.last_name}
-                </span>
-              </Menu.Button>
-            </div>
+          {/* Quick Actions */}
+          <Menu as="div" className="relative">
+            <Menu.Button
+              onClick={() => setShowQuickActions(!showQuickActions)}
+              className="p-2 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-lg transition-colors"
+              title="Quick Actions"
+            >
+              <PlusIcon className="h-5 w-5" />
+            </Menu.Button>
             <Transition
               as={Fragment}
               enter="transition ease-out duration-100"
@@ -65,14 +102,72 @@ const Header = ({ setSidebarOpen }) => {
               leaveFrom="transform opacity-100 scale-100"
               leaveTo="transform opacity-0 scale-95"
             >
-              <Menu.Items className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 focus:outline-none">
+              <Menu.Items className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
+                <div className="py-1">
+                  {quickActions.map((action) => (
+                    <Menu.Item key={action.name}>
+                      {({ active }) => (
+                        <button
+                          onClick={() => handleQuickAction(action)}
+                          className={`${
+                            active ? 'bg-gray-100' : ''
+                          } flex items-center w-full px-4 py-2 text-sm text-gray-700`}
+                        >
+                          <span className="mr-3">{action.icon}</span>
+                          {action.name}
+                        </button>
+                      )}
+                    </Menu.Item>
+                  ))}
+                </div>
+              </Menu.Items>
+            </Transition>
+          </Menu>
+
+          {/* Notifications */}
+          <button
+            type="button"
+            className="relative p-2 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-lg transition-colors"
+          >
+            <span className="sr-only">View notifications</span>
+            <BellIcon className="h-5 w-5" />
+            <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+              3
+            </span>
+          </button>
+
+          {/* Profile dropdown */}
+          <Menu as="div" className="relative">
+            <Menu.Button className="flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2">
+              <span className="sr-only">Open user menu</span>
+              <UserCircleIcon className="h-8 w-8 text-gray-400" />
+              <div className="hidden md:block ml-2 text-left">
+                <div className="text-sm font-medium text-gray-700">
+                  {user?.first_name} {user?.last_name}
+                </div>
+                <div className="text-xs text-gray-500 capitalize">
+                  {user?.role?.replace('_', ' ')}
+                </div>
+              </div>
+            </Menu.Button>
+            <Transition
+              as={Fragment}
+              enter="transition ease-out duration-100"
+              enterFrom="transform opacity-0 scale-95"
+              enterTo="transform opacity-100 scale-100"
+              leave="transition ease-in duration-75"
+              leaveFrom="transform opacity-100 scale-100"
+              leaveTo="transform opacity-0 scale-95"
+            >
+              <Menu.Items className="absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
                 <Menu.Item>
                   {({ active }) => (
                     <button
                       className={`${
                         active ? 'bg-gray-100' : ''
-                      } block px-4 py-2 text-sm text-gray-700 w-full text-left`}
+                      } flex items-center w-full px-4 py-2 text-sm text-gray-700`}
                     >
+                      <UserCircleIcon className="h-4 w-4 mr-3" />
                       Your Profile
                     </button>
                   )}
@@ -82,8 +177,9 @@ const Header = ({ setSidebarOpen }) => {
                     <button
                       className={`${
                         active ? 'bg-gray-100' : ''
-                      } block px-4 py-2 text-sm text-gray-700 w-full text-left`}
+                      } flex items-center w-full px-4 py-2 text-sm text-gray-700`}
                     >
+                      <Cog6ToothIcon className="h-4 w-4 mr-3" />
                       Settings
                     </button>
                   )}
@@ -94,7 +190,7 @@ const Header = ({ setSidebarOpen }) => {
                       onClick={handleLogout}
                       className={`${
                         active ? 'bg-gray-100' : ''
-                      } block px-4 py-2 text-sm text-gray-700 w-full text-left`}
+                      } flex items-center w-full px-4 py-2 text-sm text-gray-700`}
                     >
                       Sign out
                     </button>
