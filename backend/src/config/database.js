@@ -1,28 +1,41 @@
-const knex = require('knex');
-const knexConfig = require('../../knexfile');
+// Supabase Migration: Knex/PostgreSQL connection disabled
+// Using Supabase as the primary database instead of local PostgreSQL
 
-const environment = process.env.NODE_ENV || 'development';
-const config = knexConfig[environment];
+let db = null;
 
-// Enhanced database configuration with better connection management
-const enhancedConfig = {
-  ...config,
-  pool: {
-    min: 1,
-    max: 5,
-    acquireTimeoutMillis: 30000,
-    createTimeoutMillis: 30000,
-    destroyTimeoutMillis: 5000,
-    idleTimeoutMillis: 300000, // 5 minutes
-    reapIntervalMillis: 1000,
-    createRetryIntervalMillis: 200,
-    propagateCreateError: false
-  },
-  acquireConnectionTimeout: 30000,
-  debug: false // Disabled to prevent excessive logging
+// Check if we should initialize Knex (only for migrations if needed)
+const initializeKnex = () => {
+  if (process.env.ENABLE_KNEX === 'true') {
+    const knex = require('knex');
+    const knexConfig = require('../../knexfile');
+
+    const environment = process.env.NODE_ENV || 'development';
+    const config = knexConfig[environment];
+
+    const enhancedConfig = {
+      ...config,
+      pool: {
+        min: 1,
+        max: 5,
+        acquireTimeoutMillis: 30000,
+        createTimeoutMillis: 30000,
+        destroyTimeoutMillis: 5000,
+        idleTimeoutMillis: 300000,
+        reapIntervalMillis: 1000,
+        createRetryIntervalMillis: 200,
+        propagateCreateError: false
+      },
+      acquireConnectionTimeout: 30000,
+      debug: false
+    };
+
+    return knex(enhancedConfig);
+  }
+
+  return null;
 };
 
-const db = knex(enhancedConfig);
+// db = initializeKnex(); // Disabled for Supabase migration
 
 // Test database connection with retry logic
 const testConnection = async (retries = 3) => {
@@ -42,14 +55,19 @@ const testConnection = async (retries = 3) => {
   }
 };
 
-testConnection();
+// Database connection completely disabled - using Supabase
+console.log('🔄 Using Supabase as primary database - Knex/PostgreSQL connection disabled');
 
-// Handle database connection errors
-db.on('error', (err) => {
-  console.error('Database connection error:', err);
-  if (err.code === 'PROTOCOL_CONNECTION_LOST') {
-    console.log('Database connection lost, attempting to reconnect...');
-  }
-});
+// Handle database connection errors only if Knex is enabled
+if (db) {
+  db.on('error', (err) => {
+    console.error('Database connection error:', err);
+    if (err.code === 'PROTOCOL_CONNECTION_LOST') {
+      console.log('Database connection lost, attempting to reconnect...');
+    }
+  });
+} else {
+  console.log('✅ Database (Supabase) configuration loaded - Knex disabled');
+}
 
 module.exports = db;

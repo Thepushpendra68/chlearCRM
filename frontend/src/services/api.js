@@ -1,93 +1,118 @@
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import supabase from '../config/supabase';
 
-// Create axios instance
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/api',
-  timeout: 30000, // Increased to 30 seconds
+  timeout: 10000, // Reduced from 30 seconds to 10 seconds
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Request interceptor to add auth token
 api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+  async (config) => {
+    const { data } = await supabase.auth.getSession();
+    const accessToken = data?.session?.access_token;
+
+    console.log('🔍 [API] Request interceptor:', {
+      url: config.url,
+      hasSession: !!data?.session,
+      hasToken: !!accessToken,
+      tokenPrefix: accessToken ? accessToken.substring(0, 20) + '...' : 'none'
+    });
+
+    if (accessToken) {
+      config.headers = config.headers ?? {};
+      config.headers.Authorization = `Bearer ${accessToken}`;
+      console.log('✅ [API] Added Authorization header');
+    } else if (config.headers?.Authorization) {
+      delete config.headers.Authorization;
+      console.log('⚠️ [API] Removed Authorization header');
     }
+
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Response interceptor to handle errors
+let isSigningOut = false;
+let hasShownSessionToast = false;
+
 api.interceptors.response.use(
-  (response) => {
-    return response;
-  },
-  (error) => {
+  (response) => response,
+  async (error) => {
     const { response } = error;
 
     if (response) {
       const { status, data } = response;
 
+      console.log('🔍 [API] Response error:', {
+        status,
+        url: response.config?.url,
+        data: data?.message || 'No message'
+      });
+
       switch (status) {
-        case 401:
-          // Unauthorized - clear token and redirect to login
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          window.location.href = '/login';
-          toast.error('Session expired. Please login again.');
+        case 401: {
+          console.log('🚪 [API] 401 Unauthorized - signing out user');
+          if (!isSigningOut) {
+            isSigningOut = true;
+            try {
+              await supabase.auth.signOut();
+            } catch (signOutError) {
+              console.error('Failed to sign out after 401:', signOutError);
+            } finally {
+              isSigningOut = false;
+            }
+          }
+
+          if (!hasShownSessionToast) {
+            hasShownSessionToast = true;
+            toast.error('Session expired. Please login again.');
+            setTimeout(() => {
+              hasShownSessionToast = false;
+            }, 3000);
+          }
           break;
+        }
 
         case 403:
-          // Forbidden
           toast.error('Access denied. You don\'t have permission to perform this action.');
           break;
 
         case 404:
-          // Not found
           toast.error('Resource not found.');
           break;
 
         case 422:
-          // Validation error
-          if (data.error && Array.isArray(data.error)) {
-            data.error.forEach(err => {
+          if (data?.error && Array.isArray(data.error)) {
+            data.error.forEach((err) => {
               toast.error(err.msg || err.message || 'Validation error');
             });
           } else {
-            toast.error(data.message || 'Validation error');
+            toast.error(data?.message || 'Validation error');
           }
           break;
 
         case 429:
-          // Rate limit exceeded
           toast.error('Too many requests. Please try again later.');
           break;
 
         case 500:
-          // Server error
           toast.error('Server error. Please try again later.');
           break;
 
         default:
-          // Other errors
           toast.error(data?.message || 'An error occurred. Please try again.');
       }
     } else if (error.request) {
-      // Network error - add retry logic for network failures
-      if (error.code === 'ECONNABORTED' || error.code === 'NETWORK_ERROR') {
+      if (['ECONNABORTED', 'NETWORK_ERROR'].includes(error.code)) {
         toast.error('Network timeout. Please check your connection and try again.');
       } else {
         toast.error('Network error. Please check your connection.');
       }
     } else {
-      // Other error
       toast.error('An unexpected error occurred.');
     }
 

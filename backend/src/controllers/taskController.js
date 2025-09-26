@@ -25,7 +25,7 @@ class TaskController {
         }
       });
 
-      const tasks = await taskService.getTasks(filters);
+      const tasks = await taskService.getTasks(req.user, filters);
       res.json({
         success: true,
         data: tasks
@@ -41,7 +41,7 @@ class TaskController {
   async getTaskById(req, res, next) {
     try {
       const { id } = req.params;
-      const task = await taskService.getTaskById(id);
+      const task = await taskService.getTaskById(id, req.user);
       
       res.json({
         success: true,
@@ -62,7 +62,7 @@ class TaskController {
         created_by: req.user.id
       };
 
-      const task = await taskService.createTask(taskData);
+      const task = await taskService.createTask(taskData, req.user);
       
       res.status(201).json({
         success: true,
@@ -82,7 +82,7 @@ class TaskController {
       const { id } = req.params;
       const updateData = req.body;
 
-      const task = await taskService.updateTask(id, updateData);
+      const task = await taskService.updateTask(id, updateData, req.user);
       
       res.json({
         success: true,
@@ -100,7 +100,7 @@ class TaskController {
   async completeTask(req, res, next) {
     try {
       const { id } = req.params;
-      const task = await taskService.completeTask(id, req.user.id);
+      const task = await taskService.completeTask(id, req.user.id, req.user);
       
       res.json({
         success: true,
@@ -118,7 +118,7 @@ class TaskController {
   async deleteTask(req, res, next) {
     try {
       const { id } = req.params;
-      await taskService.deleteTask(id);
+      await taskService.deleteTask(id, req.user);
       
       res.json({
         success: true,
@@ -135,7 +135,7 @@ class TaskController {
   async getOverdueTasks(req, res, next) {
     try {
       const userId = req.query.user_id || null;
-      const overdueTasks = await taskService.getOverdueTasks(userId);
+      const overdueTasks = await taskService.getOverdueTasks(req.user, userId);
       
       res.json({
         success: true,
@@ -152,7 +152,7 @@ class TaskController {
   async getTaskStats(req, res, next) {
     try {
       const userId = req.query.user_id || null;
-      const stats = await taskService.getTaskStats(userId);
+      const stats = await taskService.getTaskStats(req.user, userId);
       
       res.json({
         success: true,
@@ -169,7 +169,7 @@ class TaskController {
   async getTasksByLeadId(req, res, next) {
     try {
       const { leadId } = req.params;
-      const tasks = await taskService.getTasksByLeadId(leadId);
+      const tasks = await taskService.getTasksByLeadId(leadId, req.user);
       
       res.json({
         success: true,

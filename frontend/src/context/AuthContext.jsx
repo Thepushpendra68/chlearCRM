@@ -1,5 +1,5 @@
 import { createContext, useContext, useReducer, useEffect } from 'react'
-import authService from '../services/authService'
+import supabase, { signIn, signUpWithCompany, signOut, getCurrentSession, getCurrentUserProfile, updateUserProfile } from '../config/supabase'
 import toast from 'react-hot-toast'
 
 const AuthContext = createContext()
@@ -7,37 +7,38 @@ const AuthContext = createContext()
 // Auth reducer for state management
 const authReducer = (state, action) => {
   switch (action.type) {
-    case 'LOGIN_START':
+    case 'AUTH_START':
       return {
         ...state,
         loading: true,
         error: null
       }
-    case 'LOGIN_SUCCESS':
+    case 'AUTH_SUCCESS':
       return {
         ...state,
         loading: false,
         isAuthenticated: true,
         user: action.payload.user,
-        token: action.payload.accessToken,
+        session: action.payload.session,
         error: null
       }
-    case 'LOGIN_FAILURE':
+    case 'AUTH_FAILURE':
       return {
         ...state,
         loading: false,
         isAuthenticated: false,
         user: null,
-        token: null,
+        session: null,
         error: action.payload
       }
-    case 'LOGOUT':
+    case 'AUTH_LOGOUT':
       return {
         ...state,
         isAuthenticated: false,
         user: null,
-        token: null,
-        error: null
+        session: null,
+        error: null,
+        loading: false
       }
     case 'UPDATE_USER':
       return {
@@ -49,6 +50,11 @@ const authReducer = (state, action) => {
         ...state,
         error: null
       }
+    case 'SET_LOADING':
+      return {
+        ...state,
+        loading: action.payload
+      }
     default:
       return state
   }
@@ -58,92 +64,157 @@ const authReducer = (state, action) => {
 const initialState = {
   isAuthenticated: false,
   user: null,
-  token: localStorage.getItem('token'),
-  loading: false,
+  session: null,
+  loading: true, // Start with loading true
   error: null
 }
 
 export const AuthProvider = ({ children }) => {
   const [state, dispatch] = useReducer(authReducer, initialState)
 
-  // Check for existing token on app load
+  // Initialize Supabase auth state on app load
   useEffect(() => {
-    const token = localStorage.getItem('token')
-    if (token) {
-      // Verify token and get user data
-      authService.getProfile()
-        .then(response => {
+    let isMounted = true
+
+    const initializeAuth = async () => {
+      try {
+        console.log('🔍 [AUTH] Initializing auth...')
+
+        // Get current session (skip refresh for now to avoid hanging)
+        const { session } = await getCurrentSession()
+        console.log('🔍 [AUTH] Session check:', session?.session ? 'Found' : 'None')
+
+        if (session?.session?.user) {
+          console.log('🔍 [AUTH] Found user ID:', session.session.user.id)
+          console.log('🔍 [AUTH] User email:', session.session.user.email)
+        }
+
+        if (session?.session && isMounted) {
+          // Get user profile data
+          console.log('🔍 [AUTH] Getting user profile for:', session.session.user.id)
+          const { profile } = await getCurrentUserProfile()
+          console.log('🔍 [AUTH] Profile result:', profile ? 'Found' : 'Not found')
+
+          if (profile && isMounted) {
+            console.log('✅ [AUTH] Login successful, profile:', profile.first_name, profile.last_name)
+            dispatch({
+              type: 'AUTH_SUCCESS',
+              payload: {
+                user: profile,
+                session: session.session
+              }
+            })
+          } else {
+            // Profile not found, but don't logout immediately - might be RLS issue
+            console.log('❌ [AUTH] Profile not found, using fallback auth data')
+            const fallbackUser = {
+              id: session.session.user.id,
+              email: session.session.user.email,
+              first_name: session.session.user.user_metadata?.first_name || 'User',
+              last_name: session.session.user.user_metadata?.last_name || '',
+              role: 'company_admin', // Assume company admin if no profile
+              company_id: session.session.user.app_metadata?.company_id,
+              company_name: 'Your Company'
+            };
+            dispatch({
+              type: 'AUTH_SUCCESS',
+              payload: {
+                user: fallbackUser,
+                session: session.session
+              }
+            })
+          }
+        } else {
+          // No session
+          console.log('🔍 [AUTH] No session found')
+          if (isMounted) {
+            dispatch({ type: 'AUTH_LOGOUT' })
+          }
+        }
+      } catch (error) {
+        console.error('❌ [AUTH] Auth initialization error:', error)
+        if (isMounted) {
+          dispatch({ type: 'AUTH_LOGOUT' })
+        }
+      }
+    }
+
+    initializeAuth()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  // Set up auth state change listener
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('🔄 [AUTH] Auth state change:', event, session ? 'with session' : 'no session')
+
+      if (event === 'SIGNED_IN' && session) {
+        console.log('🔍 [AUTH] SIGNED_IN event, getting profile...')
+        // Get user profile
+        const { profile } = await getCurrentUserProfile()
+        console.log('🔍 [AUTH] Profile from state change:', profile ? 'Found' : 'Not found')
+
+        if (profile) {
+          console.log('✅ [AUTH] State change login successful')
           dispatch({
-            type: 'LOGIN_SUCCESS',
+            type: 'AUTH_SUCCESS',
             payload: {
-              user: response.data.data.user,
-              accessToken: token
+              user: profile,
+              session
             }
           })
-        })
-        .catch((error) => {
-          console.error('Token validation failed:', error)
-          // Token is invalid, remove it
-          localStorage.removeItem('token')
-          localStorage.removeItem('user')
-          dispatch({ type: 'LOGOUT' })
-        })
-    }
+        } else {
+          console.log('❌ [AUTH] No profile in state change, logging out')
+          dispatch({ type: 'AUTH_LOGOUT' })
+        }
+      } else if (event === 'SIGNED_OUT') {
+        console.log('🚪 [AUTH] SIGNED_OUT event')
+        dispatch({ type: 'AUTH_LOGOUT' })
+      }
+    })
+
+    return () => subscription.unsubscribe()
   }, [])
 
   // Logout function
   const logout = async () => {
     try {
-      await authService.logout()
+      await signOut()
+      dispatch({ type: 'AUTH_LOGOUT' })
+      toast.success('Logged out successfully')
     } catch (error) {
-      // Ignore logout errors
-    } finally {
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
-      dispatch({ type: 'LOGOUT' })
+      console.error('Logout error:', error)
+      // Force logout even if there's an error
+      dispatch({ type: 'AUTH_LOGOUT' })
       toast.success('Logged out successfully')
     }
   }
 
-  // Set up periodic token validation
-  useEffect(() => {
-    if (state.isAuthenticated && state.token) {
-      const interval = setInterval(() => {
-        authService.getProfile()
-          .catch((error) => {
-            if (error.response?.status === 401) {
-              console.log('Token expired, logging out...')
-              logout()
-            }
-          })
-      }, 5 * 60 * 1000) // Check every 5 minutes
-
-      return () => clearInterval(interval)
-    }
-  }, [state.isAuthenticated, state.token, logout])
-
   // Login function
   const login = async (email, password) => {
-    dispatch({ type: 'LOGIN_START' })
-    
+    console.log('🔑 [AUTH] Starting login for:', email)
+    dispatch({ type: 'AUTH_START' })
+
     try {
-      const response = await authService.login(email, password)
-      const { user, accessToken } = response.data.data
-      
-      // Store token in localStorage
-      localStorage.setItem('token', accessToken)
-      
-      dispatch({
-        type: 'LOGIN_SUCCESS',
-        payload: { user, accessToken }
-      })
-      
+      const { data, error } = await signIn(email, password)
+
+      if (error) {
+        console.log('❌ [AUTH] Login error:', error.message)
+        throw error
+      }
+
+      console.log('✅ [AUTH] Supabase sign in successful, waiting for state change...')
+      // Profile will be loaded automatically by the auth state change listener
       toast.success('Login successful!')
       return { success: true }
     } catch (error) {
-      const errorMessage = error.response?.data?.error?.message || 'Login failed'
+      const errorMessage = error.message || 'Login failed'
+      console.log('❌ [AUTH] Login failed:', errorMessage)
       dispatch({
-        type: 'LOGIN_FAILURE',
+        type: 'AUTH_FAILURE',
         payload: errorMessage
       })
       toast.error(errorMessage)
@@ -151,47 +222,61 @@ export const AuthProvider = ({ children }) => {
     }
   }
 
-  // Register function
-  const register = async (userData) => {
-    dispatch({ type: 'LOGIN_START' })
-    
+  // Register company with admin user
+  const registerCompany = async (companyData, userData) => {
+    dispatch({ type: 'AUTH_START' })
+
     try {
-      const response = await authService.register(userData)
-      const { user, accessToken } = response.data.data
-      
-      // Store token in localStorage
-      localStorage.setItem('token', accessToken)
-      
-      dispatch({
-        type: 'LOGIN_SUCCESS',
-        payload: { user, accessToken }
-      })
-      
-      toast.success('Registration successful!')
+      const { data, error } = await signUpWithCompany(userData, companyData)
+
+      if (error) {
+        throw error
+      }
+
+      // User will be automatically signed in after email confirmation
+      toast.success('Company registered successfully! Please check your email to verify your account.')
       return { success: true }
     } catch (error) {
-      const errorMessage = error.response?.data?.error?.message || 'Registration failed'
+      const errorMessage = error.message || 'Registration failed'
       dispatch({
-        type: 'LOGIN_FAILURE',
+        type: 'AUTH_FAILURE',
         payload: errorMessage
       })
       toast.error(errorMessage)
       return { success: false, error: errorMessage }
     }
+  }
+
+  // Legacy register function for backward compatibility
+  const register = async (userData) => {
+    // For backward compatibility, treat as company registration
+    return registerCompany(
+      { name: userData.company || 'My Company' },
+      userData
+    )
   }
 
   // Update user profile
   const updateProfile = async (profileData) => {
     try {
-      const response = await authService.updateProfile(profileData)
+      if (!state.user?.id) {
+        throw new Error('User not authenticated')
+      }
+
+      const { data, error } = await updateUserProfile(state.user.id, profileData)
+
+      if (error) {
+        throw error
+      }
+
       dispatch({
         type: 'UPDATE_USER',
-        payload: response.data.data.user
+        payload: data
       })
       toast.success('Profile updated successfully!')
       return { success: true }
     } catch (error) {
-      const errorMessage = error.response?.data?.error?.message || 'Profile update failed'
+      const errorMessage = error.message || 'Profile update failed'
       toast.error(errorMessage)
       return { success: false, error: errorMessage }
     }
@@ -206,6 +291,7 @@ export const AuthProvider = ({ children }) => {
     ...state,
     login,
     register,
+    registerCompany,
     logout,
     updateProfile,
     clearError

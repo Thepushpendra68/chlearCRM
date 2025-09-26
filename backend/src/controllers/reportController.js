@@ -24,7 +24,7 @@ const getLeadPerformance = async (req, res, next) => {
       industry
     };
 
-    const metrics = await reportService.getLeadPerformanceMetrics(filters);
+    const metrics = await reportService.getLeadPerformanceMetrics(req.user, filters);
     
     res.json({
       success: true,
@@ -52,7 +52,7 @@ const getConversionFunnel = async (req, res, next) => {
       userId
     };
 
-    const funnel = await reportService.getConversionFunnel(filters);
+    const funnel = await reportService.getConversionFunnel(req.user, filters);
     
     res.json({
       success: true,
@@ -84,7 +84,7 @@ const getActivitySummary = async (req, res, next) => {
       leadId
     };
 
-    const summary = await reportService.getActivitySummary(filters);
+    const summary = await reportService.getActivitySummary(req.user, filters);
     
     res.json({
       success: true,
@@ -112,7 +112,7 @@ const getTeamPerformance = async (req, res, next) => {
       teamId
     };
 
-    const performance = await reportService.getTeamPerformanceMetrics(filters);
+    const performance = await reportService.getTeamPerformanceMetrics(req.user, filters);
     
     res.json({
       success: true,
@@ -140,7 +140,7 @@ const getPipelineHealth = async (req, res, next) => {
       userId
     };
 
-    const health = await reportService.getPipelineHealthAnalysis(filters);
+    const health = await reportService.getPipelineHealthAnalysis(req.user, filters);
     
     res.json({
       success: true,
@@ -176,7 +176,7 @@ const generateCustomReport = async (req, res, next) => {
       sortBy
     };
 
-    const report = await reportService.generateCustomReport(reportConfig);
+    const report = await reportService.generateCustomReport(req.user, reportConfig);
     
     res.json({
       success: true,
@@ -208,7 +208,7 @@ const exportReport = async (req, res, next) => {
       filename: filename || `${reportType}_${new Date().toISOString().split('T')[0]}`
     };
 
-    const result = await reportService.exportReport(exportConfig);
+    const result = await reportService.exportReport(req.user, exportConfig);
     
     res.setHeader('Content-Type', result.contentType);
     res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
@@ -225,7 +225,7 @@ const getScheduledReports = async (req, res, next) => {
   try {
     const { userId } = req.query;
     
-    const reports = await reportService.getScheduledReports(userId);
+    const reports = await reportService.getScheduledReports(req.user, userId);
     
     res.json({
       success: true,
@@ -260,7 +260,7 @@ const scheduleReport = async (req, res, next) => {
       createdBy: req.user.id
     };
 
-    const scheduledReport = await reportService.scheduleReport(scheduleConfig);
+    const scheduledReport = await reportService.scheduleReport(req.user, scheduleConfig);
     
     res.json({
       success: true,

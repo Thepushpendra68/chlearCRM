@@ -2,21 +2,35 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## ⚠️ CRITICAL DATABASE REQUIREMENT ⚠️
-**THIS PROJECT USES POSTGRESQL ONLY - NEVER INSTALL, USE, OR REFERENCE SQLITE3 IN ANY FORM**
-**ANY LLM WORKING ON THIS PROJECT MUST UNDERSTAND: DATABASE = POSTGRESQL ONLY**
+## ⚠️ CRITICAL DATABASE REQUIREMENTS ⚠️
+**THIS PROJECT SUPPORTS TWO DATABASE CONFIGURATIONS:**
+1. **TRADITIONAL**: PostgreSQL with local/Docker setup (legacy)
+2. **MODERN**: Supabase (PostgreSQL + Auth + Real-time) - **CURRENT ACTIVE BRANCH**
+
+**NEVER INSTALL, USE, OR REFERENCE SQLITE3 IN ANY FORM**
+**CURRENT BRANCH: `auth-supabase-multi-user-role` - Uses Supabase exclusively**
 
 ## Development Commands
+
+### 🚀 **AUTOMATED STARTUP SCRIPTS (RECOMMENDED)**
+```bash
+# Windows batch scripts for seamless development:
+start-dev.bat        # Docker mode: Backend on :5001, Frontend on :3000
+start-local.bat      # Local mode: Backend on :5000, Frontend on :3000
+stop-all.bat         # Stop all services and clean ports
+```
+**These scripts automatically handle port conflicts and configuration**
 
 ### Backend Development (Node.js/Express)
 ```bash
 cd backend
 npm run dev          # Start development server with nodemon
 npm run start        # Start production server
-npm run migrate      # Run database migrations
-npm run seed         # Seed database with sample data
+npm run migrate      # Run database migrations (PostgreSQL mode)
+npm run seed         # Seed database with sample data (PostgreSQL mode)
 npm run test         # Run tests with Jest
 npm run test:watch   # Run tests in watch mode
+npm run kill-port    # Kill port 5000 if needed
 ```
 
 ### Frontend Development (React/Vite)
@@ -26,6 +40,16 @@ npm run dev          # Start Vite development server
 npm run build        # Build for production
 npm run preview      # Preview production build
 npm run lint         # Run ESLint
+npm run test         # Run Vitest tests
+npm run test:ui      # Run tests with UI
+```
+
+### Supabase Integration Commands
+```bash
+# Supabase-specific operations:
+node backend/migrate-supabase.js     # Apply Supabase migrations
+node backend/verify-fix.js           # Verify Supabase setup
+node debug-user-lookup.js            # Debug user authentication
 ```
 
 ### Database Operations
@@ -53,13 +77,14 @@ npm run lint         # Run ESLint checks
 This is a full-stack CRM application with separated backend and frontend:
 
 ### Backend Architecture
-- **Express.js** REST API with JWT authentication
-- **PostgreSQL** database with **Knex.js** query builder
-- **⚠️ CRITICAL: THIS PROJECT USES POSTGRESQL ONLY - NEVER USE SQLITE3**
+- **Express.js** REST API with hybrid authentication system
+- **Database**: Supabase (PostgreSQL + Auth) on current branch, with legacy Knex.js support
+- **⚠️ CRITICAL: CURRENT BRANCH USES SUPABASE - NEVER USE SQLITE3**
+- **Authentication**: Dual-mode (Supabase Auth + JWT fallback)
 - **MVC pattern**: Controllers → Services → Database
 - **Middleware**: Authentication, rate limiting, CORS, validation
 - **Structure**:
-  - `src/controllers/` - Route handlers (auth, leads, users, dashboard, pipeline, activities, assignments, reports, tasks, import)
+  - `src/controllers/` - Route handlers (auth, leads, users, dashboard, pipeline, activities, assignments, reports, tasks, import, search)
   - `src/services/` - Business logic layer
   - `src/middleware/` - Custom middleware (auth, error handling)
   - `src/routes/` - API route definitions
@@ -76,7 +101,7 @@ This is a full-stack CRM application with separated backend and frontend:
 - **Tailwind CSS** for styling
 - **Structure**:
   - `src/pages/` - Page components (Dashboard, Leads, Users, Pipeline, Activities, Assignments, Reports, Tasks)
-  - `src/components/` - Reusable UI components organized by feature (Layout, Pipeline, Activities, Assignment, Reports, Tasks, Import, Export)
+  - `src/components/` - Reusable UI components organized by feature (Layout, Pipeline, Activities, Assignment, Reports, Tasks, Import, Export, Search)
   - `src/context/` - React Context providers (AuthContext)
   - `src/services/` - API service functions for each module
   - `src/hooks/` - Custom React hooks (useDragAndDrop)
@@ -91,43 +116,80 @@ This is a full-stack CRM application with separated backend and frontend:
 - **Task management**: Task creation and tracking system
 - **Reporting system**: Customizable reports and analytics
 - **Import/Export**: CSV and Excel import/export functionality
+- **Global search**: Cross-module search functionality with suggestions
 - **Dashboard**: Analytics and recent activity
 - **User management**: Admin-only user administration
 
 ## Environment Setup
 
+### Supabase Configuration (Current Branch)
+Frontend requires `.env` file with:
+```bash
+VITE_SUPABASE_URL=your_supabase_project_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
 Backend requires `.env` file with:
-- Database connection (**POSTGRESQL ONLY - NO SQLITE3**): `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`
+```bash
+SUPABASE_URL=your_supabase_project_url
+SUPABASE_SERVICE_KEY=your_supabase_service_role_key
+```
+
+### Legacy PostgreSQL Configuration
+Backend `.env` for traditional setup:
+- Database connection: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`
 - JWT configuration: `JWT_SECRET`, `JWT_EXPIRES_IN`
 - CORS configuration: `FRONTEND_URL`
 - Rate limiting: `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_MAX_REQUESTS`
 - Environment: `NODE_ENV`, `PORT`
 
-Default login credentials after seeding:
+### Authentication Setup
+**Supabase Mode**: Register via `/register-company` endpoint for multi-tenant setup
+**Legacy Mode**: Default credentials after seeding:
 - Admin: `admin@crm.com` / `admin123`
-- Manager: `manager@crm.com` / `admin123`  
+- Manager: `manager@crm.com` / `admin123`
 - Sales Rep: `sales@crm.com` / `admin123`
 
 ## Development Flow
 
+### Recommended Workflow (Current Branch)
+1. **Use automated scripts**: `start-dev.bat` or `start-local.bat`
+2. **Port configuration**: Backend varies by mode (5000 local, 5001 docker), Frontend always 3000
+3. **Supabase setup**: Run SQL setup from `SUPABASE_SETUP.md` if needed
+4. **Authentication**: Supabase Auth tokens with fallback to JWT
+5. **API endpoints** follow `/api/<resource>` pattern
+6. **Error handling**: Centralized error middleware with ApiError class
+
+### Legacy Workflow
 1. **Database first**: Run migrations and seeds before starting servers
-2. **Backend on port 5000**, Frontend on port 3000
-3. **API endpoints** follow `/api/<resource>` pattern
-4. **Authentication**: JWT tokens in Authorization headers
-5. **Error handling**: Centralized error middleware with ApiError class
+2. **Manual startup**: `npm run dev` in backend/frontend directories
+3. **Authentication**: JWT tokens in Authorization headers
 
 ## Testing
 
 - Backend uses **Jest** and **Supertest**
-- Run `npm test` in backend directory
-- Frontend testing setup available but minimal
+- Frontend uses **Vitest** and **React Testing Library**
+- Run `npm test` in respective directories
+- Frontend has UI test runner: `npm run test:ui`
 
 ## Common Issues
 
+### Current Branch (Supabase)
+- **Port conflicts**: Use `stop-all.bat` then restart with appropriate script
+- **Supabase setup**: Check `SUPABASE_SETUP.md` for database schema setup
+- **Authentication errors**: Verify Supabase environment variables in frontend
+- **Company registration**: Ensure auth triggers are properly configured in Supabase
+
+### Legacy Issues
 - Ensure PostgreSQL is running before starting backend
 - CORS configured for localhost:3000 development
 - Rate limiting may block rapid API calls during development
 - JWT tokens expire based on JWT_EXPIRES_IN setting
+
+### Automated Scripts Troubleshooting
+- If scripts fail, run `stop-all.bat` and wait 10 seconds before retrying
+- Check that Docker is running for `start-dev.bat`
+- Ensure no other applications are using ports 3000, 5000, or 5001
 
 ## Important Implementation Details
 
@@ -159,6 +221,12 @@ Default login credentials after seeding:
 - Database changes require migration files - never modify existing migrations
 - Frontend changes auto-reload in browser during development
 
+### Docker & Deployment
+- **Docker Compose**: Full containerization with PostgreSQL, backend, and frontend services
+- **Health Checks**: Configured for all services with graceful shutdown
+- **Vercel Integration**: Frontend deployment configuration available
+- **Development**: Use `docker-compose up` for complete environment
+
 ## Critical Implementation Details
 
 ### Data Type Handling & Validation
@@ -172,10 +240,14 @@ Default login credentials after seeding:
 - **ApiError Class**: Custom error class with proper HTTP status codes and consistent error response format
 
 ### Database Constraints & Relationships
-- **DATABASE TYPE: POSTGRESQL ONLY - NEVER USE SQLITE3**
+- **DATABASE TYPE: POSTGRESQL (Supabase or traditional) - NEVER USE SQLITE3**
+- **Current Branch**: Uses Supabase with RLS policies and auth triggers
 - **Foreign Key Constraints**: `pipeline_stage_id` references `pipeline_stages.id`, `assigned_to` references `users.id`
-- **Migration Dependencies**: Always run `npm run migrate` after pulling changes - schema evolution tracked through sequential migrations
+- **Migration Dependencies**:
+  - **Supabase**: Use migration scripts in root directory or manual SQL execution
+  - **Legacy**: Always run `npm run migrate` after pulling changes
 - **Data Integrity**: Empty string validation converted to NULL prevents constraint violations during updates
+- **Multi-tenancy**: Company-based data isolation with Row Level Security (RLS) policies
 
 ### Form & State Management Patterns
 - **Frontend Validation**: React Hook Form with schemas matching backend express-validator rules

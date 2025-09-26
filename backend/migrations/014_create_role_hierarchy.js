@@ -1,0 +1,121 @@
+/**
+ * Migration: Create role hierarchy for multi-tenant system
+ * This migration creates custom role types and role permission structures
+ * for the hierarchical role-based access control system.
+ */
+
+exports.up = function(knex) {
+  return knex.schema.raw(`
+    -- Create custom role type with hierarchy
+    CREATE TYPE user_role_new AS ENUM (
+      'super_admin',     -- Platform-level admin (can see all companies)
+      'company_admin',   -- Company-level admin (can manage company users)
+      'manager',         -- Department manager (can manage team leads)
+      'sales_rep'        -- Individual contributor (can manage assigned leads)
+    );
+
+    -- Create role permissions table
+    CREATE TABLE role_permissions (
+      role user_role_new PRIMARY KEY,
+      permissions TEXT[] NOT NULL,
+      description TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    -- Insert default permissions for each role
+    INSERT INTO role_permissions (role, permissions, description) VALUES
+    (
+      'super_admin',
+      ARRAY[
+        'companies:*', 'users:*', 'leads:*', 'activities:*',
+        'reports:*', 'settings:*', 'billing:*', 'support:*'
+      ],
+      'Platform administrator with full system access'
+    ),
+    (
+      'company_admin',
+      ARRAY[
+        'company:read', 'company:write', 'users:create', 'users:read', 'users:write',
+        'users:delete', 'leads:*', 'activities:*', 'reports:*', 'settings:read', 'settings:write'
+      ],
+      'Company administrator with full company-level access'
+    ),
+    (
+      'manager',
+      ARRAY[
+        'users:read', 'leads:*', 'activities:*', 'reports:read', 'reports:write',
+        'assignments:read', 'assignments:write', 'pipeline:read', 'pipeline:write'
+      ],
+      'Department manager with team and lead management access'
+    ),
+    (
+      'sales_rep',
+      ARRAY[
+        'leads:read', 'leads:write', 'activities:read', 'activities:write',
+        'reports:read', 'assignments:read', 'profile:read', 'profile:write'
+      ],
+      'Sales representative with limited access to assigned leads'
+    );
+
+    -- Create user role assignments table (for flexible role management)
+    CREATE TABLE user_role_assignments (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID NOT NULL,
+      company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
+      role user_role_new NOT NULL DEFAULT 'sales_rep',
+      assigned_by UUID,
+      assigned_at TIMESTAMPTZ DEFAULT NOW(),
+      expires_at TIMESTAMPTZ,
+      is_active BOOLEAN DEFAULT true,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    -- Create indexes for efficient role queries
+    CREATE INDEX idx_user_role_assignments_user_company ON user_role_assignments(user_id, company_id);
+    CREATE INDEX idx_user_role_assignments_company_role ON user_role_assignments(company_id, role);
+    CREATE INDEX idx_user_role_assignments_active ON user_role_assignments(is_active);
+  `)
+  .then(() => {
+    // Update the existing users table role column to support new roles
+    return knex.schema.raw(`
+      -- Add the new role column first
+      ALTER TABLE users ADD COLUMN role_new user_role_new DEFAULT 'sales_rep';
+
+      -- Update values based on existing role column
+      UPDATE users SET role_new =
+        CASE role
+          WHEN 'admin' THEN 'company_admin'::user_role_new
+          WHEN 'manager' THEN 'manager'::user_role_new
+          WHEN 'sales_rep' THEN 'sales_rep'::user_role_new
+          ELSE 'sales_rep'::user_role_new
+        END;
+
+      -- Drop the old role column (this will remove the constraint)
+      ALTER TABLE users DROP COLUMN role;
+
+      -- Rename the new column to role
+      ALTER TABLE users RENAME COLUMN role_new TO role;
+
+      -- Make the new role column NOT NULL
+      ALTER TABLE users ALTER COLUMN role SET NOT NULL;
+    `);
+  });
+};
+
+exports.down = function(knex) {
+  return knex.schema.raw(`
+    -- Drop tables
+    DROP TABLE IF EXISTS user_role_assignments;
+    DROP TABLE IF EXISTS role_permissions;
+
+    -- Drop custom type
+    DROP TYPE IF EXISTS user_role_new;
+  `)
+  .then(() => {
+    // Revert users table role column to original enum
+    return knex.schema.alterTable('users', function(table) {
+      table.enu('role', ['admin', 'manager', 'sales_rep']).alter();
+    });
+  });
+};

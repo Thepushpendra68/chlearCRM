@@ -123,13 +123,7 @@ const Login = () => {
               Demo credentials:
             </p>
             <p className="text-xs text-gray-500 mt-1">
-              Admin: admin@crm.com / Admin123!
-            </p>
-            <p className="text-xs text-gray-500">
-              Manager: manager@crm.com / Manager123!
-            </p>
-            <p className="text-xs text-gray-500">
-              Sales: sales1@crm.com / Sales123!
+              Company Admin: pushpendrachl@gmail.com / Chahar@36910?
             </p>
           </div>
         </form>

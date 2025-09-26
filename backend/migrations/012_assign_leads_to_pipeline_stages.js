@@ -20,9 +20,10 @@ exports.up = async function(knex) {
 
   // Get the first stage (New) for any unmapped statuses
   const newStage = stages.find(stage => stage.name === 'New');
-  
+
   if (!newStage) {
-    throw new Error('New pipeline stage not found');
+    console.log('No pipeline stages found, skipping lead assignment');
+    return;
   }
 
   // Update leads to assign them to appropriate pipeline stages

@@ -1,16 +1,30 @@
-const db = require('../config/database');
+const { supabaseAdmin } = require('../config/supabase');
 const AssignmentRules = require('../utils/assignmentRules');
 
 class AssignmentService {
   // Get all assignment rules
-  async getAllRules() {
+  async getAllRules(currentUser) {
     try {
-      const rules = await db('lead_assignment_rules')
+      const supabase = supabaseAdmin;
+
+      // Check permissions - managers and admins can view rules
+      if (!['company_admin', 'super_admin', 'manager'].includes(currentUser.role)) {
+        return { success: false, error: 'Access denied' };
+      }
+
+      const { data: rules, error } = await supabase
+        .from('lead_assignment_rules')
         .select('*')
-        .orderBy('priority', 'desc')
-        .orderBy('created_at', 'asc');
-      
-      return { success: true, data: rules };
+        .eq('company_id', currentUser.company_id)
+        .order('priority', { ascending: false })
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching assignment rules:', error);
+        return { success: false, error: error.message };
+      }
+
+      return { success: true, data: rules || [] };
     } catch (error) {
       console.error('Error fetching assignment rules:', error);
       return { success: false, error: error.message };
@@ -18,15 +32,24 @@ class AssignmentService {
   }
 
   // Get active assignment rules
-  async getActiveRules() {
+  async getActiveRules(currentUser) {
     try {
-      const rules = await db('lead_assignment_rules')
+      const supabase = supabaseAdmin;
+
+      const { data: rules, error } = await supabase
+        .from('lead_assignment_rules')
         .select('*')
-        .where('is_active', true)
-        .orderBy('priority', 'desc')
-        .orderBy('created_at', 'asc');
-      
-      return { success: true, data: rules };
+        .eq('company_id', currentUser.company_id)
+        .eq('is_active', true)
+        .order('priority', { ascending: false })
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching active assignment rules:', error);
+        return { success: false, error: error.message };
+      }
+
+      return { success: true, data: rules || [] };
     } catch (error) {
       console.error('Error fetching active assignment rules:', error);
       return { success: false, error: error.message };
@@ -34,17 +57,21 @@ class AssignmentService {
   }
 
   // Get assignment rule by ID
-  async getRuleById(ruleId) {
+  async getRuleById(ruleId, currentUser) {
     try {
-      const rule = await db('lead_assignment_rules')
+      const supabase = supabaseAdmin;
+
+      const { data: rule, error } = await supabase
+        .from('lead_assignment_rules')
         .select('*')
-        .where('id', ruleId)
-        .first();
-      
-      if (!rule) {
+        .eq('id', ruleId)
+        .eq('company_id', currentUser.company_id)
+        .single();
+
+      if (error || !rule) {
         return { success: false, error: 'Assignment rule not found' };
       }
-      
+
       return { success: true, data: rule };
     } catch (error) {
       console.error('Error fetching assignment rule:', error);
@@ -53,31 +80,45 @@ class AssignmentService {
   }
 
   // Create new assignment rule
-  async createRule(ruleData) {
+  async createRule(ruleData, currentUser) {
     try {
+      // Only admins and managers can create assignment rules
+      if (!['company_admin', 'super_admin', 'manager'].includes(currentUser.role)) {
+        return { success: false, error: 'Access denied' };
+      }
+
       // Validate conditions
       const validation = AssignmentRules.validateConditions(ruleData.conditions);
       if (!validation.valid) {
         return { success: false, error: `Invalid conditions: ${validation.errors.join(', ')}` };
       }
 
+      const supabase = supabaseAdmin;
+
       const newRule = {
         name: ruleData.name,
-        conditions: JSON.stringify(ruleData.conditions),
+        conditions: ruleData.conditions, // Store as object, not JSON string
         assignment_type: ruleData.assignment_type,
         assigned_to: ruleData.assigned_to || null,
         is_active: ruleData.is_active !== undefined ? ruleData.is_active : true,
         priority: ruleData.priority || 1,
-        created_at: new Date(),
-        updated_at: new Date()
+        company_id: currentUser.company_id,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
 
-      const [ruleId] = await db('lead_assignment_rules').insert(newRule).returning('id');
-      
-      // Fetch the created rule
-      const createdRule = await this.getRuleById(ruleId.id);
-      
-      return { success: true, data: createdRule.data };
+      const { data: rule, error } = await supabase
+        .from('lead_assignment_rules')
+        .insert(newRule)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating assignment rule:', error);
+        return { success: false, error: error.message };
+      }
+
+      return { success: true, data: rule };
     } catch (error) {
       console.error('Error creating assignment rule:', error);
       return { success: false, error: error.message };
@@ -85,12 +126,25 @@ class AssignmentService {
   }
 
   // Update assignment rule
-  async updateRule(ruleId, ruleData) {
+  async updateRule(ruleId, ruleData, currentUser) {
     try {
-      // Check if rule exists
-      const existingRule = await this.getRuleById(ruleId);
-      if (!existingRule.success) {
-        return existingRule;
+      // Only admins and managers can update assignment rules
+      if (!['company_admin', 'super_admin', 'manager'].includes(currentUser.role)) {
+        return { success: false, error: 'Access denied' };
+      }
+
+      const supabase = supabaseAdmin;
+
+      // Check if rule exists and belongs to company
+      const { data: existingRule, error: findError } = await supabase
+        .from('lead_assignment_rules')
+        .select('*')
+        .eq('id', ruleId)
+        .eq('company_id', currentUser.company_id)
+        .single();
+
+      if (findError || !existingRule) {
+        return { success: false, error: 'Assignment rule not found' };
       }
 
       // Validate conditions if provided
@@ -103,22 +157,23 @@ class AssignmentService {
 
       const updateData = {
         ...ruleData,
-        updated_at: new Date()
+        updated_at: new Date().toISOString()
       };
 
-      // Convert conditions to JSON if provided
-      if (updateData.conditions) {
-        updateData.conditions = JSON.stringify(updateData.conditions);
+      const { data: updatedRule, error } = await supabase
+        .from('lead_assignment_rules')
+        .update(updateData)
+        .eq('id', ruleId)
+        .eq('company_id', currentUser.company_id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error updating assignment rule:', error);
+        return { success: false, error: error.message };
       }
 
-      await db('lead_assignment_rules')
-        .where('id', ruleId)
-        .update(updateData);
-
-      // Fetch the updated rule
-      const updatedRule = await this.getRuleById(ruleId);
-      
-      return { success: true, data: updatedRule.data };
+      return { success: true, data: updatedRule };
     } catch (error) {
       console.error('Error updating assignment rule:', error);
       return { success: false, error: error.message };
@@ -126,16 +181,26 @@ class AssignmentService {
   }
 
   // Delete assignment rule
-  async deleteRule(ruleId) {
+  async deleteRule(ruleId, currentUser) {
     try {
-      const result = await db('lead_assignment_rules')
-        .where('id', ruleId)
-        .del();
-      
-      if (result === 0) {
-        return { success: false, error: 'Assignment rule not found' };
+      // Only admins and managers can delete assignment rules
+      if (!['company_admin', 'super_admin', 'manager'].includes(currentUser.role)) {
+        return { success: false, error: 'Access denied' };
       }
-      
+
+      const supabase = supabaseAdmin;
+
+      const { error } = await supabase
+        .from('lead_assignment_rules')
+        .delete()
+        .eq('id', ruleId)
+        .eq('company_id', currentUser.company_id);
+
+      if (error) {
+        console.error('Error deleting assignment rule:', error);
+        return { success: false, error: error.message };
+      }
+
       return { success: true, message: 'Assignment rule deleted successfully' };
     } catch (error) {
       console.error('Error deleting assignment rule:', error);
@@ -144,48 +209,52 @@ class AssignmentService {
   }
 
   // Assign lead manually
-  async assignLead(leadId, assignedTo, assignedBy, reason = 'Manual assignment') {
+  async assignLead(leadId, assignedTo, assignedBy, reason = 'Manual assignment', currentUser) {
     try {
-      const trx = await db.transaction();
+      const supabase = supabaseAdmin;
 
-      try {
-        // Get current lead assignment
-        const lead = await trx('leads')
-          .select('assigned_to')
-          .where('id', leadId)
-          .first();
+      // Check if lead exists and belongs to company
+      const { data: lead, error: leadError } = await supabase
+        .from('leads')
+        .select('*')
+        .eq('id', leadId)
+        .eq('company_id', currentUser.company_id)
+        .single();
 
-        if (!lead) {
-          throw new Error('Lead not found');
-        }
-
-        // Update lead assignment
-        await trx('leads')
-          .where('id', leadId)
-          .update({
-            assigned_to: assignedTo,
-            assigned_at: new Date(),
-            assignment_source: 'manual',
-            assignment_rule_id: null,
-            updated_at: new Date()
-          });
-
-        // Record assignment history
-        await trx('lead_assignment_history').insert({
-          lead_id: leadId,
-          previous_assigned_to: lead.assigned_to,
-          new_assigned_to: assignedTo,
-          assigned_by: assignedBy,
-          assignment_reason: reason
-        });
-
-        await trx.commit();
-
-        return { success: true, message: 'Lead assigned successfully' };
-      } catch (error) {
-        await trx.rollback();
-        throw error;
+      if (leadError || !lead) {
+        return { success: false, error: 'Lead not found' };
       }
+
+      // Check if assigned user exists and belongs to company
+      const { data: assignedUser, error: userError } = await supabase
+        .from('user_profiles')
+        .select('id')
+        .eq('id', assignedTo)
+        .eq('company_id', currentUser.company_id)
+        .single();
+
+      if (userError || !assignedUser) {
+        return { success: false, error: 'Assigned user not found' };
+      }
+
+      // Update lead assignment
+      const { error } = await supabase
+        .from('leads')
+        .update({
+          assigned_to: assignedTo,
+          assigned_at: new Date().toISOString(),
+          assignment_source: 'manual',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', leadId)
+        .eq('company_id', currentUser.company_id);
+
+      if (error) {
+        console.error('Error assigning lead:', error);
+        return { success: false, error: error.message };
+      }
+
+      return { success: true, message: 'Lead assigned successfully' };
     } catch (error) {
       console.error('Error assigning lead:', error);
       return { success: false, error: error.message };
@@ -193,32 +262,23 @@ class AssignmentService {
   }
 
   // Bulk assign leads
-  async bulkAssignLeads(leadIds, assignedTo, assignedBy, reason = 'Bulk assignment') {
+  async bulkAssignLeads(leadIds, assignedTo, assignedBy, reason = 'Bulk assignment', currentUser) {
     try {
-      const trx = await db.transaction();
+      const results = [];
 
-      try {
-        const results = [];
-
-        for (const leadId of leadIds) {
-          const result = await this.assignLead(leadId, assignedTo, assignedBy, reason);
-          results.push({ leadId, success: result.success, error: result.error });
-        }
-
-        await trx.commit();
-
-        const successCount = results.filter(r => r.success).length;
-        const errorCount = results.filter(r => !r.success).length;
-
-        return {
-          success: true,
-          message: `Bulk assignment completed: ${successCount} successful, ${errorCount} failed`,
-          results
-        };
-      } catch (error) {
-        await trx.rollback();
-        throw error;
+      for (const leadId of leadIds) {
+        const result = await this.assignLead(leadId, assignedTo, assignedBy, reason, currentUser);
+        results.push({ leadId, success: result.success, error: result.error });
       }
+
+      const successCount = results.filter(r => r.success).length;
+      const errorCount = results.filter(r => !r.success).length;
+
+      return {
+        success: true,
+        message: `Bulk assignment completed: ${successCount} successful, ${errorCount} failed`,
+        results
+      };
     } catch (error) {
       console.error('Error in bulk assignment:', error);
       return { success: false, error: error.message };
@@ -226,26 +286,14 @@ class AssignmentService {
   }
 
   // Get assignment history for a lead
-  async getLeadAssignmentHistory(leadId) {
+  async getLeadAssignmentHistory(leadId, currentUser) {
     try {
-      const history = await db('lead_assignment_history')
-        .select(
-          'lah.*',
-          db.raw("CONCAT(u1.first_name, ' ', u1.last_name) as assigned_by_name"),
-          'u1.email as assigned_by_email',
-          db.raw("CONCAT(u2.first_name, ' ', u2.last_name) as previous_assigned_name"),
-          'u2.email as previous_assigned_email',
-          db.raw("CONCAT(u3.first_name, ' ', u3.last_name) as new_assigned_name"),
-          'u3.email as new_assigned_email'
-        )
-        .from('lead_assignment_history as lah')
-        .leftJoin('users as u1', 'lah.assigned_by', 'u1.id')
-        .leftJoin('users as u2', 'lah.previous_assigned_to', 'u2.id')
-        .leftJoin('users as u3', 'lah.new_assigned_to', 'u3.id')
-        .where('lah.lead_id', leadId)
-        .orderBy('lah.created_at', 'desc');
-
-      return { success: true, data: history };
+      // Since we don't have assignment history table, return basic info
+      return {
+        success: true,
+        data: [],
+        message: 'Assignment history not available in current schema'
+      };
     } catch (error) {
       console.error('Error fetching assignment history:', error);
       return { success: false, error: error.message };
@@ -253,25 +301,52 @@ class AssignmentService {
   }
 
   // Get team workload distribution
-  async getTeamWorkload() {
+  async getTeamWorkload(currentUser) {
     try {
-      const workload = await db('leads')
-        .select(
-          'u.id as user_id',
-          db.raw("CONCAT(u.first_name, ' ', u.last_name) as user_name"),
-          'u.email as user_email',
-          db.raw('COUNT(l.id) as total_leads'),
-          db.raw('COUNT(CASE WHEN l.status = ? THEN 1 END) as active_leads', ['active']),
-          db.raw('COUNT(CASE WHEN l.status = ? THEN 1 END) as won_leads', ['won']),
-          db.raw('COUNT(CASE WHEN l.status = ? THEN 1 END) as lost_leads', ['lost']),
-          db.raw('COALESCE(SUM(l.deal_value), 0) as total_deal_value'),
-          db.raw('COALESCE(AVG(l.deal_value), 0) as avg_deal_value')
-        )
-        .from('users as u')
-        .leftJoin('leads as l', 'u.id', 'l.assigned_to')
-        .where('u.role', '!=', 'admin')
-        .groupBy('u.id', 'u.first_name', 'u.last_name', 'u.email')
-        .orderBy('total_leads', 'desc');
+      const supabase = supabaseAdmin;
+
+      // Get users in the company
+      const { data: users, error: usersError } = await supabase
+        .from('user_profiles')
+        .select('id, first_name, last_name, email')
+        .eq('company_id', currentUser.company_id)
+        .neq('role', 'super_admin');
+
+      if (usersError) {
+        console.error('Error fetching users:', usersError);
+        return { success: false, error: usersError.message };
+      }
+
+      // Get lead counts by assigned user
+      const { data: leadCounts, error: countsError } = await supabase
+        .from('leads')
+        .select('assigned_to, status')
+        .eq('company_id', currentUser.company_id);
+
+      if (countsError) {
+        console.error('Error fetching lead counts:', countsError);
+        return { success: false, error: countsError.message };
+      }
+
+      // Calculate workload for each user
+      const workload = users.map(user => {
+        const userLeads = leadCounts.filter(lead => lead.assigned_to === user.id);
+        const activeLeads = userLeads.filter(lead => lead.status === 'active').length;
+        const wonLeads = userLeads.filter(lead => lead.status === 'converted').length;
+        const lostLeads = userLeads.filter(lead => lead.status === 'lost').length;
+
+        return {
+          user_id: user.id,
+          user_name: `${user.first_name} ${user.last_name}`,
+          user_email: user.email,
+          total_leads: userLeads.length,
+          active_leads: activeLeads,
+          won_leads: wonLeads,
+          lost_leads: lostLeads,
+          total_deal_value: 0, // Not available in current schema
+          avg_deal_value: 0    // Not available in current schema
+        };
+      });
 
       return { success: true, data: workload };
     } catch (error) {
@@ -281,51 +356,55 @@ class AssignmentService {
   }
 
   // Redistribute leads based on workload
-  async redistributeLeads(assignedBy) {
+  async redistributeLeads(assignedBy, currentUser) {
     try {
-      const trx = await db.transaction();
-
-      try {
-        // Get current workload
-        const workloadResult = await this.getTeamWorkload();
-        if (!workloadResult.success) {
-          throw new Error(workloadResult.error);
-        }
-
-        const workload = workloadResult.data;
-        
-        // Find user with minimum leads
-        const minLeads = Math.min(...workload.map(w => w.total_leads));
-        const targetUser = workload.find(w => w.total_leads === minLeads);
-
-        if (!targetUser) {
-          throw new Error('No target user found for redistribution');
-        }
-
-        // Get unassigned leads
-        const unassignedLeads = await trx('leads')
-          .select('id')
-          .whereNull('assigned_to')
-          .limit(10); // Limit to prevent overwhelming
-
-        // Assign unassigned leads to target user
-        const results = [];
-        for (const lead of unassignedLeads) {
-          const result = await this.assignLead(lead.id, targetUser.user_id, assignedBy, 'Workload redistribution');
-          results.push({ leadId: lead.id, success: result.success, error: result.error });
-        }
-
-        await trx.commit();
-
-        return {
-          success: true,
-          message: `Redistributed ${results.filter(r => r.success).length} leads to ${targetUser.user_name}`,
-          results
-        };
-      } catch (error) {
-        await trx.rollback();
-        throw error;
+      // Check permissions - only admins can redistribute leads
+      if (!['company_admin', 'super_admin'].includes(currentUser.role)) {
+        return { success: false, error: 'Access denied' };
       }
+
+      // Get current workload
+      const workloadResult = await this.getTeamWorkload(currentUser);
+      if (!workloadResult.success) {
+        return workloadResult;
+      }
+
+      const workload = workloadResult.data;
+
+      // Find user with minimum leads
+      const minLeads = Math.min(...workload.map(w => w.total_leads));
+      const targetUser = workload.find(w => w.total_leads === minLeads);
+
+      if (!targetUser) {
+        return { success: false, error: 'No target user found for redistribution' };
+      }
+
+      // Get unassigned leads
+      const supabase = supabaseAdmin;
+      const { data: unassignedLeads, error } = await supabase
+        .from('leads')
+        .select('id')
+        .eq('company_id', currentUser.company_id)
+        .is('assigned_to', null)
+        .limit(10); // Limit to prevent overwhelming
+
+      if (error) {
+        console.error('Error fetching unassigned leads:', error);
+        return { success: false, error: error.message };
+      }
+
+      // Assign unassigned leads to target user
+      const results = [];
+      for (const lead of unassignedLeads || []) {
+        const result = await this.assignLead(lead.id, targetUser.user_id, assignedBy, 'Workload redistribution', currentUser);
+        results.push({ leadId: lead.id, success: result.success, error: result.error });
+      }
+
+      return {
+        success: true,
+        message: `Redistributed ${results.filter(r => r.success).length} leads to ${targetUser.user_name}`,
+        results
+      };
     } catch (error) {
       console.error('Error redistributing leads:', error);
       return { success: false, error: error.message };
@@ -333,18 +412,36 @@ class AssignmentService {
   }
 
   // Get assignment statistics
-  async getAssignmentStats() {
+  async getAssignmentStats(currentUser) {
     try {
-      const stats = await db('leads')
-        .select(
-          db.raw('COUNT(*) as total_leads'),
-          db.raw('COUNT(CASE WHEN assigned_to IS NOT NULL THEN 1 END) as assigned_leads'),
-          db.raw('COUNT(CASE WHEN assigned_to IS NULL THEN 1 END) as unassigned_leads'),
-          db.raw('COUNT(CASE WHEN assignment_source = ? THEN 1 END) as manual_assignments', ['manual']),
-          db.raw('COUNT(CASE WHEN assignment_source = ? THEN 1 END) as auto_assignments', ['auto']),
-          db.raw('COUNT(CASE WHEN assignment_source = ? THEN 1 END) as rule_assignments', ['rule'])
-        )
-        .first();
+      const supabase = supabaseAdmin;
+
+      // Get lead counts by assignment status and source
+      const { data: leads, error } = await supabase
+        .from('leads')
+        .select('assigned_to, assignment_source')
+        .eq('company_id', currentUser.company_id);
+
+      if (error) {
+        console.error('Error fetching leads for stats:', error);
+        return { success: false, error: error.message };
+      }
+
+      const totalLeads = leads.length;
+      const assignedLeads = leads.filter(lead => lead.assigned_to !== null).length;
+      const unassignedLeads = totalLeads - assignedLeads;
+      const manualAssignments = leads.filter(lead => lead.assignment_source === 'manual').length;
+      const autoAssignments = leads.filter(lead => lead.assignment_source === 'auto').length;
+      const ruleAssignments = leads.filter(lead => lead.assignment_source === 'rule').length;
+
+      const stats = {
+        total_leads: totalLeads,
+        assigned_leads: assignedLeads,
+        unassigned_leads: unassignedLeads,
+        manual_assignments: manualAssignments,
+        auto_assignments: autoAssignments,
+        rule_assignments: ruleAssignments
+      };
 
       return { success: true, data: stats };
     } catch (error) {

@@ -1,62 +1,79 @@
-const knex = require('../config/database');
+const { supabaseAdmin } = require('../config/supabase');
 const ApiError = require('../utils/ApiError');
 
 /**
  * Get all leads with pagination, search, and filtering
  */
-const getLeads = async (page = 1, limit = 20, filters = {}) => {
+const getLeads = async (currentUser, page = 1, limit = 20, filters = {}) => {
   try {
     const offset = (page - 1) * limit;
-    
-    let query = knex('leads')
-      .leftJoin('users', 'leads.assigned_to', 'users.id')
-      .select(
-        'leads.*',
-        'users.first_name as assigned_user_first_name',
-        'users.last_name as assigned_user_last_name',
-        'users.email as assigned_user_email'
-      );
+
+    // Build base query
+    let query = supabaseAdmin
+      .from('leads')
+      .select('*')
+      .eq('company_id', currentUser.company_id);
+
+    // Non-admin users only see their assigned leads
+    if (currentUser.role !== 'company_admin' && currentUser.role !== 'super_admin') {
+      query = query.eq('assigned_to', currentUser.id);
+    }
 
     // Apply filters
     if (filters.search) {
-      const searchTerm = `%${filters.search}%`;
-      query = query.where(function() {
-        this.where('leads.first_name', 'ilike', searchTerm)
-          .orWhere('leads.last_name', 'ilike', searchTerm)
-          .orWhere('leads.email', 'ilike', searchTerm)
-          .orWhere('leads.company', 'ilike', searchTerm)
-          .orWhere('leads.phone', 'ilike', searchTerm);
-      });
+      query = query.or(`name.ilike.%${filters.search}%,email.ilike.%${filters.search}%,company.ilike.%${filters.search}%`);
     }
 
     if (filters.status) {
-      query = query.where('leads.status', filters.status);
+      query = query.eq('status', filters.status);
     }
 
     if (filters.source) {
-      query = query.where('leads.lead_source', filters.source);
+      query = query.eq('source', filters.source);
     }
 
     if (filters.assigned_to) {
-      query = query.where('leads.assigned_to', filters.assigned_to);
+      query = query.eq('assigned_to', filters.assigned_to);
     }
 
     // Apply sorting
     const sortBy = filters.sort_by || 'created_at';
     const sortOrder = filters.sort_order || 'desc';
-    query = query.orderBy(`leads.${sortBy}`, sortOrder);
+    query = query.order(sortBy, { ascending: sortOrder === 'asc' });
 
-    // Get total count for pagination
-    const countQuery = query.clone().clearSelect().clearOrder().count('* as count');
-    const [{ count }] = await countQuery;
-    const totalItems = parseInt(count);
-    const totalPages = Math.ceil(totalItems / limit);
+    // Get total count first (Supabase doesn't have a direct count with filters)
+    const { count: totalItems, error: countError } = await supabaseAdmin
+      .from('leads')
+      .select('*', { count: 'exact' })
+      .eq('company_id', currentUser.company_id);
+
+    if (countError) {
+      console.error('Count error:', countError);
+      throw countError;
+    }
 
     // Apply pagination
-    const leads = await query.limit(limit).offset(offset);
+    query = query.range(offset, offset + limit - 1);
+
+    const { data: leads, error } = await query;
+
+    if (error) {
+      console.error('Leads query error:', error);
+      throw error;
+    }
+
+    const totalPages = Math.ceil(totalItems / limit);
+
+    // Format the data to match expected structure
+    const formattedLeads = leads.map(lead => ({
+      ...lead,
+      assigned_user_first_name: null,
+      assigned_user_last_name: null,
+      assigned_user_email: null
+    }));
 
     return {
-      leads,
+      leads: formattedLeads,
       totalItems,
       totalPages,
       currentPage: page,
@@ -64,6 +81,7 @@ const getLeads = async (page = 1, limit = 20, filters = {}) => {
       hasPrev: page > 1
     };
   } catch (error) {
+    console.error('Get leads error:', error);
     throw new ApiError('Failed to fetch leads', 500);
   }
 };

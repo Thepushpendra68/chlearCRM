@@ -3,9 +3,10 @@ import { Toaster } from 'react-hot-toast'
 import { AuthProvider } from './context/AuthContext'
 import { LeadProvider } from './context/LeadContext'
 import ProtectedRoute from './components/ProtectedRoute'
+import RoleProtectedRoute from './components/RoleProtectedRoute'
 import ErrorBoundary from './components/ErrorBoundary'
 import Login from './pages/Login'
-import Register from './pages/Register'
+import RegisterCompany from './pages/RegisterCompany'
 import Homepage from './pages/Homepage'
 import Dashboard from './pages/Dashboard'
 import Leads from './pages/Leads'
@@ -29,7 +30,7 @@ function App() {
             {/* Public routes */}
             <Route path="/" element={<Homepage />} />
             <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
+            <Route path="/register-company" element={<RegisterCompany />} />
             
             {/* Protected routes */}
             <Route path="/app" element={
@@ -43,9 +44,21 @@ function App() {
               <Route path="leads/:id" element={<LeadDetail />} />
               <Route path="pipeline" element={<Pipeline />} />
               <Route path="activities" element={<Activities />} />
-              <Route path="assignments" element={<Assignments />} />
-              <Route path="users" element={<Users />} />
-              <Route path="reports" element={<Reports />} />
+              <Route path="assignments" element={
+                <RoleProtectedRoute allowedRoles={['manager', 'company_admin', 'super_admin']}>
+                  <Assignments />
+                </RoleProtectedRoute>
+              } />
+              <Route path="users" element={
+                <RoleProtectedRoute allowedRoles={['company_admin', 'super_admin']}>
+                  <Users />
+                </RoleProtectedRoute>
+              } />
+              <Route path="reports" element={
+                <RoleProtectedRoute allowedRoles={['manager', 'company_admin', 'super_admin']}>
+                  <Reports />
+                </RoleProtectedRoute>
+              } />
               <Route path="tasks" element={<Tasks />} />
               <Route path="search" element={<SearchResults />} />
             </Route>

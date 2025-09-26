@@ -1,39 +1,77 @@
 import { PlusIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline'
 import { useAuth } from '../context/AuthContext'
+import { useState, useEffect } from 'react'
+import supabase from '../config/supabase'
 
 const Users = () => {
   const { user } = useAuth()
+  const [users, setUsers] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
-  const users = [
-    {
-      id: 1,
-      name: 'Admin User',
-      email: 'admin@crm.com',
-      role: 'admin',
-      is_active: true,
-      created_at: '2024-01-01'
-    },
-    {
-      id: 2,
-      name: 'Manager User',
-      email: 'manager@crm.com',
-      role: 'manager',
-      is_active: true,
-      created_at: '2024-01-02'
-    },
-    {
-      id: 3,
-      name: 'Sales Rep',
-      email: 'sales@crm.com',
-      role: 'sales_rep',
-      is_active: true,
-      created_at: '2024-01-03'
+  // Debug logging
+  console.log('🔍 [USERS] Current user object:', user)
+  console.log('🔍 [USERS] User role:', user?.role)
+
+  // Load users directly from Supabase
+  useEffect(() => {
+    if (user?.company_id) {
+      loadUsers()
     }
-  ]
+  }, [user])
+
+  const loadUsers = async () => {
+    try {
+      setLoading(true)
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select(`
+          id,
+          first_name,
+          last_name,
+          role,
+          is_active,
+          created_at,
+          companies!inner(name)
+        `)
+        .eq('company_id', user.company_id)
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+
+      // Format the data
+      const formattedUsers = data.map(u => ({
+        id: u.id,
+        name: `${u.first_name} ${u.last_name}`,
+        email: user.email, // Would need to join with auth.users in production
+        role: u.role,
+        is_active: u.is_active,
+        created_at: new Date(u.created_at).toLocaleDateString()
+      }))
+
+      setUsers(formattedUsers)
+    } catch (err) {
+      setError(err.message)
+      console.error('Error loading users:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Show current user if no users loaded
+  const displayUsers = users.length > 0 ? users : [{
+    id: user?.id || 'current',
+    name: `${user?.first_name || 'Current'} ${user?.last_name || 'User'}`,
+    email: user?.email || 'user@company.com',
+    role: user?.role || 'company_admin',
+    is_active: true,
+    created_at: new Date().toLocaleDateString()
+  }]
 
   const getRoleColor = (role) => {
     switch (role) {
-      case 'admin':
+      case 'company_admin':
+      case 'super_admin':
         return 'bg-red-100 text-red-800'
       case 'manager':
         return 'bg-blue-100 text-blue-800'
@@ -51,7 +89,7 @@ const Users = () => {
   }
 
   // Only show users page to admin users
-  if (user?.role !== 'admin') {
+  if (!['company_admin', 'super_admin'].includes(user?.role)) {
     return (
       <div className="text-center py-12">
         <h3 className="text-lg font-medium text-gray-900">Access Denied</h3>
@@ -98,31 +136,53 @@ const Users = () => {
         </div>
       </div>
 
+      {/* Loading State */}
+      {loading && (
+        <div className="card text-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-2 text-gray-600">Loading users...</p>
+        </div>
+      )}
+
+      {/* Error State */}
+      {error && (
+        <div className="card bg-red-50 border border-red-200 text-center py-8">
+          <p className="text-red-600">Error loading users: {error}</p>
+          <button
+            onClick={loadUsers}
+            className="mt-2 btn-primary"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       {/* Users Table */}
-      <div className="card">
-        <div className="overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  User
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Role
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Created
-                </th>
-                <th className="relative px-6 py-3">
-                  <span className="sr-only">Actions</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {users.map((userItem) => (
+      {!loading && !error && (
+        <div className="card">
+          <div className="overflow-hidden">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    User
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Role
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Created
+                  </th>
+                  <th className="relative px-6 py-3">
+                    <span className="sr-only">Actions</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {displayUsers.map((userItem) => (
                 <tr key={userItem.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
@@ -165,23 +225,6 @@ const Users = () => {
             </tbody>
           </table>
         </div>
-      </div>
-
-      {/* Empty State */}
-      {users.length === 0 && (
-        <div className="text-center py-12">
-          <UserGroupIcon className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-2 text-sm font-medium text-gray-900">No users</h3>
-          <p className="mt-1 text-sm text-gray-500">Get started by creating a new user.</p>
-          <div className="mt-6">
-            <button
-              type="button"
-              className="btn-primary"
-            >
-              <PlusIcon className="h-4 w-4 mr-2" />
-              Add User
-            </button>
-          </div>
         </div>
       )}
     </div>

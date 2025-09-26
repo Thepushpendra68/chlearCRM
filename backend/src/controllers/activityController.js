@@ -26,7 +26,7 @@ class ActivityController {
         }
       });
 
-      const result = await activityService.getActivities(filters);
+      const result = await activityService.getActivities(req.user, filters);
 
       if (!result.success) {
         throw new ApiError(400, result.error);
@@ -46,7 +46,7 @@ class ActivityController {
     try {
       const { id } = req.params;
 
-      const result = await activityService.getActivityById(id);
+      const result = await activityService.getActivityById(id, req.user);
 
       if (!result.success) {
         throw new ApiError(404, result.error);
@@ -69,7 +69,7 @@ class ActivityController {
         user_id: req.user.id // Set from authenticated user
       };
 
-      const result = await activityService.createActivity(activityData);
+      const result = await activityService.createActivity(activityData, req.user);
 
       if (!result.success) {
         throw new ApiError(400, result.error);
@@ -186,7 +186,7 @@ class ActivityController {
         limit: req.query.limit ? parseInt(req.query.limit) : 50
       };
 
-      const result = await activityService.getActivities(filters);
+      const result = await activityService.getActivities(req.user, filters);
 
       if (!result.success) {
         throw new ApiError(400, result.error);

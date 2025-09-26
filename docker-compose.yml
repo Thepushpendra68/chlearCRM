@@ -1,30 +1,7 @@
 version: '3.8'
 
 services:
-  # PostgreSQL Database
-  postgres:
-    image: postgres:15-alpine
-    container_name: chlear-crm-db
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: chlear_crm
-      POSTGRES_USER: crm_user
-      POSTGRES_PASSWORD: crm_password_2024
-      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./backend/migrations:/docker-entrypoint-initdb.d/migrations:ro
-    ports:
-      - "5432:5432"
-    networks:
-      - crm-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U crm_user -d chlear_crm"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # Backend API
+  # Backend API (Now using Supabase)
   backend:
     build:
       context: ./backend
@@ -37,33 +14,44 @@ services:
       JWT_SECRET: your_super_secret_jwt_key_for_docker_development_2024
       JWT_EXPIRES_IN: 24h
       FRONTEND_URL: http://localhost:3000
-      # Database connection
-      DB_HOST: postgres
+      # Supabase Configuration
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      # Legacy Database (kept for transition - now disabled)
+      DB_HOST: localhost
       DB_PORT: 5432
       DB_NAME: chlear_crm
       DB_USER: crm_user
       DB_PASSWORD: crm_password_2024
     ports:
       - "5000:5000"
-    depends_on:
-      postgres:
-        condition: service_healthy
     networks:
       - crm-network
     volumes:
       - ./backend:/app
       - /app/node_modules
     command: npm start
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   # Frontend React App (Production)
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://172.18.0.2:5000/api
+        VITE_SUPABASE_URL: https://qlivxpsvlymxfnamxvhz.supabase.co
+        VITE_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFsaXZ4cHN2bHlteGZuYW14dmh6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg4NjU1NDUsImV4cCI6MjA3NDQ0MTU0NX0.p8VSaRJ-vS5ePf_2z_s-hQDrAxpS-r8vZSeijPBngIQ
     container_name: chlear-crm-frontend
     restart: unless-stopped
     environment:
-      VITE_API_URL: /api
+      VITE_API_URL: http://172.18.0.2:5000/api
       VITE_APP_NAME: CHLEAR CRM
       VITE_APP_VERSION: 1.0.0
       NODE_ENV: production
@@ -89,7 +77,7 @@ services:
     container_name: chlear-crm-frontend-dev
     restart: unless-stopped
     environment:
-      VITE_API_URL: http://localhost:5000/api
+      VITE_API_URL: http://172.18.0.2:5000/api
       VITE_APP_NAME: CHLEAR CRM
       VITE_APP_VERSION: 1.0.0
       NODE_ENV: development
@@ -114,9 +102,7 @@ services:
     profiles:
       - dev
 
-volumes:
-  postgres_data:
-    driver: local
+# volumes: (PostgreSQL volume removed - using Supabase now)
 
 networks:
   crm-network:

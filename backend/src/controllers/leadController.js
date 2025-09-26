@@ -30,6 +30,7 @@ const getLeads = async (req, res, next) => {
     };
 
     const result = await leadService.getLeads(
+      req.user,
       parseInt(page),
       parseInt(limit),
       filters

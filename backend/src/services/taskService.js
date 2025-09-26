@@ -1,69 +1,95 @@
-const db = require('../config/database');
+const { supabaseAdmin } = require('../config/supabase');
 const ApiError = require('../utils/ApiError');
 
 class TaskService {
   /**
    * Get tasks with filters
    */
-  async getTasks(filters = {}) {
+  async getTasks(currentUser, filters = {}) {
     try {
-      let query = db('tasks')
-        .select(
-          'tasks.*',
-          db.raw('CONCAT(leads.first_name, \' \', leads.last_name) as lead_name'),
-          'leads.email as lead_email',
-          'assigned_user.first_name as assigned_first_name',
-          'assigned_user.last_name as assigned_last_name',
-          'assigned_user.email as assigned_email',
-          'created_user.first_name as created_first_name',
-          'created_user.last_name as created_last_name'
-        )
-        .leftJoin('leads', 'tasks.lead_id', 'leads.id')
-        .leftJoin('users as assigned_user', 'tasks.assigned_to', 'assigned_user.id')
-        .leftJoin('users as created_user', 'tasks.created_by', 'created_user.id')
-        .limit(100); // Add limit to prevent large result sets
+      const supabase = supabaseAdmin;
+
+      // Build base query with joins
+      let query = supabase
+        .from('tasks')
+        .select(`
+          *,
+          leads(name, email),
+          assigned_user:user_profiles!tasks_assigned_to_fkey(first_name, last_name, email),
+          created_user:user_profiles!tasks_created_by_fkey(first_name, last_name)
+        `)
+        .eq('company_id', currentUser.company_id);
+
+      // Non-admin users only see their assigned tasks
+      if (currentUser.role !== 'company_admin' && currentUser.role !== 'super_admin') {
+        query = query.eq('assigned_to', currentUser.id);
+      }
 
       // Apply filters
       if (filters.assigned_to) {
-        query = query.where('tasks.assigned_to', filters.assigned_to);
+        query = query.eq('assigned_to', filters.assigned_to);
       }
 
       if (filters.lead_id) {
-        query = query.where('tasks.lead_id', filters.lead_id);
+        query = query.eq('lead_id', filters.lead_id);
       }
 
       if (filters.status) {
-        query = query.where('tasks.status', filters.status);
+        query = query.eq('status', filters.status);
       }
 
       if (filters.priority) {
-        query = query.where('tasks.priority', filters.priority);
+        query = query.eq('priority', filters.priority);
       }
 
       if (filters.task_type) {
-        query = query.where('tasks.task_type', filters.task_type);
+        query = query.eq('task_type', filters.task_type);
       }
 
       if (filters.due_date_from) {
-        query = query.where('tasks.due_date', '>=', filters.due_date_from);
+        query = query.gte('due_date', filters.due_date_from);
       }
 
       if (filters.due_date_to) {
-        query = query.where('tasks.due_date', '<=', filters.due_date_to);
+        query = query.lte('due_date', filters.due_date_to);
       }
 
       if (filters.overdue) {
-        query = query.where('tasks.due_date', '<', new Date())
-          .where('tasks.status', '!=', 'completed');
+        const now = new Date().toISOString();
+        query = query.lt('due_date', now).neq('status', 'completed');
       }
 
       // Order by due date and priority
-      query = query.orderBy('tasks.due_date', 'asc')
-        .orderBy('tasks.priority', 'desc')
-        .orderBy('tasks.created_at', 'desc');
+      query = query.order('due_date', { ascending: true, nullsLast: true })
+        .order('priority', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(100); // Add limit to prevent large result sets
 
-      const tasks = await query;
-      return tasks;
+      const { data: tasks, error } = await query;
+
+      if (error) {
+        console.error('TaskService.getTasks error:', error);
+        console.error('Query that failed:', query);
+        throw new ApiError('Failed to fetch tasks', 500);
+      }
+
+      // Format the data to match expected structure
+      const formattedTasks = tasks.map(task => ({
+        ...task,
+        lead_name: task.leads?.name,
+        lead_email: task.leads?.email,
+        assigned_first_name: task.assigned_user?.first_name,
+        assigned_last_name: task.assigned_user?.last_name,
+        assigned_email: task.assigned_user?.email,
+        created_first_name: task.created_user?.first_name,
+        created_last_name: task.created_user?.last_name,
+        // Remove the nested objects
+        leads: undefined,
+        assigned_user: undefined,
+        created_user: undefined
+      }));
+
+      return formattedTasks || [];
     } catch (error) {
       console.error('TaskService.getTasks error:', error);
       throw new ApiError('Failed to fetch tasks', 500);
@@ -73,30 +99,43 @@ class TaskService {
   /**
    * Get task by ID
    */
-  async getTaskById(taskId) {
+  async getTaskById(taskId, currentUser) {
     try {
-      const task = await db('tasks')
-        .select(
-          'tasks.*',
-          db.raw('CONCAT(leads.first_name, \' \', leads.last_name) as lead_name'),
-          'leads.email as lead_email',
-          'assigned_user.first_name as assigned_first_name',
-          'assigned_user.last_name as assigned_last_name',
-          'assigned_user.email as assigned_email',
-          'created_user.first_name as created_first_name',
-          'created_user.last_name as created_last_name'
-        )
-        .leftJoin('leads', 'tasks.lead_id', 'leads.id')
-        .leftJoin('users as assigned_user', 'tasks.assigned_to', 'assigned_user.id')
-        .leftJoin('users as created_user', 'tasks.created_by', 'created_user.id')
-        .where('tasks.id', taskId)
-        .first();
+      const supabase = supabaseAdmin;
 
-      if (!task) {
+      const { data: task, error } = await supabase
+        .from('tasks')
+        .select(`
+          *,
+          leads!tasks_lead_id_fkey(name, email),
+          assigned_user:user_profiles!tasks_assigned_to_fkey(first_name, last_name, email),
+          created_user:user_profiles!tasks_created_by_fkey(first_name, last_name)
+        `)
+        .eq('id', taskId)
+        .eq('company_id', currentUser.company_id)
+        .single();
+
+      if (error || !task) {
         throw new ApiError('Task not found', 404);
       }
 
-      return task;
+      // Format the data to match expected structure
+      const formattedTask = {
+        ...task,
+        lead_name: task.leads?.name,
+        lead_email: task.leads?.email,
+        assigned_first_name: task.assigned_user?.first_name,
+        assigned_last_name: task.assigned_user?.last_name,
+        assigned_email: task.assigned_user?.email,
+        created_first_name: task.created_user?.first_name,
+        created_last_name: task.created_user?.last_name,
+        // Remove the nested objects
+        leads: undefined,
+        assigned_user: undefined,
+        created_user: undefined
+      };
+
+      return formattedTask;
     } catch (error) {
       if (error instanceof ApiError) throw error;
       throw new ApiError('Failed to fetch task', 500);
@@ -106,25 +145,67 @@ class TaskService {
   /**
    * Create new task
    */
-  async createTask(taskData) {
+  async createTask(taskData, currentUser) {
     try {
-      const [task] = await db('tasks')
-        .insert({
-          lead_id: taskData.lead_id || null,
-          assigned_to: taskData.assigned_to,
-          created_by: taskData.created_by,
-          title: taskData.title,
-          description: taskData.description,
-          due_date: taskData.due_date || null,
-          priority: taskData.priority || 'medium',
-          status: taskData.status || 'pending',
-          task_type: taskData.task_type || 'follow_up'
-        })
-        .returning('*');
+      const supabase = supabaseAdmin;
+
+      // Validate that assigned user exists and belongs to company
+      if (taskData.assigned_to) {
+        const { data: assignedUser, error: userError } = await supabase
+          .from('user_profiles')
+          .select('id')
+          .eq('id', taskData.assigned_to)
+          .eq('company_id', currentUser.company_id)
+          .single();
+
+        if (userError || !assignedUser) {
+          throw new ApiError('Assigned user not found', 404);
+        }
+      }
+
+      // Validate that lead exists and belongs to company
+      if (taskData.lead_id) {
+        const { data: lead, error: leadError } = await supabase
+          .from('leads')
+          .select('id')
+          .eq('id', taskData.lead_id)
+          .eq('company_id', currentUser.company_id)
+          .single();
+
+        if (leadError || !lead) {
+          throw new ApiError('Lead not found', 404);
+        }
+      }
+
+      const newTask = {
+        lead_id: taskData.lead_id || null,
+        assigned_to: taskData.assigned_to,
+        created_by: currentUser.id,
+        company_id: currentUser.company_id,
+        title: taskData.title,
+        description: taskData.description,
+        due_date: taskData.due_date || null,
+        priority: taskData.priority || 'medium',
+        status: taskData.status || 'pending',
+        task_type: taskData.task_type || 'follow_up',
+        created_at: new Date().toISOString()
+      };
+
+      const { data: task, error } = await supabase
+        .from('tasks')
+        .insert(newTask)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Task creation error:', error);
+        throw new ApiError('Failed to create task', 500);
+      }
 
       return task;
     } catch (error) {
       console.error('Task creation error:', error);
+      if (error instanceof ApiError) throw error;
       throw new ApiError('Failed to create task', 500);
     }
   }
@@ -132,22 +213,55 @@ class TaskService {
   /**
    * Update task
    */
-  async updateTask(taskId, updateData) {
+  async updateTask(taskId, updateData, currentUser) {
     try {
+      const supabase = supabaseAdmin;
+
+      // Validate that assigned user exists and belongs to company if being updated
+      if (updateData.assigned_to) {
+        const { data: assignedUser, error: userError } = await supabase
+          .from('user_profiles')
+          .select('id')
+          .eq('id', updateData.assigned_to)
+          .eq('company_id', currentUser.company_id)
+          .single();
+
+        if (userError || !assignedUser) {
+          throw new ApiError('Assigned user not found', 404);
+        }
+      }
+
+      // Validate that lead exists and belongs to company if being updated
+      if (updateData.lead_id) {
+        const { data: lead, error: leadError } = await supabase
+          .from('leads')
+          .select('id')
+          .eq('id', updateData.lead_id)
+          .eq('company_id', currentUser.company_id)
+          .single();
+
+        if (leadError || !lead) {
+          throw new ApiError('Lead not found', 404);
+        }
+      }
+
       // Handle empty strings for foreign key fields
       const cleanedData = {
         ...updateData,
         lead_id: updateData.lead_id || null,
         due_date: updateData.due_date || null,
-        updated_at: new Date()
+        updated_at: new Date().toISOString()
       };
 
-      const [task] = await db('tasks')
-        .where('id', taskId)
+      const { data: task, error } = await supabase
+        .from('tasks')
         .update(cleanedData)
-        .returning('*');
+        .eq('id', taskId)
+        .eq('company_id', currentUser.company_id)
+        .select()
+        .single();
 
-      if (!task) {
+      if (error || !task) {
         throw new ApiError('Task not found', 404);
       }
 
@@ -162,18 +276,23 @@ class TaskService {
   /**
    * Mark task as completed
    */
-  async completeTask(taskId, userId) {
+  async completeTask(taskId, userId, currentUser) {
     try {
-      const [task] = await db('tasks')
-        .where('id', taskId)
+      const supabase = supabaseAdmin;
+
+      const { data: task, error } = await supabase
+        .from('tasks')
         .update({
           status: 'completed',
-          completed_at: new Date(),
-          updated_at: new Date()
+          completed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         })
-        .returning('*');
+        .eq('id', taskId)
+        .eq('company_id', currentUser.company_id)
+        .select()
+        .single();
 
-      if (!task) {
+      if (error || !task) {
         throw new ApiError('Task not found', 404);
       }
 
@@ -187,13 +306,17 @@ class TaskService {
   /**
    * Delete task
    */
-  async deleteTask(taskId) {
+  async deleteTask(taskId, currentUser) {
     try {
-      const deleted = await db('tasks')
-        .where('id', taskId)
-        .del();
+      const supabase = supabaseAdmin;
 
-      if (deleted === 0) {
+      const { error } = await supabase
+        .from('tasks')
+        .delete()
+        .eq('id', taskId)
+        .eq('company_id', currentUser.company_id);
+
+      if (error) {
         throw new ApiError('Task not found', 404);
       }
 
@@ -207,28 +330,51 @@ class TaskService {
   /**
    * Get overdue tasks
    */
-  async getOverdueTasks(userId = null) {
+  async getOverdueTasks(currentUser, userId = null) {
     try {
-      let query = db('tasks')
-        .select(
-          'tasks.*',
-          db.raw('CONCAT(leads.first_name, \' \', leads.last_name) as lead_name'),
-          'leads.email as lead_email',
-          'assigned_user.first_name as assigned_first_name',
-          'assigned_user.last_name as assigned_last_name'
-        )
-        .leftJoin('leads', 'tasks.lead_id', 'leads.id')
-        .leftJoin('users as assigned_user', 'tasks.assigned_to', 'assigned_user.id')
-        .where('tasks.due_date', '<', new Date())
-        .where('tasks.status', '!=', 'completed')
-        .orderBy('tasks.due_date', 'asc');
+      const supabase = supabaseAdmin;
 
+      let query = supabase
+        .from('tasks')
+        .select(`
+          *,
+          leads!tasks_lead_id_fkey(name, email),
+          assigned_user:user_profiles!tasks_assigned_to_fkey(first_name, last_name)
+        `)
+        .eq('company_id', currentUser.company_id)
+        .lt('due_date', new Date().toISOString())
+        .neq('status', 'completed')
+        .order('due_date', { ascending: true });
+
+      // If userId is provided, filter by assigned user
       if (userId) {
-        query = query.where('tasks.assigned_to', userId);
+        query = query.eq('assigned_to', userId);
+      } else {
+        // Non-admin users only see their own tasks
+        if (currentUser.role !== 'company_admin' && currentUser.role !== 'super_admin') {
+          query = query.eq('assigned_to', currentUser.id);
+        }
       }
 
-      const overdueTasks = await query;
-      return overdueTasks;
+      const { data: overdueTasks, error } = await query;
+
+      if (error) {
+        throw new ApiError('Failed to fetch overdue tasks', 500);
+      }
+
+      // Format the data to match expected structure
+      const formattedTasks = overdueTasks.map(task => ({
+        ...task,
+        lead_name: task.leads?.name,
+        lead_email: task.leads?.email,
+        assigned_first_name: task.assigned_user?.first_name,
+        assigned_last_name: task.assigned_user?.last_name,
+        // Remove the nested objects
+        leads: undefined,
+        assigned_user: undefined
+      }));
+
+      return formattedTasks || [];
     } catch (error) {
       throw new ApiError('Failed to fetch overdue tasks', 500);
     }
@@ -237,28 +383,47 @@ class TaskService {
   /**
    * Get task statistics
    */
-  async getTaskStats(userId = null) {
+  async getTaskStats(currentUser, userId = null) {
     try {
-      // Use a single query with conditional aggregation to avoid connection pool exhaustion
-      let query = db('tasks')
-        .select(
-          db.raw('COUNT(*) as total'),
-          db.raw('COUNT(CASE WHEN status = ? THEN 1 END) as pending', ['pending']),
-          db.raw('COUNT(CASE WHEN status = ? THEN 1 END) as completed', ['completed']),
-          db.raw('COUNT(CASE WHEN due_date < ? AND status != ? THEN 1 END) as overdue', [new Date(), 'completed'])
-        );
+      const supabase = supabaseAdmin;
 
+      let query = supabase
+        .from('tasks')
+        .select('status, due_date')
+        .eq('company_id', currentUser.company_id);
+
+      // If userId is provided, filter by assigned user
       if (userId) {
-        query = query.where('assigned_to', userId);
+        query = query.eq('assigned_to', userId);
+      } else {
+        // Non-admin users only see their own tasks
+        if (currentUser.role !== 'company_admin' && currentUser.role !== 'super_admin') {
+          query = query.eq('assigned_to', currentUser.id);
+        }
       }
 
-      const result = await query.first();
+      const { data: tasks, error } = await query;
+
+      if (error) {
+        console.error('TaskService.getTaskStats error:', error);
+        throw new ApiError('Failed to fetch task statistics', 500);
+      }
+
+      const now = new Date();
+      const total = tasks.length;
+      const pending = tasks.filter(task => task.status === 'pending').length;
+      const completed = tasks.filter(task => task.status === 'completed').length;
+      const overdue = tasks.filter(task =>
+        task.due_date &&
+        new Date(task.due_date) < now &&
+        task.status !== 'completed'
+      ).length;
 
       return {
-        total: parseInt(result.total),
-        pending: parseInt(result.pending),
-        completed: parseInt(result.completed),
-        overdue: parseInt(result.overdue)
+        total,
+        pending,
+        completed,
+        overdue
       };
     } catch (error) {
       console.error('TaskService.getTaskStats error:', error);
@@ -269,22 +434,38 @@ class TaskService {
   /**
    * Get tasks by lead ID
    */
-  async getTasksByLeadId(leadId) {
+  async getTasksByLeadId(leadId, currentUser) {
     try {
-      const tasks = await db('tasks')
-        .select(
-          'tasks.*',
-          'assigned_user.first_name as assigned_first_name',
-          'assigned_user.last_name as assigned_last_name',
-          'created_user.first_name as created_first_name',
-          'created_user.last_name as created_last_name'
-        )
-        .leftJoin('users as assigned_user', 'tasks.assigned_to', 'assigned_user.id')
-        .leftJoin('users as created_user', 'tasks.created_by', 'created_user.id')
-        .where('tasks.lead_id', leadId)
-        .orderBy('tasks.created_at', 'desc');
+      const supabase = supabaseAdmin;
 
-      return tasks;
+      const { data: tasks, error } = await supabase
+        .from('tasks')
+        .select(`
+          *,
+          assigned_user:user_profiles!tasks_assigned_to_fkey(first_name, last_name),
+          created_user:user_profiles!tasks_created_by_fkey(first_name, last_name)
+        `)
+        .eq('lead_id', leadId)
+        .eq('company_id', currentUser.company_id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        throw new ApiError('Failed to fetch lead tasks', 500);
+      }
+
+      // Format the data to match expected structure
+      const formattedTasks = tasks.map(task => ({
+        ...task,
+        assigned_first_name: task.assigned_user?.first_name,
+        assigned_last_name: task.assigned_user?.last_name,
+        created_first_name: task.created_user?.first_name,
+        created_last_name: task.created_user?.last_name,
+        // Remove the nested objects
+        assigned_user: undefined,
+        created_user: undefined
+      }));
+
+      return formattedTasks || [];
     } catch (error) {
       throw new ApiError('Failed to fetch lead tasks', 500);
     }

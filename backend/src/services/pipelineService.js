@@ -1,15 +1,26 @@
-const db = require('../config/database');
+const { supabaseAdmin } = require('../config/supabase');
 
 class PipelineService {
   // Get all pipeline stages
-  async getAllStages() {
+  async getAllStages(currentUser) {
     try {
-      const stages = await db('pipeline_stages')
+      const supabase = supabaseAdmin;
+
+      let query = supabase
+        .from('pipeline_stages')
         .select('*')
-        .where('is_active', true)
-        .orderBy('order_position', 'asc');
-      
-      return { success: true, data: stages };
+        .eq('is_active', true)
+        .eq('company_id', currentUser.company_id)
+        .order('order_position', { ascending: true });
+
+      const { data: stages, error } = await query;
+
+      if (error) {
+        console.error('Error fetching pipeline stages:', error);
+        return { success: false, error: error.message };
+      }
+
+      return { success: true, data: stages || [] };
     } catch (error) {
       console.error('Error fetching pipeline stages:', error);
       return { success: false, error: error.message };
@@ -17,34 +28,45 @@ class PipelineService {
   }
 
   // Create new pipeline stage
-  async createStage(stageData) {
+  async createStage(stageData, currentUser) {
     try {
       const { name, color, order_position } = stageData;
-      
+
       // Validate required fields
       if (!name || !order_position) {
         return { success: false, error: 'Name and order position are required' };
       }
 
       // Check if order position already exists
-      const existingStage = await db('pipeline_stages')
-        .where('order_position', order_position)
-        .first();
-      
+      const { data: existingStage } = await supabaseAdmin
+        .from('pipeline_stages')
+        .select('id')
+        .eq('company_id', currentUser.company_id)
+        .eq('order_position', order_position)
+        .single();
+
       if (existingStage) {
         return { success: false, error: 'Order position already exists' };
       }
 
-      const [newStage] = await db('pipeline_stages')
+      const { data: newStage, error } = await supabaseAdmin
+        .from('pipeline_stages')
         .insert({
           name,
           color: color || '#3B82F6',
           order_position,
           is_active: true,
-          is_won: false,
-          is_lost: false
+          is_closed_won: false,
+          is_closed_lost: false,
+          company_id: currentUser.company_id
         })
-        .returning('*');
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating pipeline stage:', error);
+        return { success: false, error: error.message };
+      }
 
       return { success: true, data: newStage };
     } catch (error) {
@@ -54,43 +76,57 @@ class PipelineService {
   }
 
   // Update pipeline stage
-  async updateStage(stageId, updateData) {
+  async updateStage(stageId, updateData, currentUser) {
     try {
-      const { name, color, order_position, is_active, is_won, is_lost } = updateData;
-      
-      // Check if stage exists
-      const existingStage = await db('pipeline_stages')
-        .where('id', stageId)
-        .first();
-      
-      if (!existingStage) {
+      const { name, color, order_position, is_active, is_closed_won, is_closed_lost } = updateData;
+
+      // Check if stage exists and belongs to user's company
+      const { data: existingStage, error: findError } = await supabaseAdmin
+        .from('pipeline_stages')
+        .select('*')
+        .eq('id', stageId)
+        .eq('company_id', currentUser.company_id)
+        .single();
+
+      if (findError || !existingStage) {
         return { success: false, error: 'Pipeline stage not found' };
       }
 
       // If updating order position, check for conflicts
       if (order_position && order_position !== existingStage.order_position) {
-        const conflictingStage = await db('pipeline_stages')
-          .where('order_position', order_position)
-          .where('id', '!=', stageId)
-          .first();
-        
+        const { data: conflictingStage } = await supabaseAdmin
+          .from('pipeline_stages')
+          .select('id')
+          .eq('company_id', currentUser.company_id)
+          .eq('order_position', order_position)
+          .neq('id', stageId)
+          .single();
+
         if (conflictingStage) {
           return { success: false, error: 'Order position already exists' };
         }
       }
 
-      const [updatedStage] = await db('pipeline_stages')
-        .where('id', stageId)
+      const { data: updatedStage, error } = await supabaseAdmin
+        .from('pipeline_stages')
         .update({
           ...(name && { name }),
           ...(color && { color }),
           ...(order_position && { order_position }),
           ...(is_active !== undefined && { is_active }),
-          ...(is_won !== undefined && { is_won }),
-          ...(is_lost !== undefined && { is_lost }),
-          updated_at: db.fn.now()
+          ...(is_closed_won !== undefined && { is_closed_won }),
+          ...(is_closed_lost !== undefined && { is_closed_lost }),
+          updated_at: new Date().toISOString()
         })
-        .returning('*');
+        .eq('id', stageId)
+        .eq('company_id', currentUser.company_id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error updating pipeline stage:', error);
+        return { success: false, error: error.message };
+      }
 
       return { success: true, data: updatedStage };
     } catch (error) {
@@ -100,30 +136,41 @@ class PipelineService {
   }
 
   // Delete pipeline stage
-  async deleteStage(stageId) {
+  async deleteStage(stageId, currentUser) {
     try {
-      // Check if stage exists
-      const existingStage = await db('pipeline_stages')
-        .where('id', stageId)
-        .first();
-      
-      if (!existingStage) {
+      // Check if stage exists and belongs to user's company
+      const { data: existingStage, error: findError } = await supabaseAdmin
+        .from('pipeline_stages')
+        .select('*')
+        .eq('id', stageId)
+        .eq('company_id', currentUser.company_id)
+        .single();
+
+      if (findError || !existingStage) {
         return { success: false, error: 'Pipeline stage not found' };
       }
 
       // Check if any leads are using this stage
-      const leadsInStage = await db('leads')
-        .where('pipeline_stage_id', stageId)
-        .count('* as count')
-        .first();
-      
-      if (leadsInStage.count > 0) {
+      const { count: leadsInStage } = await supabaseAdmin
+        .from('leads')
+        .select('*', { count: 'exact' })
+        .eq('company_id', currentUser.company_id)
+        .eq('pipeline_stage_id', stageId);
+
+      if (leadsInStage && leadsInStage > 0) {
         return { success: false, error: 'Cannot delete stage with existing leads. Please reassign leads first.' };
       }
 
-      await db('pipeline_stages')
-        .where('id', stageId)
-        .del();
+      const { error } = await supabaseAdmin
+        .from('pipeline_stages')
+        .delete()
+        .eq('id', stageId)
+        .eq('company_id', currentUser.company_id);
+
+      if (error) {
+        console.error('Error deleting pipeline stage:', error);
+        return { success: false, error: error.message };
+      }
 
       return { success: true, message: 'Pipeline stage deleted successfully' };
     } catch (error) {
@@ -133,31 +180,44 @@ class PipelineService {
   }
 
   // Reorder pipeline stages
-  async reorderStages(stageOrders) {
+  async reorderStages(stageOrders, currentUser) {
     try {
       // Validate input
       if (!Array.isArray(stageOrders) || stageOrders.length === 0) {
         return { success: false, error: 'Invalid stage orders provided' };
       }
 
-      // Use transaction to ensure all updates succeed or fail together
-      const result = await db.transaction(async (trx) => {
-        for (const { id, order_position } of stageOrders) {
-          await trx('pipeline_stages')
-            .where('id', id)
-            .update({ 
-              order_position,
-              updated_at: trx.fn.now()
-            });
-        }
-        
-        // Return updated stages
-        return await trx('pipeline_stages')
-          .select('*')
-          .orderBy('order_position', 'asc');
-      });
+      // Update each stage's order position
+      for (const { id, order_position } of stageOrders) {
+        const { error } = await supabaseAdmin
+          .from('pipeline_stages')
+          .update({
+            order_position,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', id)
+          .eq('company_id', currentUser.company_id);
 
-      return { success: true, data: result };
+        if (error) {
+          console.error('Error updating stage order:', error);
+          return { success: false, error: error.message };
+        }
+      }
+
+      // Return updated stages
+      const { data: result, error } = await supabaseAdmin
+        .from('pipeline_stages')
+        .select('*')
+        .eq('company_id', currentUser.company_id)
+        .eq('is_active', true)
+        .order('order_position', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching updated stages:', error);
+        return { success: false, error: error.message };
+      }
+
+      return { success: true, data: result || [] };
     } catch (error) {
       console.error('Error reordering pipeline stages:', error);
       return { success: false, error: error.message };
@@ -165,24 +225,56 @@ class PipelineService {
   }
 
   // Get pipeline overview with lead counts
-  async getPipelineOverview() {
+  async getPipelineOverview(currentUser) {
     try {
-      const stages = await db('pipeline_stages')
+      const supabase = supabaseAdmin;
+
+      // Get stages for the user's company
+      const { data: stages, error: stagesError } = await supabase
+        .from('pipeline_stages')
         .select('*')
-        .where('is_active', true)
-        .orderBy('order_position', 'asc');
+        .eq('company_id', currentUser.company_id)
+        .eq('is_active', true)
+        .order('order_position', { ascending: true });
+
+      if (stagesError) {
+        console.error('Error fetching stages:', stagesError);
+        return { success: false, error: stagesError.message };
+      }
+
+      if (!stages || stages.length === 0) {
+        return {
+          success: true,
+          data: {
+            stages: [],
+            summary: {
+              total_leads: 0,
+              won_leads: 0,
+              lost_leads: 0,
+              active_leads: 0
+            }
+          }
+        };
+      }
 
       // Get lead counts for each stage
-      const stageCounts = await db('leads')
+      const { data: stageCounts, error: countsError } = await supabase
+        .from('leads')
         .select('pipeline_stage_id')
-        .count('* as count')
-        .groupBy('pipeline_stage_id');
+        .eq('company_id', currentUser.company_id);
+
+      if (countsError) {
+        console.error('Error fetching lead counts:', countsError);
+        return { success: false, error: countsError.message };
+      }
 
       // Create a map of stage counts
       const countsMap = {};
-      stageCounts.forEach(item => {
-        countsMap[item.pipeline_stage_id] = parseInt(item.count);
-      });
+      if (stageCounts) {
+        stageCounts.forEach(item => {
+          countsMap[item.pipeline_stage_id] = (countsMap[item.pipeline_stage_id] || 0) + 1;
+        });
+      }
 
       // Add counts to stages
       const stagesWithCounts = stages.map(stage => ({
@@ -195,11 +287,11 @@ class PipelineService {
 
       // Calculate won/lost counts
       const wonCount = stagesWithCounts
-        .filter(stage => stage.is_won)
+        .filter(stage => stage.is_closed_won)
         .reduce((sum, stage) => sum + stage.lead_count, 0);
-      
+
       const lostCount = stagesWithCounts
-        .filter(stage => stage.is_lost)
+        .filter(stage => stage.is_closed_lost)
         .reduce((sum, stage) => sum + stage.lead_count, 0);
 
       return {
@@ -221,40 +313,54 @@ class PipelineService {
   }
 
   // Move lead to different stage
-  async moveLeadToStage(leadId, stageId, userId) {
+  async moveLeadToStage(leadId, stageId, userId, currentUser) {
     try {
-      // Validate lead exists
-      const lead = await db('leads')
-        .where('id', leadId)
-        .first();
-      
-      if (!lead) {
+      // Validate lead exists and belongs to user's company
+      const { data: lead, error: leadError } = await supabaseAdmin
+        .from('leads')
+        .select('*')
+        .eq('id', leadId)
+        .eq('company_id', currentUser.company_id)
+        .single();
+
+      if (leadError || !lead) {
         return { success: false, error: 'Lead not found' };
       }
 
-      // Validate stage exists
-      const stage = await db('pipeline_stages')
-        .where('id', stageId)
-        .first();
-      
-      if (!stage) {
+      // Validate stage exists and belongs to user's company
+      const { data: stage, error: stageError } = await supabaseAdmin
+        .from('pipeline_stages')
+        .select('*')
+        .eq('id', stageId)
+        .eq('company_id', currentUser.company_id)
+        .single();
+
+      if (stageError || !stage) {
         return { success: false, error: 'Pipeline stage not found' };
       }
 
       const previousStageId = lead.pipeline_stage_id;
 
       // Update lead stage
-      const [updatedLead] = await db('leads')
-        .where('id', leadId)
+      const { data: updatedLead, error } = await supabaseAdmin
+        .from('leads')
         .update({
           pipeline_stage_id: stageId,
-          updated_at: db.fn.now()
+          updated_at: new Date().toISOString()
         })
-        .returning('*');
+        .eq('id', leadId)
+        .eq('company_id', currentUser.company_id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error updating lead stage:', error);
+        return { success: false, error: error.message };
+      }
 
       // Log the stage change activity (we'll implement this in the activity system)
       // For now, we'll just return the updated lead
-      
+
       return {
         success: true,
         data: {
@@ -270,34 +376,56 @@ class PipelineService {
   }
 
   // Get conversion rates between stages
-  async getConversionRates() {
+  async getConversionRates(currentUser) {
     try {
-      const stages = await db('pipeline_stages')
-        .select('*')
-        .where('is_active', true)
-        .orderBy('order_position', 'asc');
+      const supabase = supabaseAdmin;
 
-      const stageCounts = await db('leads')
+      // Get stages for the user's company
+      const { data: stages, error: stagesError } = await supabase
+        .from('pipeline_stages')
+        .select('*')
+        .eq('company_id', currentUser.company_id)
+        .eq('is_active', true)
+        .order('order_position', { ascending: true });
+
+      if (stagesError) {
+        console.error('Error fetching stages for conversion rates:', stagesError);
+        return { success: false, error: stagesError.message };
+      }
+
+      if (!stages || stages.length < 2) {
+        return { success: true, data: [] };
+      }
+
+      // Get lead counts for each stage
+      const { data: stageCounts, error: countsError } = await supabase
+        .from('leads')
         .select('pipeline_stage_id')
-        .count('* as count')
-        .groupBy('pipeline_stage_id');
+        .eq('company_id', currentUser.company_id);
+
+      if (countsError) {
+        console.error('Error fetching lead counts for conversion rates:', countsError);
+        return { success: false, error: countsError.message };
+      }
 
       const countsMap = {};
-      stageCounts.forEach(item => {
-        countsMap[item.pipeline_stage_id] = parseInt(item.count);
-      });
+      if (stageCounts) {
+        stageCounts.forEach(item => {
+          countsMap[item.pipeline_stage_id] = (countsMap[item.pipeline_stage_id] || 0) + 1;
+        });
+      }
 
       // Calculate conversion rates
       const conversionRates = [];
       for (let i = 0; i < stages.length - 1; i++) {
         const currentStage = stages[i];
         const nextStage = stages[i + 1];
-        
+
         const currentCount = countsMap[currentStage.id] || 0;
         const nextCount = countsMap[nextStage.id] || 0;
-        
+
         const conversionRate = currentCount > 0 ? (nextCount / currentCount) * 100 : 0;
-        
+
         conversionRates.push({
           from_stage: currentStage.name,
           to_stage: nextStage.name,

@@ -1,55 +1,49 @@
-const db = require('../config/database');
+const { supabaseAdmin } = require('../config/supabase');
 
 class ActivityService {
   // Get activities with filters
-  async getActivities(filters = {}) {
+  async getActivities(currentUser, filters = {}) {
     try {
-      let query = db('activities')
-        .select(
-          'activities.*',
-          'leads.company',
-          db.raw("CONCAT(leads.first_name, ' ', leads.last_name) as contact_name"),
-          'users.first_name',
-          'users.last_name'
-        )
-        .leftJoin('leads', 'activities.lead_id', 'leads.id')
-        .leftJoin('users', 'activities.user_id', 'users.id');
+      const supabase = supabaseAdmin;
+
+      // Build base query
+      let query = supabase
+        .from('activities')
+        .select(`
+          *,
+          leads!activities_lead_id_fkey(company, name),
+          user_profiles!activities_user_id_fkey(first_name, last_name)
+        `)
+        .eq('company_id', currentUser.company_id);
+
+      // Non-admin users only see their own activities
+      if (currentUser.role !== 'company_admin' && currentUser.role !== 'super_admin') {
+        query = query.eq('user_id', currentUser.id);
+      }
 
       // Apply filters
       if (filters.lead_id) {
-        query = query.where('activities.lead_id', filters.lead_id);
+        query = query.eq('lead_id', filters.lead_id);
       }
 
       if (filters.user_id) {
-        query = query.where('activities.user_id', filters.user_id);
+        query = query.eq('user_id', filters.user_id);
       }
 
-      if (filters.activity_type) {
-        query = query.where('activities.activity_type', filters.activity_type);
-      }
-
-      if (filters.is_completed !== undefined) {
-        query = query.where('activities.is_completed', filters.is_completed);
+      if (filters.type) {
+        query = query.eq('type', filters.type);
       }
 
       if (filters.date_from) {
-        query = query.where('activities.created_at', '>=', filters.date_from);
+        query = query.gte('created_at', filters.date_from);
       }
 
       if (filters.date_to) {
-        query = query.where('activities.created_at', '<=', filters.date_to);
-      }
-
-      if (filters.scheduled_from) {
-        query = query.where('activities.scheduled_at', '>=', filters.scheduled_from);
-      }
-
-      if (filters.scheduled_to) {
-        query = query.where('activities.scheduled_at', '<=', filters.scheduled_to);
+        query = query.lte('created_at', filters.date_to);
       }
 
       // Order by created_at desc by default
-      query = query.orderBy('activities.created_at', 'desc');
+      query = query.order('created_at', { ascending: false });
 
       // Apply pagination
       if (filters.limit) {
@@ -57,12 +51,29 @@ class ActivityService {
       }
 
       if (filters.offset) {
-        query = query.offset(filters.offset);
+        query = query.range(filters.offset, filters.offset + (filters.limit || 20) - 1);
       }
 
-      const activities = await query;
+      const { data: activities, error } = await query;
 
-      return { success: true, data: activities };
+      if (error) {
+        console.error('Error fetching activities:', error);
+        return { success: false, error: error.message };
+      }
+
+      // Format the data to match expected structure
+      const formattedActivities = activities.map(activity => ({
+        ...activity,
+        company: activity.leads?.company,
+        contact_name: activity.leads?.name,
+        first_name: activity.user_profiles?.first_name,
+        last_name: activity.user_profiles?.last_name,
+        // Remove the nested objects
+        leads: undefined,
+        user_profiles: undefined
+      }));
+
+      return { success: true, data: formattedActivities || [] };
     } catch (error) {
       console.error('Error fetching activities:', error);
       return { success: false, error: error.message };
@@ -70,26 +81,38 @@ class ActivityService {
   }
 
   // Get activity by ID
-  async getActivityById(activityId) {
+  async getActivityById(activityId, currentUser) {
     try {
-      const activity = await db('activities')
-        .select(
-          'activities.*',
-          'leads.company',
-          db.raw("CONCAT(leads.first_name, ' ', leads.last_name) as contact_name"),
-          'users.first_name',
-          'users.last_name'
-        )
-        .leftJoin('leads', 'activities.lead_id', 'leads.id')
-        .leftJoin('users', 'activities.user_id', 'users.id')
-        .where('activities.id', activityId)
-        .first();
+      const supabase = supabaseAdmin;
 
-      if (!activity) {
+      const { data: activity, error } = await supabase
+        .from('activities')
+        .select(`
+          *,
+          leads!activities_lead_id_fkey(company, name),
+          user_profiles!activities_user_id_fkey(first_name, last_name)
+        `)
+        .eq('id', activityId)
+        .eq('company_id', currentUser.company_id)
+        .single();
+
+      if (error || !activity) {
         return { success: false, error: 'Activity not found' };
       }
 
-      return { success: true, data: activity };
+      // Format the data to match expected structure
+      const formattedActivity = {
+        ...activity,
+        company: activity.leads?.company,
+        contact_name: activity.leads?.name,
+        first_name: activity.user_profiles?.first_name,
+        last_name: activity.user_profiles?.last_name,
+        // Remove the nested objects
+        leads: undefined,
+        user_profiles: undefined
+      };
+
+      return { success: true, data: formattedActivity };
     } catch (error) {
       console.error('Error fetching activity:', error);
       return { success: false, error: error.message };
@@ -97,61 +120,56 @@ class ActivityService {
   }
 
   // Create new activity
-  async createActivity(activityData) {
+  async createActivity(activityData, currentUser) {
     try {
-      const trx = await db.transaction();
+      const supabase = supabaseAdmin;
 
-      try {
-        // Validate required fields
-        if (!activityData.lead_id || !activityData.user_id || !activityData.activity_type) {
-          throw new Error('lead_id, user_id, and activity_type are required');
-        }
-
-        // Validate activity type
-        const validTypes = ['call', 'email', 'meeting', 'note', 'task', 'sms', 'stage_change', 'assignment_change'];
-        if (!validTypes.includes(activityData.activity_type)) {
-          throw new Error('Invalid activity type');
-        }
-
-        // Set default values
-        const newActivity = {
-          lead_id: activityData.lead_id,
-          user_id: activityData.user_id,
-          activity_type: activityData.activity_type,
-          subject: activityData.subject || null,
-          description: activityData.description || null,
-          scheduled_at: activityData.scheduled_at || null,
-          completed_at: activityData.completed_at || null,
-          is_completed: activityData.is_completed || false,
-          duration_minutes: activityData.duration_minutes || null,
-          outcome: activityData.outcome || null,
-          metadata: activityData.metadata || null,
-          created_at: new Date(),
-          updated_at: new Date()
-        };
-
-        const [activityId] = await trx('activities').insert(newActivity).returning('id');
-
-        // If it's a completed activity, update the lead's last_contact_date
-        if (newActivity.is_completed && newActivity.activity_type !== 'note') {
-          await trx('leads')
-            .where('id', newActivity.lead_id)
-            .update({ 
-              last_contact_date: new Date(),
-              updated_at: new Date()
-            });
-        }
-
-        await trx.commit();
-
-        // Fetch the created activity with joins
-        const createdActivity = await this.getActivityById(activityId.id);
-
-        return { success: true, data: createdActivity.data };
-      } catch (error) {
-        await trx.rollback();
-        throw error;
+      // Validate required fields
+      if (!activityData.lead_id || !activityData.user_id || !activityData.type) {
+        return { success: false, error: 'lead_id, user_id, and type are required' };
       }
+
+      // Validate activity type
+      const validTypes = ['call', 'email', 'meeting', 'note', 'task', 'sms', 'stage_change', 'assignment_change'];
+      if (!validTypes.includes(activityData.type)) {
+        return { success: false, error: 'Invalid activity type' };
+      }
+
+      // Check if lead belongs to user's company
+      const { data: lead, error: leadError } = await supabase
+        .from('leads')
+        .select('company_id')
+        .eq('id', activityData.lead_id)
+        .eq('company_id', currentUser.company_id)
+        .single();
+
+      if (leadError || !lead) {
+        return { success: false, error: 'Lead not found or access denied' };
+      }
+
+      // Set default values
+      const newActivity = {
+        lead_id: activityData.lead_id,
+        user_id: activityData.user_id,
+        company_id: currentUser.company_id,
+        type: activityData.type,
+        description: activityData.description || null,
+        metadata: activityData.metadata || {},
+        created_at: new Date().toISOString()
+      };
+
+      const { data: createdActivity, error } = await supabase
+        .from('activities')
+        .insert(newActivity)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating activity:', error);
+        return { success: false, error: error.message };
+      }
+
+      return { success: true, data: createdActivity };
     } catch (error) {
       console.error('Error creating activity:', error);
       return { success: false, error: error.message };

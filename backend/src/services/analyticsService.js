@@ -1,4 +1,4 @@
-const knex = require('../config/database');
+const { supabaseAdmin, getSupabaseForUser } = require('../config/supabase');
 const ApiError = require('../utils/ApiError');
 
 /**
@@ -6,41 +6,65 @@ const ApiError = require('../utils/ApiError');
  */
 const getDashboardStats = async (currentUser) => {
   try {
-    let baseQuery = knex('leads');
+    const supabase = supabaseAdmin;
+    
+    // Build base query with company filter
+    let totalLeadsQuery = supabase
+      .from('leads')
+      .select('*', { count: 'exact' })
+      .eq('company_id', currentUser.company_id);
+
+    let newLeadsQuery = supabase
+      .from('leads')
+      .select('*', { count: 'exact' })
+      .eq('company_id', currentUser.company_id);
+
+    let convertedLeadsQuery = supabase
+      .from('leads')
+      .select('*', { count: 'exact' })
+      .eq('company_id', currentUser.company_id);
 
     // Non-admin users only see their assigned leads
-    if (currentUser.role !== 'admin') {
-      baseQuery = baseQuery.where('assigned_to', currentUser.id);
+    if (currentUser.role !== 'company_admin' && currentUser.role !== 'super_admin') {
+      totalLeadsQuery = totalLeadsQuery.eq('assigned_to', currentUser.id);
+      newLeadsQuery = newLeadsQuery.eq('assigned_to', currentUser.id);
+      convertedLeadsQuery = convertedLeadsQuery.eq('assigned_to', currentUser.id);
     }
-
-    // Total leads
-    const [{ total_leads }] = await baseQuery.clone().count('* as total_leads');
 
     // New leads (last 30 days)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    
-    const [{ new_leads }] = await baseQuery.clone()
-      .where('created_at', '>=', thirtyDaysAgo)
-      .count('* as new_leads');
+    newLeadsQuery = newLeadsQuery.gte('created_at', thirtyDaysAgo.toISOString());
 
     // Converted leads
-    const [{ converted_leads }] = await baseQuery.clone()
-      .where('status', 'converted')
-      .count('* as converted_leads');
+    convertedLeadsQuery = convertedLeadsQuery.eq('status', 'converted');
 
+    // Execute queries
+    const [totalResult, newResult, convertedResult] = await Promise.all([
+      totalLeadsQuery,
+      newLeadsQuery,
+      convertedLeadsQuery
+    ]);
+
+    if (totalResult.error) throw totalResult.error;
+    if (newResult.error) throw newResult.error;
+    if (convertedResult.error) throw convertedResult.error;
+
+    const totalLeadsCount = totalResult.count || 0;
+    const newLeadsCount = newResult.count || 0;
+    const convertedLeadsCount = convertedResult.count || 0;
+    
     // Calculate conversion rate
-    const totalLeadsCount = parseInt(total_leads);
-    const convertedLeadsCount = parseInt(converted_leads);
     const conversionRate = totalLeadsCount > 0 ? (convertedLeadsCount / totalLeadsCount * 100).toFixed(1) : '0.0';
 
     return {
       total_leads: totalLeadsCount,
-      new_leads: parseInt(new_leads),
+      new_leads: newLeadsCount,
       converted_leads: convertedLeadsCount,
       conversion_rate: `${conversionRate}%`
     };
   } catch (error) {
+    console.error('Dashboard stats error:', error);
     throw new ApiError('Failed to fetch dashboard statistics', 500);
   }
 };
@@ -50,30 +74,53 @@ const getDashboardStats = async (currentUser) => {
  */
 const getRecentLeads = async (currentUser, limit = 10) => {
   try {
-    let query = knex('leads')
-      .leftJoin('users', 'leads.assigned_to', 'users.id')
-      .select(
-        'leads.id',
-        'leads.first_name',
-        'leads.last_name',
-        'leads.email',
-        'leads.company',
-        'leads.status',
-        'leads.lead_source',
-        'leads.created_at',
-        'users.first_name as assigned_user_first_name',
-        'users.last_name as assigned_user_last_name'
-      )
-      .orderBy('leads.created_at', 'desc')
+    const supabase = supabaseAdmin;
+    
+    // Build query with user profiles join
+    let query = supabase
+      .from('leads')
+      .select(`
+        id,
+        name,
+        email,
+        company,
+        status,
+        source,
+        created_at,
+        assigned_to,
+        user_profiles!leads_assigned_to_fkey(first_name, last_name)
+      `)
+      .eq('company_id', currentUser.company_id)
+      .order('created_at', { ascending: false })
       .limit(limit);
 
     // Non-admin users only see their assigned leads
-    if (currentUser.role !== 'admin') {
-      query = query.where('leads.assigned_to', currentUser.id);
+    if (currentUser.role !== 'company_admin' && currentUser.role !== 'super_admin') {
+      query = query.eq('assigned_to', currentUser.id);
     }
 
-    return await query;
+    const { data, error } = await query;
+    
+    if (error) {
+      console.error('Recent leads error:', error);
+      throw error;
+    }
+
+    // Format the data to match expected structure
+    return data.map(lead => ({
+      id: lead.id,
+      first_name: lead.name ? lead.name.split(' ')[0] : '',
+      last_name: lead.name ? lead.name.split(' ').slice(1).join(' ') : '',
+      email: lead.email,
+      company: lead.company,
+      status: lead.status,
+      lead_source: lead.source,
+      created_at: lead.created_at,
+      assigned_user_first_name: lead.user_profiles?.first_name,
+      assigned_user_last_name: lead.user_profiles?.last_name
+    }));
   } catch (error) {
+    console.error('Recent leads error:', error);
     throw new ApiError('Failed to fetch recent leads', 500);
   }
 };
@@ -145,28 +192,46 @@ const getLeadTrends = async (currentUser, period = '30d') => {
  */
 const getLeadSources = async (currentUser) => {
   try {
-    let query = knex('leads')
-      .select('lead_source')
-      .count('* as count')
-      .groupBy('lead_source')
-      .orderBy('count', 'desc');
+    const supabase = supabaseAdmin;
+    
+    // Build query to get lead source counts
+    let query = supabase
+      .from('leads')
+      .select('source')
+      .eq('company_id', currentUser.company_id);
 
     // Non-admin users only see their assigned leads
-    if (currentUser.role !== 'admin') {
-      query = query.where('assigned_to', currentUser.id);
+    if (currentUser.role !== 'company_admin' && currentUser.role !== 'super_admin') {
+      query = query.eq('assigned_to', currentUser.id);
     }
 
-    const sources = await query;
-
-    // Calculate percentages
-    const total = sources.reduce((sum, source) => sum + parseInt(source.count), 0);
+    const { data, error } = await query;
     
-    return sources.map(source => ({
-      source: source.lead_source,
-      count: parseInt(source.count),
-      percentage: total > 0 ? ((parseInt(source.count) / total) * 100).toFixed(1) : '0.0'
-    }));
+    if (error) {
+      console.error('Lead sources error:', error);
+      throw error;
+    }
+
+    // Group by source and count
+    const sourceCounts = {};
+    data.forEach(lead => {
+      const source = lead.source || 'unknown';
+      sourceCounts[source] = (sourceCounts[source] || 0) + 1;
+    });
+
+    // Convert to array and calculate percentages
+    const total = Object.values(sourceCounts).reduce((sum, count) => sum + count, 0);
+    const sources = Object.entries(sourceCounts)
+      .map(([source, count]) => ({
+        source,
+        count,
+        percentage: total > 0 ? ((count / total) * 100).toFixed(1) : '0.0'
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    return sources;
   } catch (error) {
+    console.error('Lead sources error:', error);
     throw new ApiError('Failed to fetch lead sources', 500);
   }
 };
