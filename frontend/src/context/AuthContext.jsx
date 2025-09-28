@@ -1,5 +1,5 @@
-import { createContext, useContext, useReducer, useEffect } from 'react'
-import supabase, { signIn, signUpWithCompany, signOut, getCurrentSession, getCurrentUserProfile, updateUserProfile } from '../config/supabase'
+import { createContext, useContext, useReducer, useEffect, useRef } from 'react'
+import supabase, { signIn, signUpWithCompany, signOut, getCurrentSession, updateUserProfile, getCurrentUserProfile } from '../config/supabase'
 import toast from 'react-hot-toast'
 
 const AuthContext = createContext()
@@ -71,113 +71,99 @@ const initialState = {
 
 export const AuthProvider = ({ children }) => {
   const [state, dispatch] = useReducer(authReducer, initialState)
+  const initializedRef = useRef(false)
 
-  // Initialize Supabase auth state on app load
+  // Initialize auth state on mount
   useEffect(() => {
-    let isMounted = true
-
     const initializeAuth = async () => {
+      console.log('🔍 [AUTH] Initializing auth...')
+
       try {
-        console.log('🔍 [AUTH] Initializing auth...')
+        const { data: { session }, error } = await supabase.auth.getSession();
 
-        // Get current session (skip refresh for now to avoid hanging)
-        const { session } = await getCurrentSession()
-        console.log('🔍 [AUTH] Session check:', session?.session ? 'Found' : 'None')
-
-        if (session?.session?.user) {
-          console.log('🔍 [AUTH] Found user ID:', session.session.user.id)
-          console.log('🔍 [AUTH] User email:', session.session.user.email)
+        if (error) {
+          console.error('❌ [AUTH] Session error:', error);
+          dispatch({ type: 'AUTH_LOGOUT' });
+          return;
         }
 
-        if (session?.session && isMounted) {
-          // Get user profile data
-          console.log('🔍 [AUTH] Getting user profile for:', session.session.user.id)
-          const { profile } = await getCurrentUserProfile()
-          console.log('🔍 [AUTH] Profile result:', profile ? 'Found' : 'Not found')
+        if (session?.user) {
+          console.log('🔍 [AUTH] Existing session found, fetching profile...');
 
-          if (profile && isMounted) {
-            console.log('✅ [AUTH] Login successful, profile:', profile.first_name, profile.last_name)
-            dispatch({
-              type: 'AUTH_SUCCESS',
-              payload: {
-                user: profile,
-                session: session.session
-              }
-            })
-          } else {
-            // Profile not found, but don't logout immediately - might be RLS issue
-            console.log('❌ [AUTH] Profile not found, using fallback auth data')
-            const fallbackUser = {
-              id: session.session.user.id,
-              email: session.session.user.email,
-              first_name: session.session.user.user_metadata?.first_name || 'User',
-              last_name: session.session.user.user_metadata?.last_name || '',
-              role: 'company_admin', // Assume company admin if no profile
-              company_id: session.session.user.app_metadata?.company_id,
-              company_name: 'Your Company'
-            };
-            dispatch({
-              type: 'AUTH_SUCCESS',
-              payload: {
-                user: fallbackUser,
-                session: session.session
-              }
-            })
+          const { profile, error: profileError } = await getCurrentUserProfile();
+
+          if (profileError || !profile) {
+            console.error('❌ [AUTH] Profile fetch error:', profileError);
+            dispatch({ type: 'AUTH_LOGOUT' });
+            return;
           }
-        } else {
-          // No session
-          console.log('🔍 [AUTH] No session found')
-          if (isMounted) {
-            dispatch({ type: 'AUTH_LOGOUT' })
-          }
-        }
-      } catch (error) {
-        console.error('❌ [AUTH] Auth initialization error:', error)
-        if (isMounted) {
-          dispatch({ type: 'AUTH_LOGOUT' })
-        }
-      }
-    }
 
-    initializeAuth()
-
-    return () => {
-      isMounted = false
-    }
-  }, [])
-
-  // Set up auth state change listener
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('🔄 [AUTH] Auth state change:', event, session ? 'with session' : 'no session')
-
-      if (event === 'SIGNED_IN' && session) {
-        console.log('🔍 [AUTH] SIGNED_IN event, getting profile...')
-        // Get user profile
-        const { profile } = await getCurrentUserProfile()
-        console.log('🔍 [AUTH] Profile from state change:', profile ? 'Found' : 'Not found')
-
-        if (profile) {
-          console.log('✅ [AUTH] State change login successful')
           dispatch({
             type: 'AUTH_SUCCESS',
             payload: {
               user: profile,
               session
             }
-          })
+          });
+          console.log('✅ [AUTH] Auth initialized successfully');
         } else {
-          console.log('❌ [AUTH] No profile in state change, logging out')
-          dispatch({ type: 'AUTH_LOGOUT' })
+          console.log('ℹ️ [AUTH] No existing session found');
+          dispatch({ type: 'AUTH_LOGOUT' });
+        }
+      } catch (error) {
+        console.error('❌ [AUTH] Initialization error:', error);
+        dispatch({ type: 'AUTH_LOGOUT' });
+      } finally {
+        initializedRef.current = true;
+      }
+    };
+
+    initializeAuth();
+  }, []);
+
+  // Handle auth state changes (only for actual sign in/out events)
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // Skip the initial SIGNED_IN event that fires during initialization
+      if (!initializedRef.current) {
+        console.log('🔄 [AUTH] Skipping auth event during initialization:', event);
+        return;
+      }
+
+      console.log('🔄 [AUTH] Auth state change:', event);
+
+      if (event === 'SIGNED_IN' && session?.user) {
+        console.log('🔍 [AUTH] New sign in, fetching profile...');
+
+        try {
+          const { profile, error } = await getCurrentUserProfile();
+
+          if (error || !profile) {
+            console.error('❌ [AUTH] Failed to fetch user profile:', error);
+            dispatch({ type: 'AUTH_LOGOUT' });
+            return;
+          }
+
+          dispatch({
+            type: 'AUTH_SUCCESS',
+            payload: {
+              user: profile,
+              session
+            }
+          });
+          console.log('✅ [AUTH] Sign in successful');
+        } catch (error) {
+          console.error('❌ [AUTH] Error during sign in:', error);
+          dispatch({ type: 'AUTH_LOGOUT' });
         }
       } else if (event === 'SIGNED_OUT') {
-        console.log('🚪 [AUTH] SIGNED_OUT event')
-        dispatch({ type: 'AUTH_LOGOUT' })
+        console.log('🚪 [AUTH] Sign out event');
+        dispatch({ type: 'AUTH_LOGOUT' });
       }
-    })
+    });
 
-    return () => subscription.unsubscribe()
-  }, [])
+    return () => subscription.unsubscribe();
+  }, []);
 
   // Logout function
   const logout = async () => {

@@ -298,7 +298,7 @@ const Leads = () => {
                     <tr 
                       key={lead.id} 
                       className="hover:bg-gradient-to-r hover:from-primary-50 hover:to-transparent cursor-pointer transition-all duration-200 group" 
-                      onClick={() => navigate(`/leads/${lead.id}`)}
+                      onClick={() => navigate(`/app/leads/${lead.id}`)}
                     >
                       <td className="px-6 py-5 whitespace-nowrap">
                         <div className="flex items-center">

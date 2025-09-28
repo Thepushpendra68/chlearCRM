@@ -245,12 +245,13 @@ class ActivityService {
   // Delete activity
   async deleteActivity(activityId) {
     try {
-      const deleted = await db('activities')
-        .where('id', activityId)
-        .del();
+      const { error } = await supabaseAdmin
+        .from('activities')
+        .delete()
+        .eq('id', activityId);
 
-      if (deleted === 0) {
-        return { success: false, error: 'Activity not found' };
+      if (error) {
+        return { success: false, error: 'Activity not found or could not be deleted' };
       }
 
       return { success: true, message: 'Activity deleted successfully' };
@@ -314,19 +315,31 @@ class ActivityService {
   // Get lead timeline (all activities for a lead)
   async getLeadTimeline(leadId, limit = 50) {
     try {
-      const activities = await db('activities')
-        .select(
-          'activities.*',
-          'users.first_name',
-          'users.last_name',
-          'users.email as user_email'
-        )
-        .leftJoin('users', 'activities.user_id', 'users.id')
-        .where('activities.lead_id', leadId)
-        .orderBy('activities.created_at', 'desc')
+      const { data: activities, error } = await supabaseAdmin
+        .from('activities')
+        .select(`
+          *,
+          user_profiles!activities_user_id_fkey(first_name, last_name, email)
+        `)
+        .eq('lead_id', leadId)
+        .order('created_at', { ascending: false })
         .limit(limit);
 
-      return { success: true, data: activities };
+      if (error) {
+        console.error('Error fetching lead timeline:', error);
+        return { success: false, error: error.message };
+      }
+
+      // Format the response to match expected structure
+      const formattedActivities = activities.map(activity => ({
+        ...activity,
+        first_name: activity.user_profiles?.first_name || '',
+        last_name: activity.user_profiles?.last_name || '',
+        user_email: activity.user_profiles?.email || '',
+        user_profiles: undefined // Remove nested object
+      }));
+
+      return { success: true, data: formattedActivities };
     } catch (error) {
       console.error('Error fetching lead timeline:', error);
       return { success: false, error: error.message };
@@ -412,40 +425,59 @@ class ActivityService {
   // Get activity statistics
   async getActivityStats(filters = {}) {
     try {
-      let query = db('activities');
+      // Get activities with filters
+      let query = supabaseAdmin
+        .from('activities')
+        .select('activity_type, is_completed, duration_minutes');
 
       // Apply filters
       if (filters.user_id) {
-        query = query.where('user_id', filters.user_id);
+        query = query.eq('user_id', filters.user_id);
       }
 
       if (filters.lead_id) {
-        query = query.where('lead_id', filters.lead_id);
+        query = query.eq('lead_id', filters.lead_id);
       }
 
       if (filters.date_from) {
-        query = query.where('created_at', '>=', filters.date_from);
+        query = query.gte('created_at', filters.date_from);
       }
 
       if (filters.date_to) {
-        query = query.where('created_at', '<=', filters.date_to);
+        query = query.lte('created_at', filters.date_to);
       }
 
-      const stats = await query
-        .select(
-          db.raw('COUNT(*) as total_activities'),
-          db.raw('COUNT(CASE WHEN is_completed = true THEN 1 END) as completed_activities'),
-          db.raw('COUNT(CASE WHEN activity_type = ? THEN 1 END) as calls', ['call']),
-          db.raw('COUNT(CASE WHEN activity_type = ? THEN 1 END) as emails', ['email']),
-          db.raw('COUNT(CASE WHEN activity_type = ? THEN 1 END) as meetings', ['meeting']),
-          db.raw('COUNT(CASE WHEN activity_type = ? THEN 1 END) as notes', ['note']),
-          db.raw('AVG(duration_minutes) as avg_duration')
-        )
-        .first();
+      const { data: activities, error } = await query;
+
+      if (error) {
+        console.error('Error fetching activities for stats:', error);
+        return { success: false, error: error.message };
+      }
+
+      // Calculate statistics
+      const totalActivities = activities.length;
+      const completedActivities = activities.filter(a => a.is_completed).length;
+      const calls = activities.filter(a => a.activity_type === 'call').length;
+      const emails = activities.filter(a => a.activity_type === 'email').length;
+      const meetings = activities.filter(a => a.activity_type === 'meeting').length;
+      const notes = activities.filter(a => a.activity_type === 'note').length;
+
+      const durations = activities.filter(a => a.duration_minutes).map(a => a.duration_minutes);
+      const avgDuration = durations.length > 0 ? durations.reduce((sum, dur) => sum + dur, 0) / durations.length : 0;
+
+      const stats = {
+        total_activities: totalActivities,
+        completed_activities: completedActivities,
+        calls,
+        emails,
+        meetings,
+        notes,
+        avg_duration: Math.round(avgDuration * 100) / 100
+      };
 
       return { success: true, data: stats };
     } catch (error) {
-      console.error('Error fetching activity stats:', error);
+      console.error('Error getting activity stats:', error);
       return { success: false, error: error.message };
     }
   }

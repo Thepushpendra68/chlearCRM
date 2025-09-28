@@ -3,8 +3,8 @@ import toast from 'react-hot-toast';
 import supabase from '../config/supabase';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api',
-  timeout: 10000, // Reduced from 30 seconds to 10 seconds
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+  timeout: 60000, // Increased to 60 seconds to handle database queries
   headers: {
     'Content-Type': 'application/json',
   },
@@ -12,23 +12,23 @@ const api = axios.create({
 
 api.interceptors.request.use(
   async (config) => {
-    const { data } = await supabase.auth.getSession();
-    const accessToken = data?.session?.access_token;
+    // Use the current session from Supabase client (should be cached)
+    const { data: { session } } = await supabase.auth.getSession();
 
     console.log('🔍 [API] Request interceptor:', {
       url: config.url,
-      hasSession: !!data?.session,
-      hasToken: !!accessToken,
-      tokenPrefix: accessToken ? accessToken.substring(0, 20) + '...' : 'none'
+      hasSession: !!session,
+      hasToken: !!session?.access_token,
+      tokenPrefix: session?.access_token ? session.access_token.substring(0, 20) + '...' : 'none'
     });
 
-    if (accessToken) {
+    if (session?.access_token) {
       config.headers = config.headers ?? {};
-      config.headers.Authorization = `Bearer ${accessToken}`;
+      config.headers.Authorization = `Bearer ${session.access_token}`;
       console.log('✅ [API] Added Authorization header');
     } else if (config.headers?.Authorization) {
       delete config.headers.Authorization;
-      console.log('⚠️ [API] Removed Authorization header');
+      console.log('⚠️ [API] Removed Authorization header - no valid session');
     }
 
     return config;

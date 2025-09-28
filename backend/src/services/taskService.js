@@ -14,8 +14,8 @@ class TaskService {
         .from('tasks')
         .select(`
           *,
-          leads(name, email),
-          assigned_user:user_profiles!tasks_assigned_to_fkey(first_name, last_name, email),
+          leads(name),
+          assigned_user:user_profiles!tasks_assigned_to_fkey(first_name, last_name),
           created_user:user_profiles!tasks_created_by_fkey(first_name, last_name)
         `)
         .eq('company_id', currentUser.company_id);
@@ -77,7 +77,6 @@ class TaskService {
       const formattedTasks = tasks.map(task => ({
         ...task,
         lead_name: task.leads?.name,
-        lead_email: task.leads?.email,
         assigned_first_name: task.assigned_user?.first_name,
         assigned_last_name: task.assigned_user?.last_name,
         assigned_email: task.assigned_user?.email,
@@ -107,7 +106,7 @@ class TaskService {
         .from('tasks')
         .select(`
           *,
-          leads!tasks_lead_id_fkey(name, email),
+          leads!tasks_lead_id_fkey(name),
           assigned_user:user_profiles!tasks_assigned_to_fkey(first_name, last_name, email),
           created_user:user_profiles!tasks_created_by_fkey(first_name, last_name)
         `)
@@ -123,7 +122,6 @@ class TaskService {
       const formattedTask = {
         ...task,
         lead_name: task.leads?.name,
-        lead_email: task.leads?.email,
         assigned_first_name: task.assigned_user?.first_name,
         assigned_last_name: task.assigned_user?.last_name,
         assigned_email: task.assigned_user?.email,
@@ -338,7 +336,7 @@ class TaskService {
         .from('tasks')
         .select(`
           *,
-          leads!tasks_lead_id_fkey(name, email),
+          leads!tasks_lead_id_fkey(name),
           assigned_user:user_profiles!tasks_assigned_to_fkey(first_name, last_name)
         `)
         .eq('company_id', currentUser.company_id)
@@ -366,7 +364,6 @@ class TaskService {
       const formattedTasks = overdueTasks.map(task => ({
         ...task,
         lead_name: task.leads?.name,
-        lead_email: task.leads?.email,
         assigned_first_name: task.assigned_user?.first_name,
         assigned_last_name: task.assigned_user?.last_name,
         // Remove the nested objects

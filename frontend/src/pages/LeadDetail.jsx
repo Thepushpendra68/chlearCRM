@@ -30,7 +30,7 @@ const LeadDetail = () => {
     } catch (error) {
       console.error('Failed to fetch lead:', error)
       toast.error('Failed to load lead details')
-      navigate('/leads')
+      navigate('/app/leads')
     } finally {
       setLoading(false)
     }
@@ -85,7 +85,7 @@ const LeadDetail = () => {
     try {
       await leadService.deleteLead(id)
       toast.success('Lead deleted successfully')
-      navigate('/leads')
+      navigate('/app/leads')
     } catch (error) {
       console.error('Failed to delete lead:', error)
       toast.error('Failed to delete lead')
@@ -134,7 +134,7 @@ const LeadDetail = () => {
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Lead not found</h3>
             <p className="text-sm text-gray-600 mb-6">The lead you're looking for doesn't exist or has been removed.</p>
             <button
-              onClick={() => navigate('/leads')}
+              onClick={() => navigate('/app/leads')}
               className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
             >
               <ArrowLeftIcon className="h-4 w-4 mr-2" />
@@ -155,7 +155,7 @@ const LeadDetail = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <button
-                  onClick={() => navigate('/leads')}
+                  onClick={() => navigate('/app/leads')}
                   className="p-1.5 text-gray-400 hover:text-gray-600 rounded-md hover:bg-gray-100 transition-colors"
                 >
                   <ArrowLeftIcon className="h-4 w-4" />

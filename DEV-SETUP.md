@@ -1,97 +1,56 @@
-# 🚀 CRM Development Setup
+# Local Development Setup
 
-## 🎯 **PERMANENT SOLUTION FOR PORT CONFLICTS**
+This project now runs entirely on your local machine. Docker is no longer required for day-to-day development.
 
-You now have **AUTOMATED STARTUP SCRIPTS** that handle all port conflicts and configuration automatically.
+## Available Scripts
 
-## 📋 **Available Scripts**
+### start-local.bat
+- Stops anything listening on ports 5000 and 3000
+- Rewrites `frontend/.env` so the UI calls `http://localhost:5000/api`
+- Starts the backend (`npm run start`) in a new terminal
+- Starts the frontend (`npm run dev`) in a new terminal
 
-### 🐳 **Docker Development (Recommended)**
-```bash
-# Double-click or run from terminal:
-start-dev.bat
+### start-dev.bat
+- Legacy filename kept for convenience
+- Prints a reminder that Docker is retired and forwards to `start-local.bat`
+
+### start-frontend.bat
+- Starts only the React dev server on http://localhost:3000
+
+### stop-all.bat
+- Looks for processes bound to ports 3000 and 5000
+- Force terminates anything it finds
+
+## NPM Commands
+
+Run these once in each workspace (backend and frontend) to make sure dependencies are installed:
+
+```powershell
+cd backend
+npm install
+
+cd ..\frontend
+npm install
 ```
-**What it does:**
-- ✅ Kills any conflicting processes on ports 3000, 5000, 5001
-- ✅ Starts Docker containers with consistent configuration
-- ✅ Backend: `http://localhost:5001/api`
-- ✅ Frontend: `http://localhost:3000`
 
-### 💻 **Local Development**
-```bash
-# Double-click or run from terminal:
-start-local.bat
+To launch services manually (if you prefer not to use the batch files):
+
+```powershell
+# Backend
+cd backend
+npm run start
+
+# Frontend (in a second terminal)
+cd frontend
+npm run dev
 ```
-**What it does:**
-- ✅ Kills any conflicting processes
-- ✅ Stops Docker containers
-- ✅ Updates frontend config to use port 5000
-- ✅ Starts backend locally on port 5000
-- ✅ Starts frontend locally on port 3000
-- ✅ Backend: `http://localhost:5000/api`
-- ✅ Frontend: `http://localhost:3000`
 
-### 🛑 **Stop Everything**
-```bash
-# Double-click or run from terminal:
-stop-all.bat
-```
-**What it does:**
-- ✅ Stops all Docker containers
-- ✅ Kills all processes on ports 3000, 5000, 5001
-- ✅ Completely clean slate
+The backend listens on http://localhost:5000 and exposes a `/health` endpoint. The frontend proxies `/api` calls to that backend and serves the UI on http://localhost:3000.
 
-## 🔧 **Port Configuration**
+## Troubleshooting
 
-| Service | Docker Mode | Local Mode |
-|---------|------------|------------|
-| Backend API | :5001 | :5000 |
-| Frontend | :3000 | :3000 |
+1. If you see "address already in use" errors, run `stop-all.bat` and try again.
+2. Make sure `backend/.env` and `frontend/.env` contain the Supabase keys supplied in the repository.
+3. Confirm Node.js 18+ and npm 9+ are installed locally: `node -v`, `npm -v`.
 
-## 🎯 **How This Solves The Port Issue**
-
-1. **Automated Cleanup**: Scripts automatically kill conflicting processes
-2. **Consistent Configuration**: Scripts ensure frontend always points to correct backend port
-3. **Clear Separation**: Choose Docker OR Local - no mixing
-4. **One-Click Start**: No manual port checking or configuration needed
-
-## 🚨 **NEVER RUN SERVICES MANUALLY AGAIN**
-
-❌ **DON'T DO:**
-- `npm run dev` manually
-- `docker-compose up` manually
-- Mix Docker and local services
-
-✅ **DO:**
-- Use `start-dev.bat` for Docker development
-- Use `start-local.bat` for local development
-- Use `stop-all.bat` to clean everything
-
-## 🔍 **Troubleshooting**
-
-If you still get port errors:
-1. Run `stop-all.bat`
-2. Wait 10 seconds
-3. Run your preferred start script
-
-## 📊 **Quick Start**
-
-1. **Choose your development mode:**
-   - Docker: `start-dev.bat`
-   - Local: `start-local.bat`
-
-2. **Open browser:**
-   - Frontend: `http://localhost:3000`
-   - Backend Health: `http://localhost:5001/health` (Docker) or `http://localhost:5000/health` (Local)
-
-3. **Login with your Supabase credentials**
-
-## 🎉 **Result**
-
-- ✅ No more port conflicts
-- ✅ No more manual configuration
-- ✅ Consistent development environment
-- ✅ One-click startup/shutdown
-- ✅ Authentication works perfectly
-
-**Your port nightmare is over! 🎉**
+With these scripts, you can develop without ever starting Docker Desktop.

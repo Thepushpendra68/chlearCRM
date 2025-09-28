@@ -84,7 +84,18 @@
       "mcp__supabase__list_tables",
       "mcp__supabase__apply_migration",
       "mcp__supabase__execute_sql",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(dir)",
+      "Read(//cygdrive/c/Users/Vishaka/Downloads/CHLEAR CRM/**)",
+      "Bash(dir backend)",
+      "Bash(dir:*)",
+      "Bash(start-local.bat --no-pause)",
+      "Bash(timeout:*)",
+      "Bash(./stop-all.bat)",
+      "Bash(./start-local.bat --no-pause)",
+      "Bash(npm run debug-user-lookup:*)"
     ],
     "deny": [],
     "ask": []

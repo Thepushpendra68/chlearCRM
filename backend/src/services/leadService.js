@@ -2,16 +2,22 @@ const { supabaseAdmin } = require('../config/supabase');
 const ApiError = require('../utils/ApiError');
 
 /**
- * Get all leads with pagination, search, and filtering
+ * Get all leads with pagination, search, and filtering - Optimized version
  */
 const getLeads = async (currentUser, page = 1, limit = 20, filters = {}) => {
   try {
     const offset = (page - 1) * limit;
 
-    // Build base query
+    // Build optimized query with specific field selection
     let query = supabaseAdmin
       .from('leads')
-      .select('*')
+      .select(`
+        id, name, email, phone, company, title,
+        status, source, deal_value, expected_close_date, notes,
+        priority, created_at, updated_at, assigned_at,
+        assigned_to, created_by, pipeline_stage_id,
+        user_profiles!assigned_to(id, first_name, last_name)
+      `)
       .eq('company_id', currentUser.company_id);
 
     // Non-admin users only see their assigned leads
@@ -19,9 +25,10 @@ const getLeads = async (currentUser, page = 1, limit = 20, filters = {}) => {
       query = query.eq('assigned_to', currentUser.id);
     }
 
-    // Apply filters
+    // Apply filters efficiently
     if (filters.search) {
-      query = query.or(`name.ilike.%${filters.search}%,email.ilike.%${filters.search}%,company.ilike.%${filters.search}%`);
+      const searchTerm = `%${filters.search}%`;
+      query = query.or(`name.ilike.${searchTerm},email.ilike.${searchTerm},company.ilike.${searchTerm}`);
     }
 
     if (filters.status) {
@@ -41,36 +48,68 @@ const getLeads = async (currentUser, page = 1, limit = 20, filters = {}) => {
     const sortOrder = filters.sort_order || 'desc';
     query = query.order(sortBy, { ascending: sortOrder === 'asc' });
 
-    // Get total count first (Supabase doesn't have a direct count with filters)
-    const { count: totalItems, error: countError } = await supabaseAdmin
+    // Get total count and paginated results in parallel for better performance
+    let countQuery = supabaseAdmin
       .from('leads')
-      .select('*', { count: 'exact' })
+      .select('*', { count: 'exact', head: true })
       .eq('company_id', currentUser.company_id);
 
-    if (countError) {
-      console.error('Count error:', countError);
-      throw countError;
+    // Non-admin users only see their assigned leads (for count)
+    if (currentUser.role !== 'company_admin' && currentUser.role !== 'super_admin') {
+      countQuery = countQuery.eq('assigned_to', currentUser.id);
     }
 
-    // Apply pagination
-    query = query.range(offset, offset + limit - 1);
+    const [countResult, leadsResult] = await Promise.all([
+      countQuery,
+      // Paginated query
+      query.range(offset, offset + limit - 1)
+    ]);
 
-    const { data: leads, error } = await query;
-
-    if (error) {
-      console.error('Leads query error:', error);
-      throw error;
+    if (countResult.error) {
+      console.error('Count error:', countResult.error);
+      throw countResult.error;
     }
 
+    if (leadsResult.error) {
+      console.error('Leads query error:', leadsResult.error);
+      throw leadsResult.error;
+    }
+
+    const totalItems = countResult.count || 0;
     const totalPages = Math.ceil(totalItems / limit);
 
-    // Format the data to match expected structure
-    const formattedLeads = leads.map(lead => ({
-      ...lead,
-      assigned_user_first_name: null,
-      assigned_user_last_name: null,
-      assigned_user_email: null
-    }));
+    // Format the data efficiently
+    const formattedLeads = leadsResult.data.map(lead => {
+      // Split name into first and last for backward compatibility
+      const nameParts = (lead.name || '').split(' ');
+      const first_name = nameParts[0] || '';
+      const last_name = nameParts.slice(1).join(' ') || '';
+
+      return {
+        id: lead.id,
+        name: lead.name || '',
+        first_name,
+        last_name,
+        email: lead.email,
+        phone: lead.phone,
+        company: lead.company,
+        title: lead.title,
+        status: lead.status,
+        source: lead.source,
+        deal_value: lead.deal_value,
+        expected_close_date: lead.expected_close_date,
+        notes: lead.notes,
+        priority: lead.priority,
+        created_at: lead.created_at,
+        updated_at: lead.updated_at,
+        assigned_at: lead.assigned_at,
+        assigned_to: lead.assigned_to,
+        created_by: lead.created_by,
+        pipeline_stage_id: lead.pipeline_stage_id,
+        assigned_user_first_name: lead.user_profiles?.first_name || null,
+        assigned_user_last_name: lead.user_profiles?.last_name || null
+      };
+    });
 
     return {
       leads: formattedLeads,
@@ -91,19 +130,24 @@ const getLeads = async (currentUser, page = 1, limit = 20, filters = {}) => {
  */
 const getLeadById = async (id) => {
   try {
-    const lead = await knex('leads')
-      .leftJoin('users', 'leads.assigned_to', 'users.id')
-      .select(
-        'leads.*',
-        'users.first_name as assigned_user_first_name',
-        'users.last_name as assigned_user_last_name',
-        'users.email as assigned_user_email'
-      )
-      .where('leads.id', id)
-      .first();
+    const { supabaseAdmin } = require('../config/supabase');
+
+    const { data: lead, error } = await supabaseAdmin
+      .from('leads')
+      .select(`
+        *,
+        user_profiles!assigned_to(id, first_name, last_name)
+      `)
+      .eq('id', id)
+      .single();
+
+    if (error) {
+      throw error;
+    }
 
     return lead;
   } catch (error) {
+    console.error('Error fetching lead by ID:', error);
     throw new ApiError('Failed to fetch lead', 500);
   }
 };
@@ -113,33 +157,44 @@ const getLeadById = async (id) => {
  */
 const createLead = async (leadData) => {
   try {
+    const { supabaseAdmin } = require('../config/supabase');
+
     // Clean up empty strings for UUID and date fields
     const cleanedData = { ...leadData };
-    
+
     // Convert empty strings to null for UUID fields
     if (cleanedData.assigned_to === '') cleanedData.assigned_to = null;
     if (cleanedData.pipeline_stage_id === '') cleanedData.pipeline_stage_id = null;
     if (cleanedData.created_by === '') cleanedData.created_by = null;
-    
+
     // Convert empty strings to null for date fields
     if (cleanedData.expected_close_date === '') cleanedData.expected_close_date = null;
-    
+
     // Convert empty strings to null for numeric fields
     if (cleanedData.deal_value === '' || cleanedData.deal_value === null) cleanedData.deal_value = null;
 
-    const [lead] = await knex('leads')
+    const { data: lead, error } = await supabaseAdmin
+      .from('leads')
       .insert({
         ...cleanedData,
-        created_at: new Date(),
-        updated_at: new Date()
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       })
-      .returning('*');
-    
-    // Return the created lead directly
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === '23505') { // Unique constraint violation
+        throw new ApiError('Email already exists', 400);
+      }
+      throw error;
+    }
+
     return lead;
   } catch (error) {
-    if (error.code === '23505') { // Unique constraint violation
-      throw new ApiError('Email already exists', 400);
+    console.error('Error creating lead:', error);
+    if (error instanceof ApiError) {
+      throw error;
     }
     throw new ApiError('Failed to create lead', 500);
   }
@@ -150,47 +205,58 @@ const createLead = async (leadData) => {
  */
 const updateLead = async (id, leadData, currentUser) => {
   try {
-    // Check if lead exists and user has permission
-    const existingLead = await knex('leads').where('id', id).first();
-    if (!existingLead) {
+    const { supabaseAdmin } = require('../config/supabase');
+
+    // First, get the existing lead to check permissions
+    const { data: existingLead, error: fetchError } = await supabaseAdmin
+      .from('leads')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !existingLead) {
       return null;
     }
 
     // Non-admin users can only update leads assigned to them
-    if (currentUser.role !== 'admin' && existingLead.assigned_to !== currentUser.id) {
+    if (currentUser.role !== 'company_admin' && currentUser.role !== 'super_admin' && existingLead.assigned_to !== currentUser.id) {
       throw new ApiError('Access denied', 403);
     }
 
     // Clean up empty strings for UUID and date fields
     const cleanedData = { ...leadData };
-    
+
     // Convert empty strings to null for UUID fields
     if (cleanedData.assigned_to === '') cleanedData.assigned_to = null;
     if (cleanedData.pipeline_stage_id === '') cleanedData.pipeline_stage_id = null;
     if (cleanedData.created_by === '') cleanedData.created_by = null;
-    
+
     // Convert empty strings to null for date fields
     if (cleanedData.expected_close_date === '') cleanedData.expected_close_date = null;
-    
+
     // Convert empty strings to null for numeric fields
     if (cleanedData.deal_value === '' || cleanedData.deal_value === null) cleanedData.deal_value = null;
 
-    const [updatedLead] = await knex('leads')
-      .where('id', id)
+    const { data: updatedLead, error: updateError } = await supabaseAdmin
+      .from('leads')
       .update({
         ...cleanedData,
-        updated_at: new Date()
+        updated_at: new Date().toISOString()
       })
-      .returning('*');
+      .eq('id', id)
+      .select()
+      .single();
 
-    // Fetch the complete lead with assigned user info
-    const completeLead = await getLeadById(id);
-    return completeLead;
+    if (updateError) {
+      if (updateError.code === '23505') { // Unique constraint violation
+        throw new ApiError('Email already exists', 400);
+      }
+      throw updateError;
+    }
+
+    return updatedLead;
   } catch (error) {
     console.error('Error in updateLead:', error);
-    if (error.code === '23505') { // Unique constraint violation
-      throw new ApiError('Email already exists', 400);
-    }
     if (error instanceof ApiError) {
       throw error; // Re-throw ApiError as-is
     }
@@ -203,20 +269,39 @@ const updateLead = async (id, leadData, currentUser) => {
  */
 const deleteLead = async (id, currentUser) => {
   try {
+    const { supabaseAdmin } = require('../config/supabase');
+
     // Check if lead exists and user has permission
-    const existingLead = await knex('leads').where('id', id).first();
-    if (!existingLead) {
+    const { data: existingLead, error: fetchError } = await supabaseAdmin
+      .from('leads')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !existingLead) {
       return false;
     }
 
     // Non-admin users can only delete leads assigned to them
-    if (currentUser.role !== 'admin' && existingLead.assigned_to !== currentUser.id) {
+    if (currentUser.role !== 'company_admin' && currentUser.role !== 'super_admin' && existingLead.assigned_to !== currentUser.id) {
       throw new ApiError('Access denied', 403);
     }
 
-    const deleted = await knex('leads').where('id', id).del();
-    return deleted > 0;
+    const { error: deleteError } = await supabaseAdmin
+      .from('leads')
+      .delete()
+      .eq('id', id);
+
+    if (deleteError) {
+      throw deleteError;
+    }
+
+    return true;
   } catch (error) {
+    console.error('Error deleting lead:', error);
+    if (error instanceof ApiError) {
+      throw error;
+    }
     throw new ApiError('Failed to delete lead', 500);
   }
 };
@@ -226,54 +311,58 @@ const deleteLead = async (id, currentUser) => {
  */
 const getLeadStats = async (currentUser) => {
   try {
-    let baseQuery = knex('leads');
+    const { supabaseAdmin } = require('../config/supabase');
+
+    // Build query with company filter
+    let query = supabaseAdmin
+      .from('leads')
+      .select('status, source, created_at')
+      .eq('company_id', currentUser.company_id);
 
     // Non-admin users only see their assigned leads
-    if (currentUser.role !== 'admin') {
-      baseQuery = baseQuery.where('assigned_to', currentUser.id);
+    if (currentUser.role !== 'company_admin' && currentUser.role !== 'super_admin') {
+      query = query.eq('assigned_to', currentUser.id);
     }
 
-    // Total leads
-    const [{ total_leads }] = await baseQuery.clone().count('* as total_leads');
+    const { data: leads, error } = await query;
+
+    if (error) {
+      throw error;
+    }
+
+    // Calculate statistics from the data
+    const total_leads = leads.length;
 
     // Leads by status
-    const statusStats = await baseQuery.clone()
-      .select('status')
-      .count('* as count')
-      .groupBy('status');
+    const statusStats = {};
+    leads.forEach(lead => {
+      const status = lead.status || 'unknown';
+      statusStats[status] = (statusStats[status] || 0) + 1;
+    });
 
     // Leads by source
-    const sourceStats = await baseQuery.clone()
-      .select('lead_source')
-      .count('* as count')
-      .groupBy('lead_source');
+    const sourceStats = {};
+    leads.forEach(lead => {
+      const source = lead.source || 'unknown';
+      sourceStats[source] = (sourceStats[source] || 0) + 1;
+    });
 
     // Recent leads (last 30 days)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    
-    const [{ recent_leads }] = await baseQuery.clone()
-      .where('created_at', '>=', thirtyDaysAgo)
-      .count('* as recent_leads');
 
-    // Convert status and source stats to objects
-    const statusDistribution = {};
-    statusStats.forEach(stat => {
-      statusDistribution[stat.status] = parseInt(stat.count);
-    });
-
-    const sourceDistribution = {};
-    sourceStats.forEach(stat => {
-      sourceDistribution[stat.lead_source] = parseInt(stat.count);
-    });
+    const recent_leads = leads.filter(lead =>
+      new Date(lead.created_at) >= thirtyDaysAgo
+    ).length;
 
     return {
-      total_leads: parseInt(total_leads),
-      recent_leads: parseInt(recent_leads),
-      status_distribution: statusDistribution,
-      source_distribution: sourceDistribution
+      total_leads,
+      recent_leads,
+      status_distribution: statusStats,
+      source_distribution: sourceStats
     };
   } catch (error) {
+    console.error('Error fetching lead statistics:', error);
     throw new ApiError('Failed to fetch lead statistics', 500);
   }
 };
@@ -283,30 +372,32 @@ const getLeadStats = async (currentUser) => {
  */
 const getRecentLeads = async (currentUser, limit = 10) => {
   try {
-    let query = knex('leads')
-      .leftJoin('users', 'leads.assigned_to', 'users.id')
-      .select(
-        'leads.id',
-        'leads.first_name',
-        'leads.last_name',
-        'leads.email',
-        'leads.company',
-        'leads.status',
-        'leads.lead_source',
-        'leads.created_at',
-        'users.first_name as assigned_user_first_name',
-        'users.last_name as assigned_user_last_name'
-      )
-      .orderBy('leads.created_at', 'desc')
+    const { supabaseAdmin } = require('../config/supabase');
+
+    let query = supabaseAdmin
+      .from('leads')
+      .select(`
+        id, first_name, last_name, email, company, status, source, created_at,
+        user_profiles!assigned_to(first_name, last_name)
+      `)
+      .eq('company_id', currentUser.company_id)
+      .order('created_at', { ascending: false })
       .limit(limit);
 
     // Non-admin users only see their assigned leads
-    if (currentUser.role !== 'admin') {
-      query = query.where('leads.assigned_to', currentUser.id);
+    if (currentUser.role !== 'company_admin' && currentUser.role !== 'super_admin') {
+      query = query.eq('assigned_to', currentUser.id);
     }
 
-    return await query;
+    const { data: leads, error } = await query;
+
+    if (error) {
+      throw error;
+    }
+
+    return leads;
   } catch (error) {
+    console.error('Error fetching recent leads:', error);
     throw new ApiError('Failed to fetch recent leads', 500);
   }
 };
@@ -314,28 +405,35 @@ const getRecentLeads = async (currentUser, limit = 10) => {
 /**
  * Search leads by query
  */
-const searchLeads = async (query, limit = 5) => {
+const searchLeads = async (query, limit = 5, currentUser = null) => {
   try {
-    const searchTerm = `%${query}%`;
-    
-    const leads = await knex('leads')
-      .leftJoin('users', 'leads.assigned_to', 'users.id')
-      .select(
-        'leads.*',
-        'users.first_name as assigned_user_first_name',
-        'users.last_name as assigned_user_last_name',
-        'users.email as assigned_user_email'
-      )
-      .where(function() {
-        this.where('leads.first_name', 'ilike', searchTerm)
-          .orWhere('leads.last_name', 'ilike', searchTerm)
-          .orWhere('leads.email', 'ilike', searchTerm)
-          .orWhere('leads.company', 'ilike', searchTerm)
-          .orWhere('leads.phone', 'ilike', searchTerm)
-          .orWhere('leads.notes', 'ilike', searchTerm);
-      })
-      .orderBy('leads.created_at', 'desc')
+    const { supabaseAdmin } = require('../config/supabase');
+
+    let searchQuery = supabaseAdmin
+      .from('leads')
+      .select(`
+        *,
+        user_profiles!assigned_to(first_name, last_name)
+      `)
+      .or(`first_name.ilike.%${query}%,last_name.ilike.%${query}%,email.ilike.%${query}%,company.ilike.%${query}%,phone.ilike.%${query}%,notes.ilike.%${query}%`)
+      .order('created_at', { ascending: false })
       .limit(limit);
+
+    // Apply company filter if user is provided
+    if (currentUser?.company_id) {
+      searchQuery = searchQuery.eq('company_id', currentUser.company_id);
+
+      // Non-admin users only see their assigned leads
+      if (currentUser.role !== 'company_admin' && currentUser.role !== 'super_admin') {
+        searchQuery = searchQuery.eq('assigned_to', currentUser.id);
+      }
+    }
+
+    const { data: leads, error } = await searchQuery;
+
+    if (error) {
+      throw error;
+    }
 
     return leads;
   } catch (error) {

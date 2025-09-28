@@ -1,30 +1,18 @@
 @echo off
-echo 🛑 Stopping all CRM services...
+setlocal
 
-echo 🐳 Stopping Docker containers...
-docker-compose down
+echo [INFO] Stopping local CRM services...
 
-echo 🧹 Killing processes on ports 3000, 5000, 5001...
-for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":3000 "') do (
-    if "%%a" neq "" (
-        echo Killing process %%a on port 3000
-        taskkill /F /PID %%a >nul 2>&1
+for %%P in (3000 5000) do (
+    echo [INFO] Checking for processes on port %%P...
+    for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":%%P "') do (
+        if "%%a" neq "" (
+            echo [INFO] Terminating process %%a listening on port %%P
+            taskkill /F /PID %%a >nul 2>&1
+        )
     )
 )
 
-for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":5000 "') do (
-    if "%%a" neq "" (
-        echo Killing process %%a on port 5000
-        taskkill /F /PID %%a >nul 2>&1
-    )
-)
-
-for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":5001 "') do (
-    if "%%a" neq "" (
-        echo Killing process %%a on port 5001
-        taskkill /F /PID %%a >nul 2>&1
-    )
-)
-
-echo ✅ All services stopped!
+echo [INFO] Local services stopped.
 pause
+endlocal

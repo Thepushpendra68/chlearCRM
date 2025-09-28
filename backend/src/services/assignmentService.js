@@ -227,10 +227,11 @@ class AssignmentService {
 
       // Check if assigned user exists and belongs to company
       const { data: assignedUser, error: userError } = await supabase
-        .from('user_profiles')
+        .from('user_profiles_with_auth')
         .select('id')
         .eq('id', assignedTo)
         .eq('company_id', currentUser.company_id)
+        .eq('is_active', true)
         .single();
 
       if (userError || !assignedUser) {
@@ -305,11 +306,12 @@ class AssignmentService {
     try {
       const supabase = supabaseAdmin;
 
-      // Get users in the company
+      // Get users in the company using the view that includes email
       const { data: users, error: usersError } = await supabase
-        .from('user_profiles')
+        .from('user_profiles_with_auth')
         .select('id, first_name, last_name, email')
         .eq('company_id', currentUser.company_id)
+        .eq('is_active', true)
         .neq('role', 'super_admin');
 
       if (usersError) {

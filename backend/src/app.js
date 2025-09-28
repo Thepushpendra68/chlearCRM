@@ -97,8 +97,54 @@ app.get('/health', (req, res) => {
   res.status(200).json({
     status: 'OK',
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development'
+    environment: process.env.NODE_ENV || 'development',
+    uptime: process.uptime(),
+    memory: process.memoryUsage()
   });
+});
+
+// Cache statistics endpoint
+app.get('/admin/cache-stats', (req, res) => {
+  try {
+    const cache = require('./utils/cache');
+    const stats = cache.getStats();
+
+    res.status(200).json({
+      status: 'OK',
+      cache: stats,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'ERROR',
+      message: 'Failed to get cache stats',
+      error: error.message
+    });
+  }
+});
+
+// Performance metrics endpoint
+app.get('/admin/performance', (req, res) => {
+  try {
+    const cache = require('./utils/cache');
+
+    res.status(200).json({
+      status: 'OK',
+      performance: {
+        uptime: process.uptime(),
+        memory: process.memoryUsage(),
+        cache: cache.getStats(),
+        environment: process.env.NODE_ENV || 'development'
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'ERROR',
+      message: 'Failed to get performance metrics',
+      error: error.message
+    });
+  }
 });
 
 // Debug endpoint to check headers

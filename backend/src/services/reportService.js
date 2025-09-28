@@ -57,7 +57,8 @@ const getLeadPerformanceMetrics = async (currentUser, filters = {}) => {
     const activeLeads = leads.filter(lead => lead.pipeline_stage_id !== null).length;
     const avgDealValue = leads.filter(lead => lead.deal_value).reduce((sum, lead) => sum + lead.deal_value, 0) / leads.filter(lead => lead.deal_value).length || 0;
     const totalDealValue = leads.filter(lead => lead.deal_value).reduce((sum, lead) => sum + lead.deal_value, 0);
-    const avgProbability = leads.filter(lead => lead.probability).reduce((sum, lead) => sum + lead.probability, 0) / leads.filter(lead => lead.probability).length || 0;
+    // Note: probability field doesn't exist in current schema, using 0 as default
+    const avgProbability = 0;
 
     const leadMetrics = {
       total_leads: totalLeads,
@@ -91,7 +92,8 @@ const getLeadPerformanceMetrics = async (currentUser, filters = {}) => {
     for (const stage of stages || []) {
       const stageLeads = leads.filter(lead => lead.pipeline_stage_id === stage.id);
       const leadCount = stageLeads.length;
-      const avgProbability = stageLeads.filter(lead => lead.probability).reduce((sum, lead) => sum + lead.probability, 0) / stageLeads.filter(lead => lead.probability).length || 0;
+      // Note: probability field doesn't exist in current schema, using 0 as default
+      const avgProbability = 0;
       const totalValue = stageLeads.filter(lead => lead.deal_value).reduce((sum, lead) => sum + lead.deal_value, 0);
 
       conversionData.push({
@@ -233,7 +235,8 @@ const getActivitySummary = async (currentUser, filters = {}) => {
         metadata,
         lead_id,
         user_id,
-        company_id
+        company_id,
+        created_at
       `)
       .eq('company_id', currentUser.company_id);
 
@@ -275,7 +278,7 @@ const getActivitySummary = async (currentUser, filters = {}) => {
     const uniqueUsers = new Set();
 
     for (const activity of activities || []) {
-      const type = activity.type;
+      const type = activity.type || 'unknown';
 
       if (!activitySummary[type]) {
         activitySummary[type] = {
@@ -299,7 +302,9 @@ const getActivitySummary = async (currentUser, filters = {}) => {
       if (activity.lead_id) {
         uniqueLeads.add(activity.lead_id);
       }
-      uniqueUsers.add(activity.user_id);
+      if (activity.user_id) {
+        uniqueUsers.add(activity.user_id);
+      }
     }
 
     // Calculate averages and finalize
@@ -311,8 +316,10 @@ const getActivitySummary = async (currentUser, filters = {}) => {
     // Get daily activity trends
     const dailyTrends = {};
     for (const activity of activities || []) {
+      if (!activity.created_at) continue; // Skip activities without created_at
+
       const date = new Date(activity.created_at).toISOString().split('T')[0];
-      const type = activity.type;
+      const type = activity.type || 'unknown';
 
       if (!dailyTrends[date]) {
         dailyTrends[date] = {};
@@ -402,8 +409,7 @@ const getTeamPerformanceMetrics = async (currentUser, filters = {}) => {
       .select(`
         assigned_to,
         pipeline_stage_id,
-        deal_value,
-        probability
+        deal_value
       `)
       .eq('company_id', currentUser.company_id);
 
@@ -470,7 +476,8 @@ const getTeamPerformanceMetrics = async (currentUser, filters = {}) => {
       const totalLeads = userLeads.length;
       const avgDealValue = userLeads.filter(lead => lead.deal_value).reduce((sum, lead) => sum + lead.deal_value, 0) / userLeads.filter(lead => lead.deal_value).length || 0;
       const totalDealValue = userLeads.filter(lead => lead.deal_value).reduce((sum, lead) => sum + lead.deal_value, 0);
-      const avgProbability = userLeads.filter(lead => lead.probability).reduce((sum, lead) => sum + lead.probability, 0) / userLeads.filter(lead => lead.probability).length || 0;
+      // Note: probability field doesn't exist in current schema, using 0 as default
+      const avgProbability = 0;
       const totalActivities = userActivities.length;
 
       return {
@@ -531,9 +538,25 @@ const getTeamPerformanceMetrics = async (currentUser, filters = {}) => {
  */
 const getPipelineHealthAnalysis = async (currentUser, filters = {}) => {
   try {
+    console.log('🔍 [PIPELINE SERVICE] Starting getPipelineHealthAnalysis...');
+    console.log('🔍 [PIPELINE SERVICE] Current user:', currentUser?.email, 'Company ID:', currentUser?.company_id);
+    console.log('🔍 [PIPELINE SERVICE] Filters:', filters);
+
     const supabase = supabaseAdmin;
     const { dateFrom, dateTo, userId } = filters;
-    
+
+    // Return empty data structure if no company to prevent errors
+    if (!currentUser?.company_id) {
+      console.log('⚠️ [PIPELINE SERVICE] No company_id found, returning empty data');
+      return {
+        stageHealth: [],
+        velocityData: [],
+        bottleneckData: [],
+        filters: filters
+      };
+    }
+
+    console.log('🔍 [PIPELINE SERVICE] Querying pipeline stages...');
     // Get pipeline stages
     const { data: stages, error: stagesError } = await supabase
       .from('pipeline_stages')
@@ -543,14 +566,22 @@ const getPipelineHealthAnalysis = async (currentUser, filters = {}) => {
       .order('order_position', { ascending: true });
 
     if (stagesError) {
-      console.error('Pipeline stages error:', stagesError);
-      // Continue with empty stages array
+      console.error('❌ [PIPELINE SERVICE] Pipeline stages error:', stagesError);
+      // Return empty data structure instead of throwing error
+      return {
+        stageHealth: [],
+        velocityData: [],
+        bottleneckData: [],
+        filters: filters
+      };
     }
+
+    console.log('✅ [PIPELINE SERVICE] Pipeline stages retrieved:', stages?.length || 0, 'stages');
 
     // Get leads with filters
     let leadQuery = supabase
       .from('leads')
-      .select('pipeline_stage_id, probability, created_at, updated_at')
+      .select('pipeline_stage_id, created_at, updated_at')
       .eq('company_id', currentUser.company_id);
 
     // Non-admin users only see their assigned leads
@@ -570,87 +601,215 @@ const getPipelineHealthAnalysis = async (currentUser, filters = {}) => {
       leadQuery = leadQuery.eq('assigned_to', userId);
     }
 
+    console.log('🔍 [PIPELINE SERVICE] Querying leads...');
     const { data: leads, error: leadsError } = await leadQuery;
 
     if (leadsError) {
+      console.error('❌ [PIPELINE SERVICE] Leads query error:', leadsError);
       throw new Error(`Failed to get leads: ${leadsError.message}`);
     }
 
-    // Calculate stage health data
-    const stageHealth = (stages || []).map(stage => {
-      const stageLeads = leads.filter(lead => lead.pipeline_stage_id === stage.id);
-      const leadCount = stageLeads.length;
-      const avgProbability = stageLeads.filter(lead => lead.probability).reduce((sum, lead) => sum + lead.probability, 0) / stageLeads.filter(lead => lead.probability).length || 0;
+    console.log('✅ [PIPELINE SERVICE] Leads retrieved:', leads?.length || 0, 'leads');
 
-      // Calculate average days in stage
-      const avgDaysInStage = stageLeads.length > 0
-        ? stageLeads.reduce((sum, lead) => {
-            const daysInStage = (new Date() - new Date(lead.created_at)) / (1000 * 60 * 60 * 24);
-            return sum + daysInStage;
-          }, 0) / stageLeads.length
-        : 0;
-
-      // Count stale leads (more than 30 days)
-      const staleLeads = stageLeads.filter(lead => {
-        const daysInStage = (new Date() - new Date(lead.created_at)) / (1000 * 60 * 60 * 24);
-        return daysInStage > 30;
-      }).length;
-
+    // If no stages found, return empty data
+    if (!stages || stages.length === 0) {
       return {
-        stage_name: stage.name,
-        order_position: stage.order_position,
-        lead_count: leadCount,
-        avg_probability: avgProbability,
-        avg_days_in_stage: Math.round(avgDaysInStage * 100) / 100,
-        stale_leads: staleLeads
+        stageHealth: [],
+        velocityData: [],
+        bottleneckData: [],
+        filters: filters
       };
-    });
+    }
 
-    // Calculate velocity data
-    const velocityData = (stages || []).map(stage => {
-      const stageLeads = leads.filter(lead => lead.pipeline_stage_id === stage.id && lead.updated_at !== lead.created_at);
-      const leadCount = stageLeads.length;
+    // Calculate stage health data with error handling
+    let stageHealth = [];
+    try {
+      stageHealth = (stages || []).map(stage => {
+        try {
+          const stageLeads = (leads || []).filter(lead => lead && lead.pipeline_stage_id === stage.id);
+          const leadCount = stageLeads.length;
+          // Note: probability field doesn't exist in current schema, using 0 as default
+          const avgProbability = 0;
 
-      // Calculate average time to move
-      const avgTimeToMove = stageLeads.length > 0
-        ? stageLeads.reduce((sum, lead) => {
-            const timeToMove = (new Date(lead.updated_at) - new Date(lead.created_at)) / (1000 * 60 * 60 * 24);
-            return sum + timeToMove;
-          }, 0) / stageLeads.length
-        : 0;
+          // Calculate average days in stage - handle invalid dates
+          let avgDaysInStage = 0;
+          try {
+            if (stageLeads.length > 0) {
+              const validLeads = stageLeads.filter(lead => lead.created_at);
+              if (validLeads.length > 0) {
+                const totalDays = validLeads.reduce((sum, lead) => {
+                  try {
+                    const createdDate = new Date(lead.created_at);
+                    if (isNaN(createdDate.getTime())) return sum;
+                    const daysInStage = (new Date() - createdDate) / (1000 * 60 * 60 * 24);
+                    return sum + (isNaN(daysInStage) ? 0 : Math.max(0, daysInStage));
+                  } catch (e) {
+                    return sum;
+                  }
+                }, 0);
+                avgDaysInStage = totalDays / validLeads.length;
+              }
+            }
+          } catch (e) {
+            console.error('Error calculating avgDaysInStage:', e);
+            avgDaysInStage = 0;
+          }
 
-      // Count fast and slow moves
-      const fastMoves = stageLeads.filter(lead => {
-        const timeToMove = (new Date(lead.updated_at) - new Date(lead.created_at)) / (1000 * 60 * 60 * 24);
-        return timeToMove <= 7;
-      }).length;
+          // Count stale leads (more than 30 days) - handle invalid dates
+          let staleLeads = 0;
+          try {
+            staleLeads = stageLeads.filter(lead => {
+              try {
+                if (!lead.created_at) return false;
+                const createdDate = new Date(lead.created_at);
+                if (isNaN(createdDate.getTime())) return false;
+                const daysInStage = (new Date() - createdDate) / (1000 * 60 * 60 * 24);
+                return !isNaN(daysInStage) && daysInStage > 30;
+              } catch (e) {
+                return false;
+              }
+            }).length;
+          } catch (e) {
+            console.error('Error calculating staleLeads:', e);
+            staleLeads = 0;
+          }
 
-      const slowMoves = stageLeads.filter(lead => {
-        const timeToMove = (new Date(lead.updated_at) - new Date(lead.created_at)) / (1000 * 60 * 60 * 24);
-        return timeToMove > 30;
-      }).length;
+          return {
+            stage_name: stage.name || 'Unknown Stage',
+            order_position: stage.order_position || 0,
+            lead_count: leadCount,
+            avg_probability: Math.round((avgProbability || 0) * 100) / 100,
+            avg_days_in_stage: Math.round((avgDaysInStage || 0) * 100) / 100,
+            stale_leads: staleLeads
+          };
+        } catch (e) {
+          console.error('Error processing stage health for stage:', stage, e);
+          return {
+            stage_name: stage?.name || 'Unknown Stage',
+            order_position: stage?.order_position || 0,
+            lead_count: 0,
+            avg_probability: 0,
+            avg_days_in_stage: 0,
+            stale_leads: 0
+          };
+        }
+      });
+    } catch (e) {
+      console.error('Error calculating stage health:', e);
+      stageHealth = [];
+    }
 
-      return {
-        stage_name: stage.name,
-        order_position: stage.order_position,
-        avg_time_to_move: Math.round(avgTimeToMove * 100) / 100,
-        fast_moves: fastMoves,
-        slow_moves: slowMoves
-      };
-    });
+    // Calculate velocity data with error handling
+    let velocityData = [];
+    try {
+      velocityData = (stages || []).map(stage => {
+        try {
+          const stageLeads = (leads || []).filter(lead =>
+            lead &&
+            lead.pipeline_stage_id === stage.id &&
+            lead.updated_at &&
+            lead.created_at &&
+            lead.updated_at !== lead.created_at
+          );
+          const leadCount = stageLeads.length;
 
-    // Calculate bottleneck data
-    const totalLeads = leads.length;
-    const bottleneckData = stageHealth
-      .filter(stage => stage.lead_count > 0)
-      .map(stage => ({
-        stage_name: stage.stage_name,
-        order_position: stage.order_position,
-        lead_count: stage.lead_count,
-        percentage_of_total: totalLeads > 0 ? Math.round((stage.lead_count / totalLeads) * 100 * 100) / 100 : 0
-      }))
-      .sort((a, b) => b.lead_count - a.lead_count);
+          // Calculate average time to move - handle invalid dates
+          let avgTimeToMove = 0;
+          try {
+            if (stageLeads.length > 0) {
+              const totalTime = stageLeads.reduce((sum, lead) => {
+                try {
+                  const updatedDate = new Date(lead.updated_at);
+                  const createdDate = new Date(lead.created_at);
+                  if (isNaN(updatedDate.getTime()) || isNaN(createdDate.getTime())) return sum;
+                  const timeToMove = (updatedDate - createdDate) / (1000 * 60 * 60 * 24);
+                  return sum + (isNaN(timeToMove) ? 0 : Math.max(0, timeToMove));
+                } catch (e) {
+                  return sum;
+                }
+              }, 0);
+              avgTimeToMove = totalTime / stageLeads.length;
+            }
+          } catch (e) {
+            console.error('Error calculating avgTimeToMove:', e);
+            avgTimeToMove = 0;
+          }
 
+          // Count fast and slow moves - handle invalid dates
+          let fastMoves = 0;
+          let slowMoves = 0;
+          try {
+            fastMoves = stageLeads.filter(lead => {
+              try {
+                const updatedDate = new Date(lead.updated_at);
+                const createdDate = new Date(lead.created_at);
+                if (isNaN(updatedDate.getTime()) || isNaN(createdDate.getTime())) return false;
+                const timeToMove = (updatedDate - createdDate) / (1000 * 60 * 60 * 24);
+                return !isNaN(timeToMove) && timeToMove <= 7;
+              } catch (e) {
+                return false;
+              }
+            }).length;
+
+            slowMoves = stageLeads.filter(lead => {
+              try {
+                const updatedDate = new Date(lead.updated_at);
+                const createdDate = new Date(lead.created_at);
+                if (isNaN(updatedDate.getTime()) || isNaN(createdDate.getTime())) return false;
+                const timeToMove = (updatedDate - createdDate) / (1000 * 60 * 60 * 24);
+                return !isNaN(timeToMove) && timeToMove > 30;
+              } catch (e) {
+                return false;
+              }
+            }).length;
+          } catch (e) {
+            console.error('Error calculating fast/slow moves:', e);
+            fastMoves = 0;
+            slowMoves = 0;
+          }
+
+          return {
+            stage_name: stage.name || 'Unknown Stage',
+            order_position: stage.order_position || 0,
+            avg_time_to_move: Math.round((avgTimeToMove || 0) * 100) / 100,
+            fast_moves: fastMoves,
+            slow_moves: slowMoves
+          };
+        } catch (e) {
+          console.error('Error processing velocity data for stage:', stage, e);
+          return {
+            stage_name: stage?.name || 'Unknown Stage',
+            order_position: stage?.order_position || 0,
+            avg_time_to_move: 0,
+            fast_moves: 0,
+            slow_moves: 0
+          };
+        }
+      });
+    } catch (e) {
+      console.error('Error calculating velocity data:', e);
+      velocityData = [];
+    }
+
+    // Calculate bottleneck data with error handling
+    let bottleneckData = [];
+    try {
+      const totalLeads = (leads || []).length;
+      bottleneckData = (stageHealth || [])
+        .filter(stage => stage && stage.lead_count > 0)
+        .map(stage => ({
+          stage_name: stage.stage_name || 'Unknown Stage',
+          order_position: stage.order_position || 0,
+          lead_count: stage.lead_count || 0,
+          percentage_of_total: totalLeads > 0 ? Math.round((stage.lead_count / totalLeads) * 100 * 100) / 100 : 0
+        }))
+        .sort((a, b) => (b.lead_count || 0) - (a.lead_count || 0));
+    } catch (e) {
+      console.error('Error calculating bottleneck data:', e);
+      bottleneckData = [];
+    }
+
+    console.log('✅ [PIPELINE SERVICE] Pipeline health analysis completed successfully');
     return {
       stageHealth,
       velocityData,
@@ -658,6 +817,7 @@ const getPipelineHealthAnalysis = async (currentUser, filters = {}) => {
       filters: filters
     };
   } catch (error) {
+    console.error('❌ [PIPELINE SERVICE] Error in getPipelineHealthAnalysis:', error);
     throw new Error(`Failed to get pipeline health analysis: ${error.message}`);
   }
 };

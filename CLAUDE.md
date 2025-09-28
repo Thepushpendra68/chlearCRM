@@ -15,9 +15,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### 🚀 **AUTOMATED STARTUP SCRIPTS (RECOMMENDED)**
 ```bash
 # Windows batch scripts for seamless development:
-start-dev.bat        # Docker mode: Backend on :5001, Frontend on :3000
+start-dev.bat        # Docker mode: Backend on :5000, Frontend on :3000
 start-local.bat      # Local mode: Backend on :5000, Frontend on :3000
 stop-all.bat         # Stop all services and clean ports
+docker-dev.bat       # Docker with hot-reload frontend on :3001
+docker-start.bat     # Production Docker containers
+start-frontend.bat   # Frontend only (requires backend running)
 ```
 **These scripts automatically handle port conflicts and configuration**
 
@@ -47,9 +50,12 @@ npm run test:ui      # Run tests with UI
 ### Supabase Integration Commands
 ```bash
 # Supabase-specific operations:
-node backend/migrate-supabase.js     # Apply Supabase migrations
-node backend/verify-fix.js           # Verify Supabase setup
+node migrate-supabase.js             # Apply Supabase migrations
+node apply-supabase-migration.js     # Alternative migration script
 node debug-user-lookup.js            # Debug user authentication
+node test-api.js                     # Test API endpoints
+node test-token-verification.js      # Test JWT token validation
+node create-user-profile.js          # Create test user profiles
 ```
 
 ### Database Operations
@@ -154,7 +160,7 @@ Backend `.env` for traditional setup:
 
 ### Recommended Workflow (Current Branch)
 1. **Use automated scripts**: `start-dev.bat` or `start-local.bat`
-2. **Port configuration**: Backend varies by mode (5000 local, 5001 docker), Frontend always 3000
+2. **Port configuration**: Backend always on 5000, Frontend always 3000
 3. **Supabase setup**: Run SQL setup from `SUPABASE_SETUP.md` if needed
 4. **Authentication**: Supabase Auth tokens with fallback to JWT
 5. **API endpoints** follow `/api/<resource>` pattern
@@ -189,7 +195,7 @@ Backend `.env` for traditional setup:
 ### Automated Scripts Troubleshooting
 - If scripts fail, run `stop-all.bat` and wait 10 seconds before retrying
 - Check that Docker is running for `start-dev.bat`
-- Ensure no other applications are using ports 3000, 5000, or 5001
+- Ensure no other applications are using ports 3000 or 5000
 
 ## Important Implementation Details
 
@@ -222,10 +228,12 @@ Backend `.env` for traditional setup:
 - Frontend changes auto-reload in browser during development
 
 ### Docker & Deployment
-- **Docker Compose**: Full containerization with PostgreSQL, backend, and frontend services
+- **Docker Compose**: Full containerization with backend and frontend services (PostgreSQL replaced by Supabase)
 - **Health Checks**: Configured for all services with graceful shutdown
+- **Development Profiles**: Use `docker-compose --profile dev up` for hot-reload frontend on port 3001
+- **Production**: Use `docker-compose up` for production containers
+- **Resource Limits**: CPU and memory constraints configured for optimal performance
 - **Vercel Integration**: Frontend deployment configuration available
-- **Development**: Use `docker-compose up` for complete environment
 
 ## Critical Implementation Details
 

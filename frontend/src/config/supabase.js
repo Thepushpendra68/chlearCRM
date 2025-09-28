@@ -18,34 +18,13 @@ if (!supabaseAnonKey) {
   throw new Error('Missing VITE_SUPABASE_ANON_KEY environment variable');
 }
 
-// Create Supabase client
+// Create Supabase client with clean, minimal configuration
 const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    // Enable session persistence in localStorage
     persistSession: true,
-
-    // Auto refresh tokens
     autoRefreshToken: true,
-
-    // Detect session from URL (for magic links, OAuth, etc.)
-    detectSessionInUrl: true,
-
-    // Storage key for session data
-    storageKey: 'chlear-crm-auth-token',
-  },
-
-  // Database options
-  db: {
-    // Schema to use (default: 'public')
-    schema: 'public',
-  },
-
-  // Real-time options
-  realtime: {
-    // Enable real-time subscriptions
-    params: {
-      eventsPerSecond: 2,
-    },
+    detectSessionInUrl: false,
+    storageKey: 'sb-qlivxpsvlymxfnamxvhz-auth-token',
   },
 });
 
@@ -134,101 +113,76 @@ export async function signOut() {
  */
 export async function getCurrentSession() {
   try {
-    const { data: session, error } = await supabase.auth.getSession();
+    const { data, error } = await supabase.auth.getSession();
 
     if (error) {
       throw error;
     }
 
-    return { session, error: null };
+    return { session: data.session, error: null };
   } catch (error) {
     console.error('Error getting current session:', error);
     return { session: null, error };
   }
 }
 
+
 /**
  * Get current user profile with company information
  * @returns {object} User profile data
  */
 export async function getCurrentUserProfile() {
-  try {
-    console.log('🔍 [SUPABASE] Getting current user profile...')
-    const { data: session } = await supabase.auth.getSession();
+  console.log('🔍 [SUPABASE] Getting current user profile...')
 
-    if (!session?.session?.user) {
-      console.log('🔍 [SUPABASE] No session/user found')
-      return { profile: null, error: null };
+  try {
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+    if (sessionError || !session?.user) {
+      console.log('❌ [SUPABASE] No active session found');
+      return { profile: null, error: sessionError };
     }
 
-    const userId = session.session.user.id;
-    const userEmail = session.session.user.email;
-    console.log('🔍 [SUPABASE] Querying profile for user:', userId)
+    const userId = session.user.id;
+    console.log('🔍 [SUPABASE] Fetching profile for user:', userId);
 
-    // Use a timeout to prevent hanging
-    const profilePromise = supabase
+    // Fetch user profile from database
+    const { data: profile, error: profileError } = await supabase
       .from('user_profiles')
       .select(`
         *,
-        companies!inner(name, subdomain)
+        companies(name, subdomain)
       `)
       .eq('id', userId)
       .single();
 
-    // Add a 3-second timeout (reduced from 5 seconds)
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Profile query timeout')), 3000)
-    );
-
-    const { data: directProfile, error: directError } = await Promise.race([
-      profilePromise,
-      timeoutPromise
-    ]);
-
-    console.log('🔍 [SUPABASE] Profile query result:', {
-      profile: directProfile ? 'Found' : 'None',
-      error: directError ? directError.message : 'None'
-    })
-
-    if (directProfile) {
-      // Flatten the structure to match expected format
-      const flatProfile = {
-        ...directProfile,
-        email: userEmail,
-        company_name: directProfile.companies?.name,
-        company_subdomain: directProfile.companies?.subdomain,
-      };
-      delete flatProfile.companies;
-
-      console.log('✅ [SUPABASE] Profile found:', flatProfile.first_name, flatProfile.last_name)
-      return { profile: flatProfile, error: null };
+    if (profileError) {
+      console.error('❌ [SUPABASE] Error fetching user profile:', profileError);
+      return { profile: null, error: profileError };
     }
 
-    if (directError && directError.code !== 'PGRST116') {
-      console.log('❌ [SUPABASE] Profile query error:', directError)
-      throw directError;
-    }
+    // Combine with auth user data
+    const userProfile = {
+      id: profile.id,
+      email: session.user.email,
+      email_verified: session.user.email_confirmed_at !== null,
+      first_name: profile.first_name,
+      last_name: profile.last_name,
+      role: profile.role,
+      company_id: profile.company_id,
+      company_name: profile.companies?.name || '',
+      company_subdomain: profile.companies?.subdomain || '',
+      avatar_url: profile.avatar_url,
+      phone: profile.phone,
+      is_active: profile.is_active,
+      created_at: profile.created_at,
+      updated_at: profile.updated_at
+    };
 
-    console.log('⚠️ [SUPABASE] No profile found for user:', userId)
-    return { profile: null, error: null };
+    console.log('✅ [SUPABASE] Profile fetched successfully:', userProfile.email, userProfile.role);
+    return { profile: userProfile, error: null };
 
   } catch (error) {
     console.error('❌ [SUPABASE] Error getting user profile:', error);
-    // If it's a timeout, return a basic profile from auth data
-    if (error.message === 'Profile query timeout') {
-      const { data: session } = await supabase.auth.getSession();
-      const basicProfile = {
-        id: session.session.user.id,
-        email: session.session.user.email,
-        first_name: session.session.user.user_metadata?.first_name || 'User',
-        last_name: session.session.user.user_metadata?.last_name || '',
-        role: 'company_admin',
-        company_id: null,
-        company_name: 'Unknown Company'
-      };
-      console.log('⚠️ [SUPABASE] Using basic profile due to timeout')
-      return { profile: basicProfile, error: null };
-    }
     return { profile: null, error };
   }
 }

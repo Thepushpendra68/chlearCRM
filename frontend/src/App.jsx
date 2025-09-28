@@ -31,6 +31,7 @@ function App() {
             <Route path="/" element={<Homepage />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register-company" element={<RegisterCompany />} />
+            <Route path="/dashboard" element={<Navigate to="/app/dashboard" replace />} />
             
             {/* Protected routes */}
             <Route path="/app" element={

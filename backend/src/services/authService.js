@@ -1,5 +1,5 @@
 const bcrypt = require('bcryptjs');
-const db = require('../config/database');
+const { supabaseAdmin, verifySupabaseToken } = require('../config/supabase');
 const { generateAccessToken, generateRefreshToken } = require('../utils/jwtUtils');
 const ApiError = require('../utils/ApiError');
 
@@ -13,29 +13,136 @@ class AuthService {
    * @returns {Object} Created user and tokens
    */
   async register(userData) {
-    const { email, password, first_name, last_name, role = 'sales_rep' } = userData;
+    const { email, password, first_name, last_name, role = 'sales_rep', company_id } = userData;
 
-    // Check if user already exists
-    const existingUser = await db('users').where('email', email).first();
-    if (existingUser) {
+    // Check if user already exists in auth.users
+    const { data: existingAuthUser } = await supabaseAdmin.auth.admin.listUsers();
+    const userExists = existingAuthUser.users.some(user => user.email === email);
+
+    if (userExists) {
       throw ApiError.conflict('User with this email already exists');
     }
 
-    // Hash password
-    const saltRounds = 12;
-    const password_hash = await bcrypt.hash(password, saltRounds);
+    // For now, create user with a default company_id if not provided
+    // In production, this should be handled by a company creation flow
+    const defaultCompanyId = company_id || '00000000-0000-0000-0000-000000000000';
 
-    // Create user
-    const [user] = await db('users')
-      .insert({
+    try {
+      // Create user in Supabase Auth
+      const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
         email,
-        password_hash,
-        first_name,
-        last_name,
-        role,
-        is_active: true
-      })
-      .returning(['id', 'email', 'first_name', 'last_name', 'role', 'is_active', 'created_at']);
+        password,
+        email_confirm: true,
+        user_metadata: {
+          first_name,
+          last_name,
+          role,
+          company_id: defaultCompanyId
+        }
+      });
+
+      if (authError) {
+        throw authError;
+      }
+
+      // Create user profile
+      const { data: profile, error: profileError } = await supabaseAdmin
+        .from('user_profiles')
+        .insert({
+          id: authUser.user.id,
+          company_id: defaultCompanyId,
+          role,
+          first_name,
+          last_name,
+          is_active: true,
+          email_verified: true,
+          created_by: authUser.user.id
+        })
+        .select()
+        .single();
+
+      if (profileError) {
+        // Cleanup: delete auth user if profile creation fails
+        await supabaseAdmin.auth.admin.deleteUser(authUser.user.id);
+        throw profileError;
+      }
+
+      // Get complete user data
+      const user = {
+        id: profile.id,
+        email: authUser.user.email,
+        first_name: profile.first_name,
+        last_name: profile.last_name,
+        role: profile.role,
+        is_active: profile.is_active,
+        company_id: profile.company_id,
+        created_at: profile.created_at
+      };
+
+      // Generate tokens
+      const accessToken = generateAccessToken(user);
+      const refreshToken = generateRefreshToken(user);
+
+      return {
+        user,
+        accessToken,
+        refreshToken
+      };
+    } catch (error) {
+      console.error('Registration error:', error);
+      throw ApiError.badRequest('Failed to create user account');
+    }
+  }
+
+  /**
+   * Login user with email and password
+   * @param {string} email - User email
+   * @param {string} password - User password
+   * @returns {Object} User data and tokens
+   */
+  async login(email, password) {
+    // Authenticate with Supabase
+    const { data: authData, error: authError } = await supabaseAdmin.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (authError || !authData.user) {
+      throw ApiError.unauthorized('Invalid email or password');
+    }
+
+    // Get user profile from user_profiles table
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('user_profiles')
+      .select(`
+        *,
+        companies(name, subdomain)
+      `)
+      .eq('id', authData.user.id)
+      .single();
+
+    if (profileError || !profile) {
+      // User exists in auth but not in profiles - this shouldn't happen
+      throw ApiError.unauthorized('User profile not found');
+    }
+
+    if (!profile.is_active) {
+      throw ApiError.unauthorized('Account is deactivated');
+    }
+
+    // Create user object
+    const user = {
+      id: profile.id,
+      email: authData.user.email,
+      first_name: profile.first_name,
+      last_name: profile.last_name,
+      role: profile.role,
+      is_active: profile.is_active,
+      company_id: profile.company_id,
+      company_name: profile.companies?.name,
+      created_at: profile.created_at,
+      updated_at: profile.updated_at
+    };
 
     // Generate tokens
     const accessToken = generateAccessToken(user);
@@ -49,62 +156,39 @@ class AuthService {
   }
 
   /**
-   * Login user with email and password
-   * @param {string} email - User email
-   * @param {string} password - User password
-   * @returns {Object} User data and tokens
-   */
-  async login(email, password) {
-    // Find user by email
-    const user = await db('users')
-      .select('*')
-      .where('email', email)
-      .first();
-
-    if (!user) {
-      throw ApiError.unauthorized('Invalid email or password');
-    }
-
-    if (!user.is_active) {
-      throw ApiError.unauthorized('Account is deactivated');
-    }
-
-    // Verify password
-    const isPasswordValid = await bcrypt.compare(password, user.password_hash);
-    if (!isPasswordValid) {
-      throw ApiError.unauthorized('Invalid email or password');
-    }
-
-    // Remove password hash from response
-    const { password_hash, ...userWithoutPassword } = user;
-
-    // Generate tokens
-    const accessToken = generateAccessToken(user);
-    const refreshToken = generateRefreshToken(user);
-
-    return {
-      user: userWithoutPassword,
-      accessToken,
-      refreshToken
-    };
-  }
-
-  /**
    * Get user profile by ID
    * @param {string} userId - User ID
    * @returns {Object} User profile data
    */
   async getUserProfile(userId) {
-    const user = await db('users')
-      .select('id', 'email', 'first_name', 'last_name', 'role', 'is_active', 'created_at', 'updated_at')
-      .where('id', userId)
-      .first();
+    const { data: profile, error } = await supabaseAdmin
+      .from('user_profiles')
+      .select(`
+        *,
+        companies(name, subdomain)
+      `)
+      .eq('id', userId)
+      .single();
 
-    if (!user) {
+    if (error || !profile) {
       throw ApiError.notFound('User not found');
     }
 
-    return user;
+    // Get auth user email
+    const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(userId);
+
+    return {
+      id: profile.id,
+      email: authUser?.user?.email || '',
+      first_name: profile.first_name,
+      last_name: profile.last_name,
+      role: profile.role,
+      is_active: profile.is_active,
+      company_id: profile.company_id,
+      company_name: profile.companies?.name,
+      created_at: profile.created_at,
+      updated_at: profile.updated_at
+    };
   }
 
   /**
@@ -118,31 +202,66 @@ class AuthService {
 
     // Check if email is being changed and if it's already taken
     if (email) {
-      const existingUser = await db('users')
-        .where('email', email)
-        .where('id', '!=', userId)
-        .first();
+      // Check in auth.users
+      const { data: existingAuthUsers } = await supabaseAdmin.auth.admin.listUsers();
+      const emailExists = existingAuthUsers.users.some(user =>
+        user.email === email && user.id !== userId
+      );
 
-      if (existingUser) {
+      if (emailExists) {
         throw ApiError.conflict('Email is already taken');
       }
     }
 
-    const [updatedUser] = await db('users')
-      .where('id', userId)
-      .update({
-        ...(first_name && { first_name }),
-        ...(last_name && { last_name }),
-        ...(email && { email }),
-        updated_at: db.fn.now()
-      })
-      .returning(['id', 'email', 'first_name', 'last_name', 'role', 'is_active', 'created_at', 'updated_at']);
+    // Update user profile
+    const updatePayload = {
+      ...(first_name && { first_name }),
+      ...(last_name && { last_name }),
+      updated_at: new Date().toISOString()
+    };
 
-    if (!updatedUser) {
+    const { data: updatedProfile, error } = await supabaseAdmin
+      .from('user_profiles')
+      .update(updatePayload)
+      .eq('id', userId)
+      .select(`
+        *,
+        companies(name, subdomain)
+      `)
+      .single();
+
+    if (error || !updatedProfile) {
       throw ApiError.notFound('User not found');
     }
 
-    return updatedUser;
+    // Update email in auth.users if provided
+    if (email) {
+      const { error: authUpdateError } = await supabaseAdmin.auth.admin.updateUserById(
+        userId,
+        { email }
+      );
+
+      if (authUpdateError) {
+        console.error('Failed to update auth email:', authUpdateError);
+        // Don't throw here as the profile update succeeded
+      }
+    }
+
+    // Get updated auth user email
+    const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(userId);
+
+    return {
+      id: updatedProfile.id,
+      email: authUser?.user?.email || '',
+      first_name: updatedProfile.first_name,
+      last_name: updatedProfile.last_name,
+      role: updatedProfile.role,
+      is_active: updatedProfile.is_active,
+      company_id: updatedProfile.company_id,
+      company_name: updatedProfile.companies?.name,
+      created_at: updatedProfile.created_at,
+      updated_at: updatedProfile.updated_at
+    };
   }
 
   /**
@@ -153,33 +272,39 @@ class AuthService {
    * @returns {boolean} Success status
    */
   async changePassword(userId, currentPassword, newPassword) {
-    // Get user with password hash
-    const user = await db('users')
-      .select('password_hash')
-      .where('id', userId)
-      .first();
+    // For Supabase Auth, we need to reauthenticate the user first
+    // Get user email for reauthentication
+    const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(userId);
 
-    if (!user) {
+    if (!authUser?.user?.email) {
       throw ApiError.notFound('User not found');
     }
 
-    // Verify current password
-    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password_hash);
-    if (!isCurrentPasswordValid) {
+    // Verify current password by attempting to sign in
+    const { data: verifyData, error: verifyError } = await supabaseAdmin.auth.signInWithPassword({
+      email: authUser.user.email,
+      password: currentPassword
+    });
+
+    if (verifyError || !verifyData.user) {
       throw ApiError.badRequest('Current password is incorrect');
     }
 
-    // Hash new password
-    const saltRounds = 12;
-    const newPasswordHash = await bcrypt.hash(newPassword, saltRounds);
+    // Update password in Supabase Auth
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+      userId,
+      { password: newPassword }
+    );
 
-    // Update password
-    await db('users')
-      .where('id', userId)
-      .update({
-        password_hash: newPasswordHash,
-        updated_at: db.fn.now()
-      });
+    if (updateError) {
+      throw ApiError.badRequest('Failed to update password');
+    }
+
+    // Update last_login_at in profile
+    await supabaseAdmin
+      .from('user_profiles')
+      .update({ last_login_at: new Date().toISOString() })
+      .eq('id', userId);
 
     return true;
   }

@@ -1,49 +1,157 @@
 const { supabaseAdmin, getSupabaseForUser } = require('../config/supabase');
 const ApiError = require('../utils/ApiError');
+const cache = require('../utils/cache');
 
 /**
- * Get dashboard statistics
+ * Get dashboard statistics with period comparison
  */
 const getDashboardStats = async (currentUser) => {
   try {
+    // Generate cache key for this user's dashboard stats
+    const cacheKey = cache.generateUserKey('dashboard_stats', currentUser, {
+      role: currentUser.role
+    });
+
+    // Check cache first
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      console.log('📋 [CACHE] Returning cached dashboard stats');
+      return cached;
+    }
+
+    // Calculate date ranges
+    const now = new Date();
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const sixtyDaysAgo = new Date();
+    sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+
+    // Get current and previous period stats
+    const result = await getDashboardStatsWithComparison(currentUser, thirtyDaysAgo, sixtyDaysAgo);
+
+    // Cache the result for 5 minutes (300 seconds)
+    cache.set(cacheKey, result, 300);
+
+    return result;
+  } catch (error) {
+    console.error('Dashboard stats error:', error);
+    throw new ApiError('Failed to fetch dashboard statistics', 500);
+  }
+};
+
+/**
+ * Get dashboard statistics with comparison to previous period
+ */
+const getDashboardStatsWithComparison = async (currentUser, thirtyDaysAgo, sixtyDaysAgo) => {
+  try {
     const supabase = supabaseAdmin;
-    
-    // Build base query with company filter
-    let totalLeadsQuery = supabase
-      .from('leads')
-      .select('*', { count: 'exact' })
-      .eq('company_id', currentUser.company_id);
 
-    let newLeadsQuery = supabase
-      .from('leads')
-      .select('*', { count: 'exact' })
-      .eq('company_id', currentUser.company_id);
+    // Create separate query builders to avoid conflicts
+    const createBaseQuery = () => {
+      let query = supabase
+        .from('leads')
+        .select('id, created_at, status', { count: 'exact' })
+        .eq('company_id', currentUser.company_id);
 
-    let convertedLeadsQuery = supabase
+      // Non-admin users only see their assigned leads
+      if (currentUser.role !== 'company_admin' && currentUser.role !== 'super_admin') {
+        query = query.eq('assigned_to', currentUser.id);
+      }
+      return query;
+    };
+
+    // Execute queries for different time periods
+    const [
+      totalResult,
+      currentNewResult,
+      previousNewResult,
+      currentConvertedResult,
+      previousConvertedResult
+    ] = await Promise.all([
+      createBaseQuery(), // Total leads
+      createBaseQuery().gte('created_at', thirtyDaysAgo.toISOString()), // New leads (last 30 days)
+      createBaseQuery().gte('created_at', sixtyDaysAgo.toISOString()).lt('created_at', thirtyDaysAgo.toISOString()), // New leads (30-60 days ago)
+      createBaseQuery().eq('status', 'converted').gte('created_at', thirtyDaysAgo.toISOString()), // Converted leads (last 30 days)
+      createBaseQuery().eq('status', 'converted').gte('created_at', sixtyDaysAgo.toISOString()).lt('created_at', thirtyDaysAgo.toISOString()) // Converted leads (30-60 days ago)
+    ]);
+
+    if (totalResult.error) throw totalResult.error;
+    if (currentNewResult.error) throw currentNewResult.error;
+    if (previousNewResult.error) throw previousNewResult.error;
+    if (currentConvertedResult.error) throw currentConvertedResult.error;
+    if (previousConvertedResult.error) throw previousConvertedResult.error;
+
+    const totalLeadsCount = totalResult.count || 0;
+    const currentNewLeadsCount = currentNewResult.count || 0;
+    const previousNewLeadsCount = previousNewResult.count || 0;
+    const currentConvertedLeadsCount = currentConvertedResult.count || 0;
+    const previousConvertedLeadsCount = previousConvertedResult.count || 0;
+
+    // Calculate conversion rate
+    const conversionRate = totalLeadsCount > 0 ? (currentConvertedLeadsCount / totalLeadsCount * 100).toFixed(1) : '0.0';
+
+    // Calculate percentage changes
+    const newLeadsChange = previousNewLeadsCount > 0
+      ? ((currentNewLeadsCount - previousNewLeadsCount) / previousNewLeadsCount * 100).toFixed(1)
+      : currentNewLeadsCount > 0 ? '100.0' : '0.0';
+
+    const convertedLeadsChange = previousConvertedLeadsCount > 0
+      ? ((currentConvertedLeadsCount - previousConvertedLeadsCount) / previousConvertedLeadsCount * 100).toFixed(1)
+      : currentConvertedLeadsCount > 0 ? '100.0' : '0.0';
+
+    // Calculate total leads change (comparing current period vs previous period)
+    const totalLeadsChange = previousNewLeadsCount > 0
+      ? ((currentNewLeadsCount - previousNewLeadsCount) / previousNewLeadsCount * 100).toFixed(1)
+      : currentNewLeadsCount > 0 ? '100.0' : '0.0';
+
+    // Calculate conversion rate change
+    const previousConversionRate = totalLeadsCount > 0 ? (previousConvertedLeadsCount / totalLeadsCount * 100) : 0;
+    const conversionRateChange = previousConversionRate > 0
+      ? ((parseFloat(conversionRate) - previousConversionRate) / previousConversionRate * 100).toFixed(1)
+      : '0.0';
+
+    return {
+      total_leads: totalLeadsCount,
+      new_leads: currentNewLeadsCount,
+      converted_leads: currentConvertedLeadsCount,
+      conversion_rate: `${conversionRate}%`,
+      // Include percentage changes for frontend
+      total_leads_change: `${totalLeadsChange >= 0 ? '+' : ''}${totalLeadsChange}%`,
+      new_leads_change: `${newLeadsChange >= 0 ? '+' : ''}${newLeadsChange}%`,
+      converted_leads_change: `${convertedLeadsChange >= 0 ? '+' : ''}${convertedLeadsChange}%`,
+      conversion_rate_change: `${conversionRateChange >= 0 ? '+' : ''}${conversionRateChange}%`
+    };
+  } catch (error) {
+    console.error('Dashboard stats with comparison error:', error);
+    throw new ApiError('Failed to fetch dashboard statistics', 500);
+  }
+};
+
+/**
+ * Fallback dashboard stats function using individual queries
+ * Used when the optimized RPC function is not available
+ */
+const getDashboardStatsFallback = async (currentUser, thirtyDaysAgo) => {
+  try {
+    const supabase = supabaseAdmin;
+
+    // Build base query with filters
+    let baseQuery = supabase
       .from('leads')
       .select('*', { count: 'exact' })
       .eq('company_id', currentUser.company_id);
 
     // Non-admin users only see their assigned leads
     if (currentUser.role !== 'company_admin' && currentUser.role !== 'super_admin') {
-      totalLeadsQuery = totalLeadsQuery.eq('assigned_to', currentUser.id);
-      newLeadsQuery = newLeadsQuery.eq('assigned_to', currentUser.id);
-      convertedLeadsQuery = convertedLeadsQuery.eq('assigned_to', currentUser.id);
+      baseQuery = baseQuery.eq('assigned_to', currentUser.id);
     }
 
-    // New leads (last 30 days)
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    newLeadsQuery = newLeadsQuery.gte('created_at', thirtyDaysAgo.toISOString());
-
-    // Converted leads
-    convertedLeadsQuery = convertedLeadsQuery.eq('status', 'converted');
-
-    // Execute queries
+    // Execute optimized queries in parallel
     const [totalResult, newResult, convertedResult] = await Promise.all([
-      totalLeadsQuery,
-      newLeadsQuery,
-      convertedLeadsQuery
+      baseQuery, // Total leads
+      baseQuery.gte('created_at', thirtyDaysAgo.toISOString()), // New leads (last 30 days)
+      baseQuery.eq('status', 'converted') // Converted leads
     ]);
 
     if (totalResult.error) throw totalResult.error;
@@ -53,7 +161,7 @@ const getDashboardStats = async (currentUser) => {
     const totalLeadsCount = totalResult.count || 0;
     const newLeadsCount = newResult.count || 0;
     const convertedLeadsCount = convertedResult.count || 0;
-    
+
     // Calculate conversion rate
     const conversionRate = totalLeadsCount > 0 ? (convertedLeadsCount / totalLeadsCount * 100).toFixed(1) : '0.0';
 
@@ -64,19 +172,32 @@ const getDashboardStats = async (currentUser) => {
       conversion_rate: `${conversionRate}%`
     };
   } catch (error) {
-    console.error('Dashboard stats error:', error);
+    console.error('Dashboard stats fallback error:', error);
     throw new ApiError('Failed to fetch dashboard statistics', 500);
   }
 };
 
 /**
- * Get recent leads
+ * Get recent leads - Optimized with single query and proper field selection
  */
 const getRecentLeads = async (currentUser, limit = 10) => {
   try {
+    // Generate cache key for this user's recent leads
+    const cacheKey = cache.generateUserKey('recent_leads', currentUser, {
+      limit: limit,
+      role: currentUser.role
+    });
+
+    // Check cache first (shorter TTL for recent leads as they change more frequently)
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      console.log('📋 [CACHE] Returning cached recent leads');
+      return cached;
+    }
+
     const supabase = supabaseAdmin;
-    
-    // Build query with user profiles join
+
+    // Build optimized query with specific field selection (no SELECT *)
     let query = supabase
       .from('leads')
       .select(`
@@ -88,7 +209,7 @@ const getRecentLeads = async (currentUser, limit = 10) => {
         source,
         created_at,
         assigned_to,
-        user_profiles!leads_assigned_to_fkey(first_name, last_name)
+        user_profiles!assigned_to(first_name, last_name)
       `)
       .eq('company_id', currentUser.company_id)
       .order('created_at', { ascending: false })
@@ -100,25 +221,38 @@ const getRecentLeads = async (currentUser, limit = 10) => {
     }
 
     const { data, error } = await query;
-    
+
     if (error) {
       console.error('Recent leads error:', error);
       throw error;
     }
 
-    // Format the data to match expected structure
-    return data.map(lead => ({
-      id: lead.id,
-      first_name: lead.name ? lead.name.split(' ')[0] : '',
-      last_name: lead.name ? lead.name.split(' ').slice(1).join(' ') : '',
-      email: lead.email,
-      company: lead.company,
-      status: lead.status,
-      lead_source: lead.source,
-      created_at: lead.created_at,
-      assigned_user_first_name: lead.user_profiles?.first_name,
-      assigned_user_last_name: lead.user_profiles?.last_name
-    }));
+    // Format the data efficiently
+    const result = data.map(lead => {
+      // Split name into first and last for backward compatibility
+      const nameParts = (lead.name || '').split(' ');
+      const first_name = nameParts[0] || '';
+      const last_name = nameParts.slice(1).join(' ') || '';
+
+      return {
+        id: lead.id,
+        first_name,
+        last_name,
+        name: lead.name || '',
+        email: lead.email || '',
+        company: lead.company || '',
+        status: lead.status || 'new',
+        lead_source: lead.source || 'unknown',
+        created_at: lead.created_at,
+        assigned_user_first_name: lead.user_profiles?.first_name || null,
+        assigned_user_last_name: lead.user_profiles?.last_name || null
+      };
+    });
+
+    // Cache the result for 2 minutes (120 seconds)
+    cache.set(cacheKey, result, 120);
+
+    return result;
   } catch (error) {
     console.error('Recent leads error:', error);
     throw new ApiError('Failed to fetch recent leads', 500);
@@ -161,25 +295,53 @@ const getLeadTrends = async (currentUser, period = '30d') => {
         groupByFormat = 'YYYY-MM-DD';
     }
 
-    let query = knex('leads')
-      .select(
-        knex.raw(`DATE_TRUNC('day', created_at) as date`),
-        knex.raw('COUNT(*) as count')
-      )
-      .where('created_at', '>=', dateFilter)
-      .groupBy(knex.raw('DATE_TRUNC(\'day\', created_at)'))
-      .orderBy('date', 'asc');
+    // Use Supabase RPC for complex date aggregation query
+    const supabase = supabaseAdmin;
 
-    // Non-admin users only see their assigned leads
-    if (currentUser.role !== 'admin') {
-      query = query.where('assigned_to', currentUser.id);
+    const { data: trends, error } = await supabase.rpc('get_lead_trends', {
+      p_company_id: currentUser.company_id,
+      p_date_filter: dateFilter.toISOString(),
+      p_assigned_to: currentUser.role !== 'company_admin' && currentUser.role !== 'super_admin' ? currentUser.id : null
+    });
+
+    if (error) {
+      console.error('Lead trends RPC error:', error);
+      // Fallback to simpler Supabase query if RPC fails
+      let query = supabase
+        .from('leads')
+        .select('created_at')
+        .eq('company_id', currentUser.company_id)
+        .gte('created_at', dateFilter.toISOString());
+
+      // Non-admin users only see their assigned leads
+      if (currentUser.role !== 'company_admin' && currentUser.role !== 'super_admin') {
+        query = query.eq('assigned_to', currentUser.id);
+      }
+
+      const { data: leadsData, error: leadsError } = await query;
+
+      if (leadsError) {
+        throw leadsError;
+      }
+
+      // Group by date in JavaScript since we can't use SQL functions easily
+      const groupedData = {};
+      leadsData.forEach(lead => {
+        const date = new Date(lead.created_at).toISOString().split('T')[0];
+        groupedData[date] = (groupedData[date] || 0) + 1;
+      });
+
+      // Convert to array format
+      const trendsData = Object.keys(groupedData)
+        .map(date => ({ date, count: groupedData[date] }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+      return trendsData;
     }
-
-    const trends = await query;
 
     // Format the data for charts
     return trends.map(trend => ({
-      date: trend.date.toISOString().split('T')[0],
+      date: trend.date,
       count: parseInt(trend.count)
     }));
   } catch (error) {
@@ -241,28 +403,45 @@ const getLeadSources = async (currentUser) => {
  */
 const getLeadStatus = async (currentUser) => {
   try {
-    let query = knex('leads')
+    const supabase = supabaseAdmin;
+
+    // Build query for lead status counts
+    let query = supabase
+      .from('leads')
       .select('status')
-      .count('* as count')
-      .groupBy('status')
-      .orderBy('count', 'desc');
+      .eq('company_id', currentUser.company_id);
 
     // Non-admin users only see their assigned leads
-    if (currentUser.role !== 'admin') {
-      query = query.where('assigned_to', currentUser.id);
+    if (currentUser.role !== 'company_admin' && currentUser.role !== 'super_admin') {
+      query = query.eq('assigned_to', currentUser.id);
     }
 
-    const statuses = await query;
+    const { data: leadsData, error } = await query;
 
-    // Calculate percentages
-    const total = statuses.reduce((sum, status) => sum + parseInt(status.count), 0);
-    
-    return statuses.map(status => ({
-      status: status.status,
-      count: parseInt(status.count),
-      percentage: total > 0 ? ((parseInt(status.count) / total) * 100).toFixed(1) : '0.0'
-    }));
+    if (error) {
+      throw error;
+    }
+
+    // Group by status and count
+    const statusCounts = {};
+    leadsData.forEach(lead => {
+      const status = lead.status || 'new';
+      statusCounts[status] = (statusCounts[status] || 0) + 1;
+    });
+
+    // Convert to array format and calculate percentages
+    const total = Object.values(statusCounts).reduce((sum, count) => sum + count, 0);
+    const statuses = Object.entries(statusCounts)
+      .map(([status, count]) => ({
+        status,
+        count,
+        percentage: total > 0 ? ((count / total) * 100).toFixed(1) : '0.0'
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    return statuses;
   } catch (error) {
+    console.error('Lead status error:', error);
     throw new ApiError('Failed to fetch lead status', 500);
   }
 };
@@ -270,36 +449,76 @@ const getLeadStatus = async (currentUser) => {
 /**
  * Get user performance metrics (admin only)
  */
-const getUserPerformance = async () => {
+const getUserPerformance = async (currentUser) => {
   try {
-    const performance = await knex('users')
-      .leftJoin('leads', 'users.id', 'leads.assigned_to')
-      .select(
-        'users.id',
-        'users.first_name',
-        'users.last_name',
-        'users.email',
-        'users.role',
-        knex.raw('COUNT(leads.id) as total_leads'),
-        knex.raw('COUNT(CASE WHEN leads.status = \'converted\' THEN 1 END) as converted_leads'),
-        knex.raw('COUNT(CASE WHEN leads.created_at >= NOW() - INTERVAL \'30 days\' THEN 1 END) as recent_leads')
-      )
-      .where('users.is_active', true)
-      .groupBy('users.id', 'users.first_name', 'users.last_name', 'users.email', 'users.role')
-      .orderBy('total_leads', 'desc');
+    const supabase = supabaseAdmin;
 
-    return performance.map(user => ({
-      id: user.id,
-      name: `${user.first_name} ${user.last_name}`,
-      email: user.email,
-      role: user.role,
-      total_leads: parseInt(user.total_leads),
-      converted_leads: parseInt(user.converted_leads),
-      recent_leads: parseInt(user.recent_leads),
-      conversion_rate: user.total_leads > 0 ? 
-        ((parseInt(user.converted_leads) / parseInt(user.total_leads)) * 100).toFixed(1) : '0.0'
-    }));
+    // Get all user profiles for the company
+    const { data: users, error: usersError } = await supabase
+      .from('user_profiles')
+      .select('id, first_name, last_name, role, is_active')
+      .eq('company_id', currentUser.company_id)
+      .eq('is_active', true);
+
+    if (usersError) {
+      throw usersError;
+    }
+
+    // Get email addresses from auth.users via the view
+    const { data: userEmails, error: emailError } = await supabase
+      .from('user_profiles_limited')
+      .select('id, email')
+      .eq('company_id', currentUser.company_id);
+
+    if (emailError) {
+      console.warn('Could not fetch user emails:', emailError);
+    }
+
+    // Create email lookup
+    const emailLookup = {};
+    if (userEmails) {
+      userEmails.forEach(user => {
+        emailLookup[user.id] = user.email;
+      });
+    }
+
+    // Get leads for all users in the company
+    const { data: leads, error: leadsError } = await supabase
+      .from('leads')
+      .select('assigned_to, status, created_at')
+      .eq('company_id', currentUser.company_id);
+
+    if (leadsError) {
+      throw leadsError;
+    }
+
+    // Calculate 30 days ago
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    // Group leads by assigned user and calculate metrics
+    const userPerformance = users.map(user => {
+      const userLeads = leads.filter(lead => lead.assigned_to === user.id);
+      const convertedLeads = userLeads.filter(lead => lead.status === 'converted');
+      const recentLeads = userLeads.filter(lead => new Date(lead.created_at) >= thirtyDaysAgo);
+
+      return {
+        id: user.id,
+        name: `${user.first_name || ''} ${user.last_name || ''}`.trim(),
+        email: emailLookup[user.id] || '',
+        role: user.role,
+        total_leads: userLeads.length,
+        converted_leads: convertedLeads.length,
+        recent_leads: recentLeads.length,
+        conversion_rate: userLeads.length > 0 ?
+          ((convertedLeads.length / userLeads.length) * 100).toFixed(1) : '0.0'
+      };
+    });
+
+    // Sort by total leads descending
+    return userPerformance.sort((a, b) => b.total_leads - a.total_leads);
   } catch (error) {
+    console.error('User performance error:', error);
     throw new ApiError('Failed to fetch user performance', 500);
   }
 };
@@ -312,21 +531,33 @@ const getMonthlyTrends = async (currentUser) => {
     const twelveMonthsAgo = new Date();
     twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
 
-    let query = knex('leads')
-      .select(
-        knex.raw('DATE_TRUNC(\'month\', created_at) as month'),
-        knex.raw('COUNT(*) as count')
-      )
-      .where('created_at', '>=', twelveMonthsAgo)
-      .groupBy(knex.raw('DATE_TRUNC(\'month\', created_at)'))
-      .orderBy('month', 'asc');
+    // Use Supabase with JavaScript grouping
+    const supabase = supabaseAdmin;
+
+    let query = supabase
+      .from('leads')
+      .select('created_at')
+      .eq('company_id', currentUser.company_id)
+      .gte('created_at', twelveMonthsAgo.toISOString());
 
     // Non-admin users only see their assigned leads
-    if (currentUser.role !== 'admin') {
-      query = query.where('assigned_to', currentUser.id);
+    if (currentUser.role !== 'company_admin' && currentUser.role !== 'super_admin') {
+      query = query.eq('assigned_to', currentUser.id);
     }
 
-    const trends = await query;
+    const { data: leadsData, error } = await query;
+    if (error) throw error;
+
+    // Group by month in JavaScript
+    const groupedData = {};
+    leadsData.forEach(lead => {
+      const month = new Date(lead.created_at).toISOString().slice(0, 7); // YYYY-MM
+      groupedData[month] = (groupedData[month] || 0) + 1;
+    });
+
+    const trends = Object.keys(groupedData)
+      .map(month => ({ month, count: groupedData[month] }))
+      .sort((a, b) => a.month.localeCompare(b.month));
 
     return trends.map(trend => ({
       month: trend.month.toISOString().substring(0, 7), // YYYY-MM format
@@ -342,37 +573,63 @@ const getMonthlyTrends = async (currentUser) => {
  */
 const getPipelineStageDistribution = async (currentUser) => {
   try {
-    let query = knex('leads')
-      .leftJoin('pipeline_stages', 'leads.pipeline_stage_id', 'pipeline_stages.id')
-      .select(
-        'pipeline_stages.name as stage_name',
-        'pipeline_stages.order_position',
-        knex.raw('COUNT(leads.id) as count'),
-        knex.raw('AVG(leads.deal_value) as avg_deal_value'),
-        knex.raw('SUM(leads.deal_value) as total_deal_value')
-      )
-      .groupBy('pipeline_stages.id', 'pipeline_stages.name', 'pipeline_stages.order_position')
-      .orderBy('pipeline_stages.order_position', 'asc');
+    const supabase = supabaseAdmin;
 
-    // Non-admin users only see their assigned leads
-    if (currentUser.role !== 'admin') {
-      query = query.where('leads.assigned_to', currentUser.id);
+    // Get all pipeline stages
+    const { data: stages, error: stagesError } = await supabase
+      .from('pipeline_stages')
+      .select('id, name, order_position')
+      .eq('company_id', currentUser.company_id)
+      .order('order_position', { ascending: true });
+
+    if (stagesError) {
+      throw stagesError;
     }
 
-    const stages = await query;
+    // Get leads data
+    let leadsQuery = supabase
+      .from('leads')
+      .select('pipeline_stage_id, deal_value')
+      .eq('company_id', currentUser.company_id);
+
+    // Non-admin users only see their assigned leads
+    if (currentUser.role !== 'company_admin' && currentUser.role !== 'super_admin') {
+      leadsQuery = leadsQuery.eq('assigned_to', currentUser.id);
+    }
+
+    const { data: leads, error: leadsError } = await leadsQuery;
+
+    if (leadsError) {
+      throw leadsError;
+    }
+
+    // Calculate metrics for each stage
+    const stageMetrics = stages.map(stage => {
+      const stageLeads = leads.filter(lead => lead.pipeline_stage_id === stage.id);
+      const dealValues = stageLeads.map(lead => parseFloat(lead.deal_value || 0)).filter(val => val > 0);
+
+      const count = stageLeads.length;
+      const totalDealValue = dealValues.reduce((sum, val) => sum + val, 0);
+      const avgDealValue = dealValues.length > 0 ? totalDealValue / dealValues.length : 0;
+
+      return {
+        stage_name: stage.name,
+        order_position: stage.order_position,
+        count,
+        avg_deal_value: avgDealValue,
+        total_deal_value: totalDealValue
+      };
+    });
 
     // Calculate percentages
-    const total = stages.reduce((sum, stage) => sum + parseInt(stage.count), 0);
-    
-    return stages.map(stage => ({
-      stage_name: stage.stage_name,
-      order_position: stage.order_position,
-      count: parseInt(stage.count),
-      percentage: total > 0 ? ((parseInt(stage.count) / total) * 100).toFixed(1) : '0.0',
-      avg_deal_value: parseFloat(stage.avg_deal_value || 0),
-      total_deal_value: parseFloat(stage.total_deal_value || 0)
+    const total = stageMetrics.reduce((sum, stage) => sum + stage.count, 0);
+
+    return stageMetrics.map(stage => ({
+      ...stage,
+      percentage: total > 0 ? ((stage.count / total) * 100).toFixed(1) : '0.0'
     }));
   } catch (error) {
+    console.error('Pipeline stage distribution error:', error);
     throw new ApiError('Failed to fetch pipeline stage distribution', 500);
   }
 };
@@ -383,7 +640,7 @@ const getPipelineStageDistribution = async (currentUser) => {
 const getActivityTrends = async (currentUser, period = '30d') => {
   try {
     let dateFilter;
-    
+
     // Determine date range
     switch (period) {
       case '7d':
@@ -403,35 +660,41 @@ const getActivityTrends = async (currentUser, period = '30d') => {
         dateFilter.setDate(dateFilter.getDate() - 30);
     }
 
-    let query = knex('activities')
-      .select(
-        knex.raw('DATE_TRUNC(\'day\', created_at) as date'),
-        'activity_type',
-        knex.raw('COUNT(*) as count')
-      )
-      .where('created_at', '>=', dateFilter)
-      .groupBy(knex.raw('DATE_TRUNC(\'day\', created_at)'), 'activity_type')
-      .orderBy('date', 'asc');
+    const supabase = supabaseAdmin;
+
+    let activitiesQuery = supabase
+      .from('activities')
+      .select('created_at, activity_type')
+      .eq('company_id', currentUser.company_id)
+      .gte('created_at', dateFilter.toISOString());
 
     // Non-admin users only see their activities
-    if (currentUser.role !== 'admin') {
-      query = query.where('user_id', currentUser.id);
+    if (currentUser.role !== 'company_admin' && currentUser.role !== 'super_admin') {
+      activitiesQuery = activitiesQuery.eq('user_id', currentUser.id);
     }
 
-    const trends = await query;
+    const { data: activities, error } = await activitiesQuery;
+
+    if (error) {
+      throw error;
+    }
 
     // Group by date and activity type
     const groupedTrends = {};
-    trends.forEach(trend => {
-      const date = trend.date.toISOString().split('T')[0];
+    activities.forEach(activity => {
+      const date = new Date(activity.created_at).toISOString().split('T')[0];
       if (!groupedTrends[date]) {
         groupedTrends[date] = {};
       }
-      groupedTrends[date][trend.activity_type] = parseInt(trend.count);
+      if (!groupedTrends[date][activity.activity_type]) {
+        groupedTrends[date][activity.activity_type] = 0;
+      }
+      groupedTrends[date][activity.activity_type]++;
     });
 
     return groupedTrends;
   } catch (error) {
+    console.error('Activity trends error:', error);
     throw new ApiError('Failed to fetch activity trends', 500);
   }
 };
@@ -441,44 +704,67 @@ const getActivityTrends = async (currentUser, period = '30d') => {
  */
 const getConversionFunnelData = async (currentUser) => {
   try {
-    let query = knex('leads')
-      .leftJoin('pipeline_stages', 'leads.pipeline_stage_id', 'pipeline_stages.id')
-      .select(
-        'pipeline_stages.name as stage_name',
-        'pipeline_stages.order_position',
-        knex.raw('COUNT(leads.id) as count')
-      )
-      .groupBy('pipeline_stages.id', 'pipeline_stages.name', 'pipeline_stages.order_position')
-      .orderBy('pipeline_stages.order_position', 'asc');
+    const supabase = supabaseAdmin;
 
-    // Non-admin users only see their assigned leads
-    if (currentUser.role !== 'admin') {
-      query = query.where('leads.assigned_to', currentUser.id);
+    // Get all pipeline stages
+    const { data: stages, error: stagesError } = await supabase
+      .from('pipeline_stages')
+      .select('id, name, order_position')
+      .eq('company_id', currentUser.company_id)
+      .order('order_position', { ascending: true });
+
+    if (stagesError) {
+      throw stagesError;
     }
 
-    const stages = await query;
+    // Get leads data
+    let leadsQuery = supabase
+      .from('leads')
+      .select('pipeline_stage_id')
+      .eq('company_id', currentUser.company_id);
+
+    // Non-admin users only see their assigned leads
+    if (currentUser.role !== 'company_admin' && currentUser.role !== 'super_admin') {
+      leadsQuery = leadsQuery.eq('assigned_to', currentUser.id);
+    }
+
+    const { data: leads, error: leadsError } = await leadsQuery;
+
+    if (leadsError) {
+      throw leadsError;
+    }
+
+    // Calculate counts for each stage
+    const stageCounts = stages.map(stage => {
+      const count = leads.filter(lead => lead.pipeline_stage_id === stage.id).length;
+      return {
+        stage_name: stage.name,
+        order_position: stage.order_position,
+        count
+      };
+    });
 
     // Calculate conversion rates
     const funnelData = [];
     let previousCount = null;
 
-    stages.forEach(stage => {
-      const count = parseInt(stage.count);
-      const conversionRate = previousCount && previousCount > 0 ? 
-        ((count / previousCount) * 100).toFixed(1) : '100.0';
-      
+    stageCounts.forEach(stage => {
+      const conversionRate = previousCount && previousCount > 0 ?
+        ((stage.count / previousCount) * 100).toFixed(1) : '100.0';
+
       funnelData.push({
         stage_name: stage.stage_name,
         order_position: stage.order_position,
-        count: count,
+        count: stage.count,
         conversion_rate: parseFloat(conversionRate)
       });
-      
-      previousCount = count;
+
+      previousCount = stage.count;
     });
 
     return funnelData;
   } catch (error) {
+    console.error('Conversion funnel data error:', error);
     throw new ApiError('Failed to fetch conversion funnel data', 500);
   }
 };
@@ -488,32 +774,72 @@ const getConversionFunnelData = async (currentUser) => {
  */
 const getResponseTimeAnalytics = async (currentUser) => {
   try {
-    let query = knex('leads')
-      .leftJoin('activities', function() {
-        this.on('leads.id', '=', 'activities.lead_id')
-             .andOn('activities.activity_type', '=', knex.raw('?', ['call']))
-             .andOn('activities.created_at', '>', 'leads.created_at');
-      })
-      .select(
-        knex.raw('AVG(EXTRACT(EPOCH FROM (activities.created_at - leads.created_at))/3600) as avg_response_time_hours'),
-        knex.raw('COUNT(CASE WHEN EXTRACT(EPOCH FROM (activities.created_at - leads.created_at))/3600 <= 1 THEN 1 END) as responded_within_1h'),
-        knex.raw('COUNT(CASE WHEN EXTRACT(EPOCH FROM (activities.created_at - leads.created_at))/3600 <= 24 THEN 1 END) as responded_within_24h'),
-        knex.raw('COUNT(leads.id) as total_leads')
-      );
+    const supabase = supabaseAdmin;
+
+    // Get leads data
+    let leadsQuery = supabase
+      .from('leads')
+      .select('id, created_at')
+      .eq('company_id', currentUser.company_id);
 
     // Non-admin users only see their assigned leads
-    if (currentUser.role !== 'admin') {
-      query = query.where('leads.assigned_to', currentUser.id);
+    if (currentUser.role !== 'company_admin' && currentUser.role !== 'super_admin') {
+      leadsQuery = leadsQuery.eq('assigned_to', currentUser.id);
     }
 
-    const [result] = await query;
+    const { data: leads, error: leadsError } = await leadsQuery;
 
-    const totalLeads = parseInt(result.total_leads) || 0;
-    const respondedWithin1h = parseInt(result.responded_within_1h) || 0;
-    const respondedWithin24h = parseInt(result.responded_within_24h) || 0;
+    if (leadsError) {
+      throw leadsError;
+    }
+
+    // Get call activities
+    const { data: activities, error: activitiesError } = await supabase
+      .from('activities')
+      .select('lead_id, created_at')
+      .eq('company_id', currentUser.company_id)
+      .eq('activity_type', 'call');
+
+    if (activitiesError) {
+      throw activitiesError;
+    }
+
+    // Calculate response times in JavaScript
+    let totalResponseTime = 0;
+    let responseCount = 0;
+    let respondedWithin1h = 0;
+    let respondedWithin24h = 0;
+
+    leads.forEach(lead => {
+      const leadCreatedAt = new Date(lead.created_at);
+
+      // Find first activity for this lead after it was created
+      const firstActivity = activities
+        .filter(activity =>
+          activity.lead_id === lead.id &&
+          new Date(activity.created_at) > leadCreatedAt
+        )
+        .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))[0];
+
+      if (firstActivity) {
+        const responseTimeHours = (new Date(firstActivity.created_at) - leadCreatedAt) / (1000 * 60 * 60);
+        totalResponseTime += responseTimeHours;
+        responseCount++;
+
+        if (responseTimeHours <= 1) {
+          respondedWithin1h++;
+        }
+        if (responseTimeHours <= 24) {
+          respondedWithin24h++;
+        }
+      }
+    });
+
+    const totalLeads = leads.length;
+    const avgResponseTimeHours = responseCount > 0 ? totalResponseTime / responseCount : 0;
 
     return {
-      avg_response_time_hours: parseFloat(result.avg_response_time_hours || 0),
+      avg_response_time_hours: avgResponseTimeHours,
       responded_within_1h: respondedWithin1h,
       responded_within_24h: respondedWithin24h,
       response_rate_1h: totalLeads > 0 ? ((respondedWithin1h / totalLeads) * 100).toFixed(1) : '0.0',
@@ -521,6 +847,7 @@ const getResponseTimeAnalytics = async (currentUser) => {
       total_leads: totalLeads
     };
   } catch (error) {
+    console.error('Response time analytics error:', error);
     throw new ApiError('Failed to fetch response time analytics', 500);
   }
 };
@@ -528,36 +855,88 @@ const getResponseTimeAnalytics = async (currentUser) => {
 /**
  * Get team workload distribution
  */
-const getTeamWorkloadDistribution = async () => {
+const getTeamWorkloadDistribution = async (currentUser) => {
   try {
-    const workload = await knex('users')
-      .leftJoin('leads', 'users.id', 'leads.assigned_to')
-      .leftJoin('activities', 'users.id', 'activities.user_id')
-      .select(
-        'users.id',
-        'users.first_name',
-        'users.last_name',
-        'users.email',
-        knex.raw('COUNT(DISTINCT leads.id) as total_leads'),
-        knex.raw('COUNT(DISTINCT CASE WHEN leads.pipeline_stage_id IS NOT NULL THEN leads.id END) as active_leads'),
-        knex.raw('COUNT(activities.id) as total_activities'),
-        knex.raw('COUNT(CASE WHEN activities.created_at >= NOW() - INTERVAL \'7 days\' THEN activities.id END) as recent_activities')
-      )
-      .where('users.is_active', true)
-      .where('users.role', '!=', 'admin')
-      .groupBy('users.id', 'users.first_name', 'users.last_name', 'users.email')
-      .orderBy('total_leads', 'desc');
+    const supabase = supabaseAdmin;
 
-    return workload.map(user => ({
-      id: user.id,
-      name: `${user.first_name} ${user.last_name}`,
-      email: user.email,
-      total_leads: parseInt(user.total_leads),
-      active_leads: parseInt(user.active_leads),
-      total_activities: parseInt(user.total_activities),
-      recent_activities: parseInt(user.recent_activities)
-    }));
+    // Get all user profiles for the company (exclude admins)
+    const { data: users, error: usersError } = await supabase
+      .from('user_profiles')
+      .select('id, first_name, last_name, role, is_active')
+      .eq('company_id', currentUser.company_id)
+      .eq('is_active', true)
+      .neq('role', 'company_admin');
+
+    if (usersError) {
+      throw usersError;
+    }
+
+    // Get email addresses from auth.users via the view
+    const { data: userEmails, error: emailError } = await supabase
+      .from('user_profiles_limited')
+      .select('id, email')
+      .eq('company_id', currentUser.company_id);
+
+    if (emailError) {
+      console.warn('Could not fetch user emails:', emailError);
+    }
+
+    // Create email lookup
+    const emailLookup = {};
+    if (userEmails) {
+      userEmails.forEach(user => {
+        emailLookup[user.id] = user.email;
+      });
+    }
+
+    // Get leads for all users in the company
+    const { data: leads, error: leadsError } = await supabase
+      .from('leads')
+      .select('assigned_to, pipeline_stage_id')
+      .eq('company_id', currentUser.company_id);
+
+    if (leadsError) {
+      throw leadsError;
+    }
+
+    // Get activities for all users in the company
+    const { data: activities, error: activitiesError } = await supabase
+      .from('activities')
+      .select('user_id, created_at')
+      .eq('company_id', currentUser.company_id);
+
+    if (activitiesError) {
+      throw activitiesError;
+    }
+
+    // Calculate 7 days ago
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    // Group data by user and calculate metrics
+    const workload = users.map(user => {
+      const userLeads = leads.filter(lead => lead.assigned_to === user.id);
+      const activeLeads = userLeads.filter(lead => lead.pipeline_stage_id !== null);
+      const userActivities = activities.filter(activity => activity.user_id === user.id);
+      const recentActivities = userActivities.filter(activity =>
+        new Date(activity.created_at) >= sevenDaysAgo
+      );
+
+      return {
+        id: user.id,
+        name: `${user.first_name || ''} ${user.last_name || ''}`.trim(),
+        email: emailLookup[user.id] || '',
+        total_leads: userLeads.length,
+        active_leads: activeLeads.length,
+        total_activities: userActivities.length,
+        recent_activities: recentActivities.length
+      };
+    });
+
+    // Sort by total leads descending
+    return workload.sort((a, b) => b.total_leads - a.total_leads);
   } catch (error) {
+    console.error('Team workload distribution error:', error);
     throw new ApiError('Failed to fetch team workload distribution', 500);
   }
 };

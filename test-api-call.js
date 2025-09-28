@@ -6,13 +6,13 @@ async function testApiCall() {
 
     // Test a simple API call without authentication first
     console.log('\n🏥 Testing health endpoint...');
-    const healthResponse = await axios.get('http://localhost:5001/health');
+    const healthResponse = await axios.get('http://localhost:5000/health');
     console.log('✅ Health check successful:', healthResponse.data);
 
     // Now test an authenticated endpoint (this should fail with 401)
     console.log('\n🔒 Testing authenticated endpoint without token...');
     try {
-      const dashboardResponse = await axios.get('http://localhost:5001/api/dashboard/stats');
+      const dashboardResponse = await axios.get('http://localhost:5000/api/dashboard/stats');
       console.log('❌ This should not succeed:', dashboardResponse.data);
     } catch (error) {
       if (error.response?.status === 401) {
@@ -25,7 +25,7 @@ async function testApiCall() {
     // Test with a fake token to see the exact error
     console.log('\n🎭 Testing with fake token...');
     try {
-      const fakeTokenResponse = await axios.get('http://localhost:5001/api/dashboard/stats', {
+      const fakeTokenResponse = await axios.get('http://localhost:5000/api/dashboard/stats', {
         headers: {
           Authorization: 'Bearer fake-token-123'
         }

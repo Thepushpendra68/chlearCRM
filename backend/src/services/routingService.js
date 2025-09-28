@@ -1,4 +1,4 @@
-const db = require('../config/database');
+const { supabaseAdmin } = require('../config/supabase');
 const assignmentService = require('./assignmentService');
 const AssignmentRules = require('../utils/assignmentRules');
 
@@ -11,89 +11,94 @@ class RoutingService {
    */
   async autoAssignLead(leadId, assignedBy = null) {
     try {
-      const trx = await db.transaction();
+      // Get lead data
+      const { data: lead, error: leadError } = await supabaseAdmin
+        .from('leads')
+        .select('*')
+        .eq('id', leadId)
+        .single();
 
-      try {
-        // Get lead data
-        const lead = await trx('leads')
-          .select('*')
-          .where('id', leadId)
-          .first();
+      if (leadError || !lead) {
+        throw new Error('Lead not found');
+      }
 
-        if (!lead) {
-          throw new Error('Lead not found');
-        }
+      // Check if lead is already assigned
+      if (lead.assigned_to) {
+        return { success: true, message: 'Lead is already assigned', assignedTo: lead.assigned_to };
+      }
 
-        // Check if lead is already assigned
-        if (lead.assigned_to) {
-          return { success: true, message: 'Lead is already assigned', assignedTo: lead.assigned_to };
-        }
+      // Get active assignment rules
+      const rulesResult = await assignmentService.getActiveRules();
+      if (!rulesResult.success) {
+        throw new Error(rulesResult.error);
+      }
 
-        // Get active assignment rules
-        const rulesResult = await assignmentService.getActiveRules();
-        if (!rulesResult.success) {
-          throw new Error(rulesResult.error);
-        }
+      const rules = rulesResult.data;
+      if (rules.length === 0) {
+        // No rules available, use round-robin as fallback
+        return await this.roundRobinAssignment(leadId, assignedBy);
+      }
 
-        const rules = rulesResult.data;
-        if (rules.length === 0) {
-          // No rules available, use round-robin as fallback
-          return await this.roundRobinAssignment(leadId, assignedBy);
-        }
+      // Evaluate rules against lead data
+      const matchingRule = AssignmentRules.evaluateRules(lead, rules);
 
-        // Evaluate rules against lead data
-        const matchingRule = AssignmentRules.evaluateRules(lead, rules);
-        
-        if (!matchingRule) {
-          // No rule matches, use round-robin as fallback
-          return await this.roundRobinAssignment(leadId, assignedBy);
-        }
+      if (!matchingRule) {
+        // No rule matches, use round-robin as fallback
+        return await this.roundRobinAssignment(leadId, assignedBy);
+      }
 
-        // Execute assignment based on rule type
-        let assignedTo = null;
-        let assignmentSource = 'rule';
+      // Execute assignment based on rule type
+      let assignedTo = null;
+      let assignmentSource = 'rule';
 
-        switch (matchingRule.assignment_type) {
-          case 'specific_user':
-            assignedTo = matchingRule.assigned_to;
-            break;
-          
-          case 'round_robin':
-            const roundRobinResult = await this.getRoundRobinUser();
-            if (roundRobinResult.success) {
-              assignedTo = roundRobinResult.data;
-            }
-            break;
-          
-          case 'team':
-            // For team assignment, we'll use round-robin among team members
-            const teamResult = await this.getTeamRoundRobinUser();
-            if (teamResult.success) {
-              assignedTo = teamResult.data;
-            }
-            break;
-          
-          default:
-            throw new Error(`Unknown assignment type: ${matchingRule.assignment_type}`);
-        }
+      switch (matchingRule.assignment_type) {
+        case 'specific_user':
+          assignedTo = matchingRule.assigned_to;
+          break;
 
-        if (!assignedTo) {
-          throw new Error('No user available for assignment');
-        }
+        case 'round_robin':
+          const roundRobinResult = await this.getRoundRobinUser();
+          if (roundRobinResult.success) {
+            assignedTo = roundRobinResult.data;
+          }
+          break;
 
-        // Assign the lead
-        await trx('leads')
-          .where('id', leadId)
-          .update({
-            assigned_to: assignedTo,
-            assigned_at: new Date(),
-            assignment_source: assignmentSource,
-            assignment_rule_id: matchingRule.id,
-            updated_at: new Date()
-          });
+        case 'team':
+          // For team assignment, we'll use round-robin among team members
+          const teamResult = await this.getTeamRoundRobinUser();
+          if (teamResult.success) {
+            assignedTo = teamResult.data;
+          }
+          break;
 
-        // Record assignment history
-        await trx('lead_assignment_history').insert({
+        default:
+          throw new Error(`Unknown assignment type: ${matchingRule.assignment_type}`);
+      }
+
+      if (!assignedTo) {
+        throw new Error('No user available for assignment');
+      }
+
+      // Assign the lead
+      const { error: updateError } = await supabaseAdmin
+        .from('leads')
+        .update({
+          assigned_to: assignedTo,
+          assigned_at: new Date().toISOString(),
+          assignment_source: assignmentSource,
+          assignment_rule_id: matchingRule.id,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', leadId);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      // Record assignment history
+      const { error: historyError } = await supabaseAdmin
+        .from('lead_assignment_history')
+        .insert({
           lead_id: leadId,
           previous_assigned_to: null,
           new_assigned_to: assignedTo,
@@ -101,18 +106,17 @@ class RoutingService {
           assignment_reason: `Auto-assigned by rule: ${matchingRule.name}`
         });
 
-        await trx.commit();
-
-        return {
-          success: true,
-          message: `Lead assigned by rule: ${matchingRule.name}`,
-          assignedTo,
-          rule: matchingRule
-        };
-      } catch (error) {
-        await trx.rollback();
-        throw error;
+      if (historyError) {
+        console.error('Failed to record assignment history:', historyError);
+        // Don't fail the assignment if history recording fails
       }
+
+      return {
+        success: true,
+        message: `Lead assigned by rule: ${matchingRule.name}`,
+        assignedTo,
+        rule: matchingRule
+      };
     } catch (error) {
       console.error('Error in auto-assignment:', error);
       return { success: false, error: error.message };
@@ -127,30 +131,34 @@ class RoutingService {
    */
   async roundRobinAssignment(leadId, assignedBy = null) {
     try {
-      const trx = await db.transaction();
+      // Get next user in round-robin sequence
+      const userResult = await this.getRoundRobinUser();
+      if (!userResult.success) {
+        throw new Error(userResult.error);
+      }
 
-      try {
-        // Get next user in round-robin sequence
-        const userResult = await this.getRoundRobinUser();
-        if (!userResult.success) {
-          throw new Error(userResult.error);
-        }
+      const assignedTo = userResult.data;
 
-        const assignedTo = userResult.data;
+      // Assign the lead
+      const { error: updateError } = await supabaseAdmin
+        .from('leads')
+        .update({
+          assigned_to: assignedTo,
+          assigned_at: new Date().toISOString(),
+          assignment_source: 'auto',
+          assignment_rule_id: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', leadId);
 
-        // Assign the lead
-        await trx('leads')
-          .where('id', leadId)
-          .update({
-            assigned_to: assignedTo,
-            assigned_at: new Date(),
-            assignment_source: 'auto',
-            assignment_rule_id: null,
-            updated_at: new Date()
-          });
+      if (updateError) {
+        throw updateError;
+      }
 
-        // Record assignment history
-        await trx('lead_assignment_history').insert({
+      // Record assignment history
+      const { error: historyError } = await supabaseAdmin
+        .from('lead_assignment_history')
+        .insert({
           lead_id: leadId,
           previous_assigned_to: null,
           new_assigned_to: assignedTo,
@@ -158,17 +166,16 @@ class RoutingService {
           assignment_reason: 'Round-robin assignment'
         });
 
-        await trx.commit();
-
-        return {
-          success: true,
-          message: 'Lead assigned using round-robin',
-          assignedTo
-        };
-      } catch (error) {
-        await trx.rollback();
-        throw error;
+      if (historyError) {
+        console.error('Failed to record assignment history:', historyError);
+        // Don't fail the assignment if history recording fails
       }
+
+      return {
+        success: true,
+        message: 'Lead assigned using round-robin',
+        assignedTo
+      };
     } catch (error) {
       console.error('Error in round-robin assignment:', error);
       return { success: false, error: error.message };
@@ -181,27 +188,34 @@ class RoutingService {
    */
   async getRoundRobinUser() {
     try {
-      // Get all active users (excluding admins)
-      const users = await db('users')
-        .select('id', 'name', 'email')
-        .where('is_active', true)
-        .where('role', '!=', 'admin')
-        .orderBy('id', 'asc');
+      // Get all active users from user_profiles (excluding admins)
+      const { data: users, error: usersError } = await supabaseAdmin
+        .from('user_profiles')
+        .select('id')
+        .eq('is_active', true)
+        .neq('role', 'super_admin')
+        .neq('role', 'company_admin')
+        .order('id', { ascending: true });
 
-      if (users.length === 0) {
+      if (usersError || !users || users.length === 0) {
         return { success: false, error: 'No active users available for assignment' };
       }
 
       // Get current assignment counts for each user
-      const assignmentCounts = await db('leads')
+      const { data: assignmentCounts, error: countsError } = await supabaseAdmin
+        .from('leads')
         .select('assigned_to')
-        .count('* as count')
-        .whereNotNull('assigned_to')
-        .groupBy('assigned_to');
+        .not('assigned_to', 'is', null);
 
+      if (countsError) {
+        console.error('Error getting assignment counts:', countsError);
+        return { success: false, error: 'Failed to get assignment counts' };
+      }
+
+      // Count assignments per user
       const countsMap = {};
       assignmentCounts.forEach(item => {
-        countsMap[item.assigned_to] = parseInt(item.count);
+        countsMap[item.assigned_to] = (countsMap[item.assigned_to] || 0) + 1;
       });
 
       // Find user with minimum assignments
@@ -214,6 +228,10 @@ class RoutingService {
           minCount = count;
           selectedUser = user;
         }
+      }
+
+      if (!selectedUser) {
+        return { success: false, error: 'No user found for assignment' };
       }
 
       return { success: true, data: selectedUser.id };
@@ -298,12 +316,13 @@ class RoutingService {
   async getAssignmentRecommendations(leadId) {
     try {
       // Get lead data
-      const lead = await db('leads')
+      const { data: lead, error: leadError } = await supabaseAdmin
+        .from('leads')
         .select('*')
-        .where('id', leadId)
-        .first();
+        .eq('id', leadId)
+        .single();
 
-      if (!lead) {
+      if (leadError || !lead) {
         return { success: false, error: 'Lead not found' };
       }
 
@@ -366,31 +385,63 @@ class RoutingService {
    */
   async getRoutingStats() {
     try {
-      const stats = await db('leads')
-        .select(
-          db.raw('COUNT(*) as total_leads'),
-          db.raw('COUNT(CASE WHEN assigned_to IS NOT NULL THEN 1 END) as assigned_leads'),
-          db.raw('COUNT(CASE WHEN assignment_source = ? THEN 1 END) as auto_assigned', ['auto']),
-          db.raw('COUNT(CASE WHEN assignment_source = ? THEN 1 END) as rule_assigned', ['rule']),
-          db.raw('COUNT(CASE WHEN assignment_source = ? THEN 1 END) as manually_assigned', ['manual'])
-        )
-        .first();
+      // Get basic statistics
+      const { data: leads, error: leadsError } = await supabaseAdmin
+        .from('leads')
+        .select('assigned_to, assignment_source');
+
+      if (leadsError) {
+        console.error('Error getting leads for stats:', leadsError);
+        return { success: false, error: error.message };
+      }
+
+      const totalLeads = leads.length;
+      const assignedLeads = leads.filter(l => l.assigned_to).length;
+      const autoAssigned = leads.filter(l => l.assignment_source === 'auto').length;
+      const ruleAssigned = leads.filter(l => l.assignment_source === 'rule').length;
+      const manuallyAssigned = leads.filter(l => l.assignment_source === 'manual').length;
+
+      const stats = {
+        total_leads: totalLeads,
+        assigned_leads: assignedLeads,
+        auto_assigned: autoAssigned,
+        rule_assigned: ruleAssigned,
+        manually_assigned: manuallyAssigned
+      };
 
       // Get rule usage statistics
-      const ruleStats = await db('leads')
-        .select('lar.name as rule_name', 'lar.id as rule_id')
-        .count('l.id as usage_count')
-        .from('lead_assignment_rules as lar')
-        .leftJoin('leads as l', 'lar.id', 'l.assignment_rule_id')
-        .where('lar.is_active', true)
-        .groupBy('lar.id', 'lar.name')
-        .orderBy('usage_count', 'desc');
+      const { data: ruleStats, error: ruleStatsError } = await supabaseAdmin
+        .from('lead_assignment_rules')
+        .select(`
+          id,
+          name,
+          leads!lead_assignment_rules_id_fkey(count)
+        `)
+        .eq('is_active', true);
+
+      if (ruleStatsError) {
+        console.error('Error getting rule stats:', ruleStatsError);
+        return {
+          success: true,
+          data: {
+            ...stats,
+            ruleUsage: []
+          }
+        };
+      }
+
+      // Format rule usage data
+      const formattedRuleStats = ruleStats.map(rule => ({
+        rule_id: rule.id,
+        rule_name: rule.name,
+        usage_count: rule.leads?.length || 0
+      })).sort((a, b) => b.usage_count - a.usage_count);
 
       return {
         success: true,
         data: {
           ...stats,
-          ruleUsage: ruleStats
+          ruleUsage: formattedRuleStats
         }
       };
     } catch (error) {

@@ -128,10 +128,13 @@ const getTeamPerformance = async (req, res, next) => {
  */
 const getPipelineHealth = async (req, res, next) => {
   try {
-    const { 
-      dateFrom, 
-      dateTo, 
-      userId 
+    console.log('🔍 [PIPELINE HEALTH] Starting pipeline health analysis...');
+    console.log('🔍 [PIPELINE HEALTH] User:', req.user?.email, 'Company:', req.user?.company_id);
+
+    const {
+      dateFrom,
+      dateTo,
+      userId
     } = req.query;
 
     const filters = {
@@ -140,13 +143,24 @@ const getPipelineHealth = async (req, res, next) => {
       userId
     };
 
+    console.log('🔍 [PIPELINE HEALTH] Filters:', filters);
+
     const health = await reportService.getPipelineHealthAnalysis(req.user, filters);
-    
+
+    console.log('✅ [PIPELINE HEALTH] Analysis completed successfully');
+
     res.json({
       success: true,
       data: health
     });
   } catch (error) {
+    console.error('❌ [PIPELINE HEALTH] Error details:', {
+      message: error.message,
+      stack: error.stack,
+      user: req.user?.email,
+      company_id: req.user?.company_id,
+      filters: req.query
+    });
     next(new ApiError('Failed to generate pipeline health report', 500, error.message));
   }
 };

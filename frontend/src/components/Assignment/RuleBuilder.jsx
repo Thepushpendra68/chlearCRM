@@ -61,7 +61,7 @@ const RuleBuilder = ({
       ]);
 
       if (usersResponse.success) {
-        setUsers(usersResponse.data.users.filter(user => user.role !== 'admin'));
+        setUsers(usersResponse.data.filter(user => user.role !== 'admin'));
       }
 
       if (rulesResponse.success) {

@@ -185,7 +185,7 @@ If you need to change ports, edit `docker-compose.yml`:
 services:
   backend:
     ports:
-      - "5001:5000"  # Change 5001 to your preferred port
+      - "5000:5000"  # Backend runs on port 5000
   frontend:
     ports:
       - "3001:3000"  # Change 3001 to your preferred port

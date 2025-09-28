@@ -22,8 +22,8 @@ const supabaseAnon = createClient(
   process.env.SUPABASE_ANON_KEY,
   {
     auth: {
-      autoRefreshToken: false,
-      persistSession: false,
+      autoRefreshToken: true,
+      persistSession: true,
     },
   }
 );
@@ -34,8 +34,8 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY,
   {
     auth: {
-      autoRefreshToken: false,
-      persistSession: false,
+      autoRefreshToken: true,
+      persistSession: true,
     },
   }
 );
@@ -57,8 +57,8 @@ function getSupabaseForUser(accessToken) {
         },
       },
       auth: {
-        autoRefreshToken: false,
-        persistSession: false,
+        autoRefreshToken: true,
+        persistSession: true,
       },
     }
   );
