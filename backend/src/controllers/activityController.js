@@ -29,7 +29,7 @@ class ActivityController {
       const result = await activityService.getActivities(req.user, filters);
 
       if (!result.success) {
-        throw new ApiError(400, result.error);
+        throw new ApiError(result.error, 400);
       }
 
       res.json({
@@ -72,7 +72,7 @@ class ActivityController {
       const result = await activityService.createActivity(activityData, req.user);
 
       if (!result.success) {
-        throw new ApiError(400, result.error);
+        throw new ApiError(result.error, 400);
       }
 
       res.status(201).json({
@@ -91,10 +91,10 @@ class ActivityController {
       const { id } = req.params;
       const updateData = req.body;
 
-      const result = await activityService.updateActivity(id, updateData);
+      const result = await activityService.updateActivity(id, updateData, req.user);
 
       if (!result.success) {
-        throw new ApiError(400, result.error);
+        throw new ApiError(result.error, 400);
       }
 
       res.json({
@@ -133,10 +133,10 @@ class ActivityController {
       const { id } = req.params;
       const completionData = req.body;
 
-      const result = await activityService.completeActivity(id, completionData);
+      const result = await activityService.completeActivity(id, completionData, req.user);
 
       if (!result.success) {
-        throw new ApiError(400, result.error);
+        throw new ApiError(result.error, 400);
       }
 
       res.json({
@@ -165,7 +165,7 @@ class ActivityController {
       const result = await timelineService.getLeadTimeline(id, options);
 
       if (!result.success) {
-        throw new ApiError(400, result.error);
+        throw new ApiError(result.error, 400);
       }
 
       res.json({
@@ -189,7 +189,7 @@ class ActivityController {
       const result = await activityService.getActivities(req.user, filters);
 
       if (!result.success) {
-        throw new ApiError(400, result.error);
+        throw new ApiError(result.error, 400);
       }
 
       res.json({
@@ -225,7 +225,7 @@ class ActivityController {
       const result = await activityService.getUserActivities(id, filters);
 
       if (!result.success) {
-        throw new ApiError(400, result.error);
+        throw new ApiError(result.error, 400);
       }
 
       res.json({
@@ -252,10 +252,10 @@ class ActivityController {
         user_id: req.user.id
       }));
 
-      const result = await activityService.createBulkActivities(activitiesWithUser);
+      const result = await activityService.createBulkActivities(activitiesWithUser, req.user);
 
       if (!result.success) {
-        throw new ApiError(400, result.error);
+        throw new ApiError(result.error, 400);
       }
 
       res.status(201).json({
@@ -288,7 +288,7 @@ class ActivityController {
       const result = await activityService.getActivityStats(filters);
 
       if (!result.success) {
-        throw new ApiError(400, result.error);
+        throw new ApiError(result.error, 400);
       }
 
       res.json({
@@ -308,7 +308,7 @@ class ActivityController {
       const result = await timelineService.getLeadTimelineSummary(id);
 
       if (!result.success) {
-        throw new ApiError(400, result.error);
+        throw new ApiError(result.error, 400);
       }
 
       res.json({
@@ -334,7 +334,7 @@ class ActivityController {
       const result = await timelineService.getUserTimeline(id, options);
 
       if (!result.success) {
-        throw new ApiError(400, result.error);
+        throw new ApiError(result.error, 400);
       }
 
       res.json({
@@ -366,7 +366,7 @@ class ActivityController {
       const result = await timelineService.getTeamTimeline(teamUserIds, options);
 
       if (!result.success) {
-        throw new ApiError(400, result.error);
+        throw new ApiError(result.error, 400);
       }
 
       res.json({
@@ -392,7 +392,7 @@ class ActivityController {
       const result = await timelineService.getActivityTrends(filters);
 
       if (!result.success) {
-        throw new ApiError(400, result.error);
+        throw new ApiError(result.error, 400);
       }
 
       res.json({

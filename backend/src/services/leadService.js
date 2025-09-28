@@ -93,9 +93,9 @@ const getLeads = async (currentUser, page = 1, limit = 20, filters = {}) => {
         email: lead.email,
         phone: lead.phone,
         company: lead.company,
-        title: lead.title,
+        job_title: lead.title, // Map title to job_title for frontend
+        lead_source: lead.source, // Map source to lead_source for frontend
         status: lead.status,
-        source: lead.source,
         deal_value: lead.deal_value,
         expected_close_date: lead.expected_close_date,
         notes: lead.notes,
@@ -145,6 +145,24 @@ const getLeadById = async (id) => {
       throw error;
     }
 
+    // Transform database fields to frontend expected format
+    if (lead) {
+      // Split name into first and last for backward compatibility
+      const nameParts = (lead.name || '').split(' ');
+      const first_name = nameParts[0] || '';
+      const last_name = nameParts.slice(1).join(' ') || '';
+
+      return {
+        ...lead,
+        first_name,
+        last_name,
+        job_title: lead.title, // Map title to job_title for frontend
+        lead_source: lead.source, // Map source to lead_source for frontend
+        assigned_user_first_name: lead.user_profiles?.first_name || null,
+        assigned_user_last_name: lead.user_profiles?.last_name || null
+      };
+    }
+
     return lead;
   } catch (error) {
     console.error('Error fetching lead by ID:', error);
@@ -159,13 +177,51 @@ const createLead = async (leadData) => {
   try {
     const { supabaseAdmin } = require('../config/supabase');
 
+    // Transform frontend field names to database column names
+    const transformedData = {
+      company_id: leadData.company_id,
+      name: `${leadData.first_name} ${leadData.last_name}`.trim(),
+      email: leadData.email,
+      phone: leadData.phone,
+      company: leadData.company,
+      title: leadData.job_title, // Map job_title to title
+      source: leadData.lead_source, // Map lead_source to source
+      status: leadData.status,
+      deal_value: leadData.deal_value,
+      expected_close_date: leadData.expected_close_date,
+      notes: leadData.notes,
+      priority: leadData.priority,
+      assigned_to: leadData.assigned_to,
+      pipeline_stage_id: leadData.pipeline_stage_id,
+      created_by: leadData.created_by
+    };
+
     // Clean up empty strings for UUID and date fields
-    const cleanedData = { ...leadData };
+    const cleanedData = { ...transformedData };
 
     // Convert empty strings to null for UUID fields
     if (cleanedData.assigned_to === '') cleanedData.assigned_to = null;
-    if (cleanedData.pipeline_stage_id === '') cleanedData.pipeline_stage_id = null;
     if (cleanedData.created_by === '') cleanedData.created_by = null;
+
+    // If no pipeline stage is provided, assign the default first stage
+    if (!cleanedData.pipeline_stage_id || cleanedData.pipeline_stage_id === '') {
+      const { data: defaultStage, error: stageError } = await supabaseAdmin
+        .from('pipeline_stages')
+        .select('id')
+        .eq('company_id', leadData.company_id)
+        .eq('is_active', true)
+        .order('order_position', { ascending: true })
+        .limit(1)
+        .single();
+
+      if (stageError) {
+        console.error('Error fetching default pipeline stage:', stageError);
+        // If no stages exist, create lead without stage (better than failing)
+        cleanedData.pipeline_stage_id = null;
+      } else {
+        cleanedData.pipeline_stage_id = defaultStage.id;
+      }
+    }
 
     // Convert empty strings to null for date fields
     if (cleanedData.expected_close_date === '') cleanedData.expected_close_date = null;
@@ -223,13 +279,30 @@ const updateLead = async (id, leadData, currentUser) => {
       throw new ApiError('Access denied', 403);
     }
 
+    // Transform frontend field names to database column names
+    const transformedData = {};
+    if (leadData.first_name !== undefined || leadData.last_name !== undefined) {
+      transformedData.name = `${leadData.first_name || ''} ${leadData.last_name || ''}`.trim();
+    }
+    if (leadData.email !== undefined) transformedData.email = leadData.email;
+    if (leadData.phone !== undefined) transformedData.phone = leadData.phone;
+    if (leadData.company !== undefined) transformedData.company = leadData.company;
+    if (leadData.job_title !== undefined) transformedData.title = leadData.job_title; // Map job_title to title
+    if (leadData.lead_source !== undefined) transformedData.source = leadData.lead_source; // Map lead_source to source
+    if (leadData.status !== undefined) transformedData.status = leadData.status;
+    if (leadData.deal_value !== undefined) transformedData.deal_value = leadData.deal_value;
+    if (leadData.expected_close_date !== undefined) transformedData.expected_close_date = leadData.expected_close_date;
+    if (leadData.notes !== undefined) transformedData.notes = leadData.notes;
+    if (leadData.priority !== undefined) transformedData.priority = leadData.priority;
+    if (leadData.assigned_to !== undefined) transformedData.assigned_to = leadData.assigned_to;
+    if (leadData.pipeline_stage_id !== undefined) transformedData.pipeline_stage_id = leadData.pipeline_stage_id;
+
     // Clean up empty strings for UUID and date fields
-    const cleanedData = { ...leadData };
+    const cleanedData = { ...transformedData };
 
     // Convert empty strings to null for UUID fields
     if (cleanedData.assigned_to === '') cleanedData.assigned_to = null;
     if (cleanedData.pipeline_stage_id === '') cleanedData.pipeline_stage_id = null;
-    if (cleanedData.created_by === '') cleanedData.created_by = null;
 
     // Convert empty strings to null for date fields
     if (cleanedData.expected_close_date === '') cleanedData.expected_close_date = null;

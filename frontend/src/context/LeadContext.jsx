@@ -57,6 +57,19 @@ const leadReducer = (state, action) => {
       };
     
     case LEAD_ACTIONS.ADD_LEAD:
+      // Check if lead already exists to prevent duplicates
+      const existingLead = state.leads.find(lead => lead.id === action.payload.id);
+      if (existingLead) {
+        // If lead exists, update it instead of adding
+        return {
+          ...state,
+          leads: state.leads.map(lead =>
+            lead.id === action.payload.id ? { ...lead, ...action.payload } : lead
+          ),
+          lastUpdated: new Date()
+        };
+      }
+      // If lead doesn't exist, add it
       return {
         ...state,
         leads: [action.payload, ...state.leads],

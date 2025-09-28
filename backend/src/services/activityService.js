@@ -30,8 +30,8 @@ class ActivityService {
         query = query.eq('user_id', filters.user_id);
       }
 
-      if (filters.type) {
-        query = query.eq('type', filters.type);
+      if (filters.activity_type || filters.type) {
+        query = query.eq('type', filters.activity_type || filters.type);
       }
 
       if (filters.date_from) {
@@ -68,6 +68,7 @@ class ActivityService {
         contact_name: activity.leads?.name,
         first_name: activity.user_profiles?.first_name,
         last_name: activity.user_profiles?.last_name,
+        activity_type: activity.type, // Map back for frontend compatibility
         // Remove the nested objects
         leads: undefined,
         user_profiles: undefined
@@ -107,6 +108,7 @@ class ActivityService {
         contact_name: activity.leads?.name,
         first_name: activity.user_profiles?.first_name,
         last_name: activity.user_profiles?.last_name,
+        activity_type: activity.type, // Map back for frontend compatibility
         // Remove the nested objects
         leads: undefined,
         user_profiles: undefined
@@ -124,14 +126,17 @@ class ActivityService {
     try {
       const supabase = supabaseAdmin;
 
+      // Map activity_type to type for backend compatibility
+      const activityType = activityData.activity_type || activityData.type;
+
       // Validate required fields
-      if (!activityData.lead_id || !activityData.user_id || !activityData.type) {
-        return { success: false, error: 'lead_id, user_id, and type are required' };
+      if (!activityData.lead_id || !activityData.user_id || !activityType) {
+        return { success: false, error: 'lead_id, user_id, and activity_type are required' };
       }
 
       // Validate activity type
       const validTypes = ['call', 'email', 'meeting', 'note', 'task', 'sms', 'stage_change', 'assignment_change'];
-      if (!validTypes.includes(activityData.type)) {
+      if (!validTypes.includes(activityType)) {
         return { success: false, error: 'Invalid activity type' };
       }
 
@@ -147,12 +152,12 @@ class ActivityService {
         return { success: false, error: 'Lead not found or access denied' };
       }
 
-      // Set default values
+      // Set default values with proper field mapping (only existing columns)
       const newActivity = {
         lead_id: activityData.lead_id,
         user_id: activityData.user_id,
         company_id: currentUser.company_id,
-        type: activityData.type,
+        type: activityType,
         description: activityData.description || null,
         metadata: activityData.metadata || {},
         created_at: new Date().toISOString()

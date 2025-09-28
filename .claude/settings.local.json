@@ -95,7 +95,8 @@
       "Bash(timeout:*)",
       "Bash(./stop-all.bat)",
       "Bash(./start-local.bat --no-pause)",
-      "Bash(npm run debug-user-lookup:*)"
+      "Bash(npm run debug-user-lookup:*)",
+      "mcp__context7__resolve-library-id"
     ],
     "deny": [],
     "ask": []

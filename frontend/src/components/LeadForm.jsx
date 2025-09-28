@@ -17,13 +17,16 @@ const LeadForm = ({ lead = null, onClose, onSuccess, initialStageId = null, onSu
   // Use the global leads context
   const { addLead, updateLead } = useLeads();
 
+  // Enhanced form configuration with strict validation
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isSubmitting },
     reset,
-    setValue
+    setValue,
+    watch
   } = useForm({
+    mode: 'onChange', // Validate on every change for immediate feedback
     defaultValues: {
       first_name: '',
       last_name: '',
@@ -42,6 +45,10 @@ const LeadForm = ({ lead = null, onClose, onSuccess, initialStageId = null, onSu
       priority: 'medium'
     }
   });
+
+  // Watch email and phone for CRM validation
+  const emailValue = watch('email');
+  const phoneValue = watch('phone');
 
   // Load users and stages for dropdowns
   useEffect(() => {
@@ -95,29 +102,94 @@ const LeadForm = ({ lead = null, onClose, onSuccess, initialStageId = null, onSu
   const handleFormSubmit = async (data) => {
     try {
       setLoading(true);
-      
+
+      // Validate required fields client-side as backup
+      if (!data.first_name?.trim() || !data.last_name?.trim()) {
+        toast.error('First name and last name are required');
+        return;
+      }
+
+      // CRM Business Rule: Must have at least one contact method
+      if (!data.email?.trim() && !data.phone?.trim()) {
+        toast.error('🔍 At least one contact method (email or phone) is required for a lead');
+        return;
+      }
+
+      // Clean data before sending
+      const cleanedData = {
+        ...data,
+        first_name: data.first_name.trim(),
+        last_name: data.last_name.trim(),
+        email: data.email?.trim() || '',
+        phone: data.phone?.trim() || '',
+        company: data.company?.trim() || '',
+        job_title: data.job_title?.trim() || '',
+        notes: data.notes?.trim() || '',
+        deal_value: data.deal_value === '' ? null : data.deal_value,
+        expected_close_date: data.expected_close_date === '' ? null : data.expected_close_date,
+        assigned_to: data.assigned_to === '' ? null : data.assigned_to,
+        pipeline_stage_id: data.pipeline_stage_id === '' ? null : data.pipeline_stage_id
+      };
+
       if (lead) {
         // Update existing lead
-        const updatedLead = await leadService.updateLead(lead.id, data);
-        updateLead(updatedLead.data); // Update the global state
-        toast.success('Lead updated successfully');
-        onSuccess?.(updatedLead.data);
+        const response = await leadService.updateLead(lead.id, cleanedData);
+        if (response.success) {
+          updateLead(response.data);
+          toast.success('Lead updated successfully!');
+          onSuccess?.(response.data);
+        } else {
+          throw new Error(response.message || 'Failed to update lead');
+        }
       } else {
         // Create new lead
-        const newLead = await leadService.createLead(data);
-        addLead(newLead.data); // Add to the global state
-        toast.success('Lead created successfully');
-        onSuccess?.(newLead.data);
+        const response = await leadService.createLead(cleanedData);
+        if (response.success) {
+          addLead(response.data);
+          toast.success('Lead created successfully!');
+          onSuccess?.(response.data);
+        } else {
+          throw new Error(response.message || 'Failed to create lead');
+        }
       }
-      
+
       if (onSubmit) {
-        onSubmit(data);
+        onSubmit(cleanedData);
       } else {
         onClose();
       }
     } catch (error) {
       console.error('Failed to save lead:', error);
-      // Error handling is done in the API interceptor
+
+      // Enhanced error handling with specific messages
+      let errorMessage = 'An unexpected error occurred';
+
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.response?.data?.error?.message) {
+        errorMessage = error.response.data.error.message;
+      } else if (error.response?.data?.errors) {
+        // Handle validation errors array
+        const validationErrors = error.response.data.errors;
+        if (Array.isArray(validationErrors) && validationErrors.length > 0) {
+          errorMessage = validationErrors.map(err => err.msg || err.message).join(', ');
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      // Show specific error messages
+      if (errorMessage.toLowerCase().includes('email')) {
+        toast.error('Please check the email address format');
+      } else if (errorMessage.toLowerCase().includes('phone')) {
+        toast.error('Please check the phone number format');
+      } else if (errorMessage.toLowerCase().includes('validation')) {
+        toast.error(`Validation Error: ${errorMessage}`);
+      } else if (errorMessage.toLowerCase().includes('required')) {
+        toast.error('Please fill in all required fields');
+      } else {
+        toast.error(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
@@ -140,6 +212,25 @@ const LeadForm = ({ lead = null, onClose, onSuccess, initialStageId = null, onSu
       size="lg"
     >
       <div className="bg-gradient-to-br from-gray-50 to-white rounded-lg p-1">
+        {/* CRM Requirements Notice */}
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-start">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-blue-700">
+                <strong>CRM Requirements:</strong> At least one contact method (email or phone) is required to create a useful lead.
+                {!emailValue?.trim() && !phoneValue?.trim() && (
+                  <span className="block mt-1 text-blue-600 font-medium">⚠️ Please provide email or phone to continue</span>
+                )}
+              </p>
+            </div>
+          </div>
+        </div>
+
         <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* First Name */}
@@ -158,6 +249,13 @@ const LeadForm = ({ lead = null, onClose, onSuccess, initialStageId = null, onSu
                   maxLength: {
                     value: 50,
                     message: 'First name must not exceed 50 characters'
+                  },
+                  pattern: {
+                    value: /^[a-zA-Z\s]+$/,
+                    message: 'First name can only contain letters and spaces'
+                  },
+                  validate: {
+                    notEmpty: value => value.trim().length > 0 || 'First name cannot be empty or just spaces'
                   }
                 })}
                 className={`block w-full px-4 py-3 border rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200 ${errors.first_name ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300'}`}
@@ -189,6 +287,13 @@ const LeadForm = ({ lead = null, onClose, onSuccess, initialStageId = null, onSu
                   maxLength: {
                     value: 50,
                     message: 'Last name must not exceed 50 characters'
+                  },
+                  pattern: {
+                    value: /^[a-zA-Z\s]+$/,
+                    message: 'Last name can only contain letters and spaces'
+                  },
+                  validate: {
+                    notEmpty: value => value.trim().length > 0 || 'Last name cannot be empty or just spaces'
                   }
                 })}
                 className={`input ${errors.last_name ? 'border-red-500' : ''}`}
@@ -202,14 +307,21 @@ const LeadForm = ({ lead = null, onClose, onSuccess, initialStageId = null, onSu
             {/* Email */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email
+                Email <span className="text-blue-600 text-xs">(Required if no phone)</span>
               </label>
               <input
                 type="email"
                 {...register('email', {
                   pattern: {
                     value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                    message: 'Invalid email address'
+                    message: 'Please provide a valid email address'
+                  },
+                  maxLength: {
+                    value: 100,
+                    message: 'Email must not exceed 100 characters'
+                  },
+                  validate: {
+                    validOrEmpty: value => !value || /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(value.trim()) || 'Please provide a valid email address'
                   }
                 })}
                 className={`input ${errors.email ? 'border-red-500' : ''}`}
@@ -223,20 +335,32 @@ const LeadForm = ({ lead = null, onClose, onSuccess, initialStageId = null, onSu
             {/* Phone */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Phone
+                Phone <span className="text-blue-600 text-xs">(Required if no email)</span>
               </label>
               <input
                 type="tel"
-                {...register('phone')}
-                className="input"
+                {...register('phone', {
+                  pattern: {
+                    value: /^[\+]?[0-9\s\-\(\)]{0,20}$/,
+                    message: 'Please provide a valid phone number'
+                  },
+                  maxLength: {
+                    value: 20,
+                    message: 'Phone number must not exceed 20 characters'
+                  }
+                })}
+                className={`input ${errors.phone ? 'border-red-500' : ''}`}
                 placeholder="Enter phone number"
               />
+              {errors.phone && (
+                <p className="text-red-500 text-xs mt-1">{errors.phone.message}</p>
+              )}
             </div>
 
             {/* Company */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Company
+                Company <span className="text-green-600 text-xs">(Highly recommended for B2B)</span>
               </label>
               <input
                 type="text"
@@ -467,12 +591,13 @@ const LeadForm = ({ lead = null, onClose, onSuccess, initialStageId = null, onSu
             <button
               type="submit"
               className="px-8 py-3 border border-transparent rounded-lg text-sm font-medium text-white bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-              disabled={loading}
+              disabled={loading || isSubmitting || loadingUsers || loadingStages || (!emailValue?.trim() && !phoneValue?.trim())}
+              title={(!emailValue?.trim() && !phoneValue?.trim()) ? 'Please provide email or phone to create a lead' : ''}
             >
-              {loading ? (
+              {(loading || isSubmitting) ? (
                 <div className="flex items-center">
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                  Saving...
+                  {lead ? 'Updating...' : 'Creating...'}
                 </div>
               ) : (
                 lead ? 'Update Lead' : 'Create Lead'

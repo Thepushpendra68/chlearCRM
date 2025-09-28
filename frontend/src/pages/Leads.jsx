@@ -110,11 +110,10 @@ const Leads = () => {
     return colorMap[stage.color] || 'bg-gray-100 text-gray-800'
   }
 
-  // Handle lead creation success
-  const handleLeadCreated = (newLead) => {
+  // Handle lead creation/update success
+  const handleLeadSaved = (leadData) => {
     setShowAddLeadForm(false)
-    addLead(newLead) // Add the new lead to the global state
-    toast.success('Lead created successfully')
+    // LeadForm already handles adding to global state
   }
 
   // Debug: Log leads data
@@ -470,7 +469,7 @@ const Leads = () => {
       {showAddLeadForm && (
         <LeadForm
           onClose={() => setShowAddLeadForm(false)}
-          onSuccess={handleLeadCreated}
+          onSuccess={handleLeadSaved}
         />
       )}
     </div>

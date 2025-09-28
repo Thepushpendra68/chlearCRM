@@ -86,12 +86,30 @@ const createLead = async (req, res, next) => {
     // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      throw new ApiError('Validation failed', 400, errors.array());
+      const errorMessages = errors.array().map(error => ({
+        field: error.path || error.param,
+        message: error.msg,
+        value: error.value
+      }));
+
+      // Create a more user-friendly error message
+      const fieldErrors = errorMessages.map(err => `${err.field}: ${err.message}`).join(', ');
+
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: errorMessages,
+        error: {
+          message: `Please check the following fields: ${fieldErrors}`,
+          code: 'VALIDATION_ERROR'
+        }
+      });
     }
 
     const leadData = {
       ...req.body,
-      created_by: req.user.id
+      created_by: req.user.id,
+      company_id: req.user.company_id
     };
 
     const lead = await leadService.createLead(leadData);
@@ -116,7 +134,24 @@ const updateLead = async (req, res, next) => {
     // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      throw new ApiError('Validation failed', 400, errors.array());
+      const errorMessages = errors.array().map(error => ({
+        field: error.path || error.param,
+        message: error.msg,
+        value: error.value
+      }));
+
+      // Create a more user-friendly error message
+      const fieldErrors = errorMessages.map(err => `${err.field}: ${err.message}`).join(', ');
+
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: errorMessages,
+        error: {
+          message: `Please check the following fields: ${fieldErrors}`,
+          code: 'VALIDATION_ERROR'
+        }
+      });
     }
 
     const { id } = req.params;
