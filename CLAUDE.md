@@ -18,9 +18,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 start-dev.bat        # Docker mode: Backend on :5000, Frontend on :3000
 start-local.bat      # Local mode: Backend on :5000, Frontend on :3000
 stop-all.bat         # Stop all services and clean ports
-docker-dev.bat       # Docker with hot-reload frontend on :3001
-docker-start.bat     # Production Docker containers
 start-frontend.bat   # Frontend only (requires backend running)
+# Note: docker-dev.bat and docker-start.bat may need to be created if needed
 ```
 **These scripts automatically handle port conflicts and configuration**
 
@@ -28,6 +27,7 @@ start-frontend.bat   # Frontend only (requires backend running)
 ```bash
 cd backend
 npm run dev          # Start development server with nodemon
+npm run dev:clean    # Kill port 5000 and start dev server
 npm run start        # Start production server
 npm run migrate      # Run database migrations (PostgreSQL mode)
 npm run seed         # Seed database with sample data (PostgreSQL mode)
@@ -44,18 +44,18 @@ npm run build        # Build for production
 npm run preview      # Preview production build
 npm run lint         # Run ESLint
 npm run test         # Run Vitest tests
+npm run test:run     # Run Vitest tests once
 npm run test:ui      # Run tests with UI
 ```
 
 ### Supabase Integration Commands
 ```bash
-# Supabase-specific operations:
-node migrate-supabase.js             # Apply Supabase migrations
-node apply-supabase-migration.js     # Alternative migration script
-node debug-user-lookup.js            # Debug user authentication
-node test-api.js                     # Test API endpoints
-node test-token-verification.js      # Test JWT token validation
-node create-user-profile.js          # Create test user profiles
+# Note: Supabase migration scripts may need to be created if not present
+# Check root directory for available Supabase-related scripts:
+ls *.js                              # List available JavaScript files
+node debug-user-lookup.js            # Debug user authentication (if available)
+node test-api.js                     # Test API endpoints (if available)
+node test-token-verification.js      # Test JWT token validation (if available)
 ```
 
 ### Database Operations
