@@ -80,7 +80,7 @@ const getLeads = async (currentUser, page = 1, limit = 20, filters = {}) => {
 
     // Format the data efficiently
     const formattedLeads = leadsResult.data.map(lead => {
-      // Split name into first and last for backward compatibility
+      // Split name into first and last for frontend compatibility
       const nameParts = (lead.name || '').split(' ');
       const first_name = nameParts[0] || '';
       const last_name = nameParts.slice(1).join(' ') || '';
@@ -147,7 +147,7 @@ const getLeadById = async (id) => {
 
     // Transform database fields to frontend expected format
     if (lead) {
-      // Split name into first and last for backward compatibility
+      // Split name into first and last for frontend compatibility
       const nameParts = (lead.name || '').split(' ');
       const first_name = nameParts[0] || '';
       const last_name = nameParts.slice(1).join(' ') || '';

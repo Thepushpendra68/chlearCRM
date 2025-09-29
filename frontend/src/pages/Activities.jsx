@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import ActivityList from '../components/Activities/ActivityList';
 import ActivityForm from '../components/Activities/ActivityForm';
+import ActivityDetail from '../components/Activities/ActivityDetail';
 import activityService from '../services/activityService';
 
 const Activities = () => {
   const [showActivityForm, setShowActivityForm] = useState(false);
+  const [showActivityDetail, setShowActivityDetail] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState(null);
   const [selectedLeadId, setSelectedLeadId] = useState(null);
   const [activityType, setActivityType] = useState('note');
@@ -61,8 +63,22 @@ const Activities = () => {
   };
 
   const handleActivityClick = (activity) => {
-    // Handle activity click - could open a detail modal
-    console.log('Activity clicked:', activity);
+    // Show activity detail modal
+    setSelectedActivity(activity);
+    setShowActivityDetail(true);
+  };
+
+  const handleCloseActivityDetail = () => {
+    setShowActivityDetail(false);
+    setSelectedActivity(null);
+  };
+
+  const handleEditFromDetail = (activity) => {
+    // Close detail modal and open edit form
+    setShowActivityDetail(false);
+    setSelectedActivity(activity);
+    setSelectedLeadId(activity.lead_id);
+    setShowActivityForm(true);
   };
 
   const handleActivityFormSubmit = (activityData) => {
@@ -185,6 +201,16 @@ const Activities = () => {
             leadId={selectedLeadId}
             activity={selectedActivity}
             initialType={activityType}
+          />
+        )}
+
+        {/* Activity Detail Modal */}
+        {showActivityDetail && (
+          <ActivityDetail
+            isOpen={showActivityDetail}
+            onClose={handleCloseActivityDetail}
+            activity={selectedActivity}
+            onEdit={handleEditFromDetail}
           />
         )}
       </div>

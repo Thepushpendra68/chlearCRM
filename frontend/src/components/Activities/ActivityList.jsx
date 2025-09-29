@@ -267,7 +267,8 @@ const ActivityList = ({
           {filteredActivities.map((activity) => (
             <div
               key={activity.id}
-              className={`bg-white border rounded-lg p-4 hover:shadow-sm transition-shadow ${getActivityColor(activity.activity_type)}`}
+              onClick={() => onActivityClick && onActivityClick(activity)}
+              className={`bg-white border rounded-lg p-4 hover:shadow-md hover:border-blue-300 transition-all cursor-pointer ${getActivityColor(activity.activity_type)}`}
             >
               <div className="flex items-start space-x-3">
                 {/* Icon */}
@@ -337,19 +338,13 @@ const ActivityList = ({
                       </div>
                       
                       <div className="mt-2 flex items-center space-x-2">
-                        {onActivityClick && (
-                          <button
-                            onClick={() => onActivityClick(activity)}
-                            className="text-xs text-blue-600 hover:text-blue-800"
-                          >
-                            View
-                          </button>
-                        )}
-                        
                         {onEditActivity && (
                           <button
-                            onClick={() => onEditActivity(activity)}
-                            className="text-xs text-gray-600 hover:text-gray-800"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onEditActivity(activity);
+                            }}
+                            className="text-xs text-blue-600 hover:text-blue-800 font-medium"
                           >
                             Edit
                           </button>

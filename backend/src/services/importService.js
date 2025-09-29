@@ -208,8 +208,8 @@ class ImportService {
         .from('leads')
         .select(`
           *,
-          user_profiles!leads_assigned_to_fkey(first_name, last_name),
-          user_profiles!leads_created_by_fkey(first_name, last_name),
+          assigned_user:user_profiles!leads_assigned_to_fkey(first_name, last_name),
+          created_user:user_profiles!leads_created_by_fkey(first_name, last_name),
           pipeline_stages(name)
         `);
 
@@ -261,8 +261,8 @@ class ImportService {
         'Probability': lead.probability || '',
         'Expected Close Date': lead.expected_close_date ? new Date(lead.expected_close_date).toLocaleDateString() : '',
         'Priority': lead.priority || '',
-        'Assigned To': lead.user_profiles ? `${lead.user_profiles.first_name || ''} ${lead.user_profiles.last_name || ''}`.trim() : '',
-        'Created By': lead.user_profiles_leads_created_by_fkey ? `${lead.user_profiles_leads_created_by_fkey.first_name || ''} ${lead.user_profiles_leads_created_by_fkey.last_name || ''}`.trim() : '',
+        'Assigned To': lead.assigned_user ? `${lead.assigned_user.first_name || ''} ${lead.assigned_user.last_name || ''}`.trim() : '',
+        'Created By': lead.created_user ? `${lead.created_user.first_name || ''} ${lead.created_user.last_name || ''}`.trim() : '',
         'Created Date': lead.created_at ? new Date(lead.created_at).toLocaleDateString() : '',
         'Last Updated': lead.updated_at ? new Date(lead.updated_at).toLocaleDateString() : '',
         'Notes': lead.notes || ''

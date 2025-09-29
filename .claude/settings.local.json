@@ -96,7 +96,8 @@
       "Bash(./stop-all.bat)",
       "Bash(./start-local.bat --no-pause)",
       "Bash(npm run debug-user-lookup:*)",
-      "mcp__context7__resolve-library-id"
+      "mcp__context7__resolve-library-id",
+      "Bash(npm run dev:clean:*)"
     ],
     "deny": [],
     "ask": []

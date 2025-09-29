@@ -68,7 +68,7 @@ class ActivityService {
         contact_name: activity.leads?.name,
         first_name: activity.user_profiles?.first_name,
         last_name: activity.user_profiles?.last_name,
-        activity_type: activity.type, // Map back for frontend compatibility
+        // Keep activity_type as is - no mapping needed
         // Remove the nested objects
         leads: undefined,
         user_profiles: undefined
@@ -108,7 +108,7 @@ class ActivityService {
         contact_name: activity.leads?.name,
         first_name: activity.user_profiles?.first_name,
         last_name: activity.user_profiles?.last_name,
-        activity_type: activity.type, // Map back for frontend compatibility
+        // Keep activity_type as is - no mapping needed
         // Remove the nested objects
         leads: undefined,
         user_profiles: undefined
@@ -184,63 +184,70 @@ class ActivityService {
   // Update activity
   async updateActivity(activityId, updateData) {
     try {
-      const trx = await db.transaction();
+      const supabase = supabaseAdmin;
 
-      try {
-        // Check if activity exists
-        const existingActivity = await trx('activities')
-          .where('id', activityId)
-          .first();
+      // Check if activity exists
+      const { data: existingActivity, error: fetchError } = await supabase
+        .from('activities')
+        .select('*')
+        .eq('id', activityId)
+        .single();
 
-        if (!existingActivity) {
-          throw new Error('Activity not found');
-        }
-
-        // Prepare update data
-        const updateFields = {
-          subject: updateData.subject,
-          description: updateData.description,
-          scheduled_at: updateData.scheduled_at,
-          completed_at: updateData.completed_at,
-          is_completed: updateData.is_completed,
-          duration_minutes: updateData.duration_minutes,
-          outcome: updateData.outcome,
-          metadata: updateData.metadata,
-          updated_at: new Date()
-        };
-
-        // Remove undefined values
-        Object.keys(updateFields).forEach(key => {
-          if (updateFields[key] === undefined) {
-            delete updateFields[key];
-          }
-        });
-
-        await trx('activities')
-          .where('id', activityId)
-          .update(updateFields);
-
-        // If activity was marked as completed, update lead's last_contact_date
-        if (updateData.is_completed && !existingActivity.is_completed && 
-            existingActivity.activity_type !== 'note') {
-          await trx('leads')
-            .where('id', existingActivity.lead_id)
-            .update({ 
-              last_contact_date: new Date(),
-              updated_at: new Date()
-            });
-        }
-
-        await trx.commit();
-
-        // Fetch the updated activity
-        const updatedActivity = await this.getActivityById(activityId);
-
-        return { success: true, data: updatedActivity.data };
-      } catch (error) {
-        await trx.rollback();
-        throw error;
+      if (fetchError || !existingActivity) {
+        throw new Error('Activity not found');
       }
+
+      // Prepare update data
+      const updateFields = {
+        subject: updateData.subject,
+        description: updateData.description,
+        scheduled_at: updateData.scheduled_at,
+        completed_at: updateData.completed_at,
+        is_completed: updateData.is_completed,
+        duration_minutes: updateData.duration_minutes,
+        outcome: updateData.outcome,
+        metadata: updateData.metadata,
+        updated_at: new Date().toISOString()
+      };
+
+      // Remove undefined values
+      Object.keys(updateFields).forEach(key => {
+        if (updateFields[key] === undefined) {
+          delete updateFields[key];
+        }
+      });
+
+      // Update the activity
+      const { error: updateError } = await supabase
+        .from('activities')
+        .update(updateFields)
+        .eq('id', activityId);
+
+      if (updateError) {
+        throw new Error(`Failed to update activity: ${updateError.message}`);
+      }
+
+      // If activity was marked as completed, update lead's last_contact_date
+      if (updateData.is_completed && !existingActivity.is_completed &&
+          existingActivity.activity_type !== 'note') {
+        const { error: leadUpdateError } = await supabase
+          .from('leads')
+          .update({
+            last_contact_date: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingActivity.lead_id);
+
+        if (leadUpdateError) {
+          console.error('Error updating lead last_contact_date:', leadUpdateError);
+          // Don't fail the entire operation if lead update fails
+        }
+      }
+
+      // Fetch the updated activity
+      const updatedActivity = await this.getActivityById(activityId);
+
+      return { success: true, data: updatedActivity.data };
     } catch (error) {
       console.error('Error updating activity:', error);
       return { success: false, error: error.message };
@@ -269,48 +276,56 @@ class ActivityService {
   // Mark activity as completed
   async completeActivity(activityId, completionData = {}) {
     try {
-      const trx = await db.transaction();
+      const supabase = supabaseAdmin;
 
-      try {
-        const existingActivity = await trx('activities')
-          .where('id', activityId)
-          .first();
+      // Check if activity exists
+      const { data: existingActivity, error: fetchError } = await supabase
+        .from('activities')
+        .select('*')
+        .eq('id', activityId)
+        .single();
 
-        if (!existingActivity) {
-          throw new Error('Activity not found');
-        }
-
-        const updateData = {
-          is_completed: true,
-          completed_at: completionData.completed_at || new Date(),
-          outcome: completionData.outcome || null,
-          duration_minutes: completionData.duration_minutes || null,
-          updated_at: new Date()
-        };
-
-        await trx('activities')
-          .where('id', activityId)
-          .update(updateData);
-
-        // Update lead's last_contact_date if it's not a note
-        if (existingActivity.activity_type !== 'note') {
-          await trx('leads')
-            .where('id', existingActivity.lead_id)
-            .update({ 
-              last_contact_date: new Date(),
-              updated_at: new Date()
-            });
-        }
-
-        await trx.commit();
-
-        const updatedActivity = await this.getActivityById(activityId);
-
-        return { success: true, data: updatedActivity.data };
-      } catch (error) {
-        await trx.rollback();
-        throw error;
+      if (fetchError || !existingActivity) {
+        throw new Error('Activity not found');
       }
+
+      const updateData = {
+        is_completed: true,
+        completed_at: completionData.completed_at || new Date().toISOString(),
+        outcome: completionData.outcome || null,
+        duration_minutes: completionData.duration_minutes || null,
+        updated_at: new Date().toISOString()
+      };
+
+      // Update the activity
+      const { error: updateError } = await supabase
+        .from('activities')
+        .update(updateData)
+        .eq('id', activityId);
+
+      if (updateError) {
+        throw new Error(`Failed to complete activity: ${updateError.message}`);
+      }
+
+      // Update lead's last_contact_date if it's not a note
+      if (existingActivity.activity_type !== 'note') {
+        const { error: leadUpdateError } = await supabase
+          .from('leads')
+          .update({
+            last_contact_date: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingActivity.lead_id);
+
+        if (leadUpdateError) {
+          console.error('Error updating lead last_contact_date:', leadUpdateError);
+          // Don't fail the entire operation if lead update fails
+        }
+      }
+
+      const updatedActivity = await this.getActivityById(activityId);
+
+      return { success: true, data: updatedActivity.data };
     } catch (error) {
       console.error('Error completing activity:', error);
       return { success: false, error: error.message };
@@ -365,62 +380,74 @@ class ActivityService {
   // Create multiple activities (bulk)
   async createBulkActivities(activitiesData) {
     try {
-      const trx = await db.transaction();
+      const supabase = supabaseAdmin;
+      const validTypes = ['call', 'email', 'meeting', 'note', 'task', 'sms', 'stage_change', 'assignment_change'];
+      const activities = [];
 
-      try {
-        const validTypes = ['call', 'email', 'meeting', 'note', 'task', 'sms', 'stage_change', 'assignment_change'];
-        const activities = [];
-
-        for (const activityData of activitiesData) {
-          // Validate required fields
-          if (!activityData.lead_id || !activityData.user_id || !activityData.activity_type) {
-            throw new Error('Each activity must have lead_id, user_id, and activity_type');
-          }
-
-          if (!validTypes.includes(activityData.activity_type)) {
-            throw new Error(`Invalid activity type: ${activityData.activity_type}`);
-          }
-
-          activities.push({
-            lead_id: activityData.lead_id,
-            user_id: activityData.user_id,
-            activity_type: activityData.activity_type,
-            subject: activityData.subject || null,
-            description: activityData.description || null,
-            scheduled_at: activityData.scheduled_at || null,
-            completed_at: activityData.completed_at || null,
-            is_completed: activityData.is_completed || false,
-            duration_minutes: activityData.duration_minutes || null,
-            outcome: activityData.outcome || null,
-            metadata: activityData.metadata || null,
-            created_at: new Date(),
-            updated_at: new Date()
-          });
+      for (const activityData of activitiesData) {
+        // Validate required fields
+        if (!activityData.lead_id || !activityData.user_id || !activityData.activity_type) {
+          throw new Error('Each activity must have lead_id, user_id, and activity_type');
         }
 
-        const activityIds = await trx('activities').insert(activities).returning('id');
-
-        // Update last_contact_date for leads with completed activities
-        const completedLeadIds = activities
-          .filter(a => a.is_completed && a.activity_type !== 'note')
-          .map(a => a.lead_id);
-
-        if (completedLeadIds.length > 0) {
-          await trx('leads')
-            .whereIn('id', completedLeadIds)
-            .update({ 
-              last_contact_date: new Date(),
-              updated_at: new Date()
-            });
+        if (!validTypes.includes(activityData.activity_type)) {
+          throw new Error(`Invalid activity type: ${activityData.activity_type}`);
         }
 
-        await trx.commit();
-
-        return { success: true, data: { created_count: activityIds.length, activity_ids: activityIds } };
-      } catch (error) {
-        await trx.rollback();
-        throw error;
+        activities.push({
+          lead_id: activityData.lead_id,
+          user_id: activityData.user_id,
+          activity_type: activityData.activity_type,
+          subject: activityData.subject || null,
+          description: activityData.description || null,
+          scheduled_at: activityData.scheduled_at || null,
+          completed_at: activityData.completed_at || null,
+          is_completed: activityData.is_completed || false,
+          duration_minutes: activityData.duration_minutes || null,
+          outcome: activityData.outcome || null,
+          metadata: activityData.metadata || null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
       }
+
+      // Insert activities in bulk
+      const { data: insertedActivities, error: insertError } = await supabase
+        .from('activities')
+        .insert(activities)
+        .select('id');
+
+      if (insertError) {
+        throw new Error(`Failed to create activities: ${insertError.message}`);
+      }
+
+      // Update last_contact_date for leads with completed activities
+      const completedLeadIds = activities
+        .filter(a => a.is_completed && a.activity_type !== 'note')
+        .map(a => a.lead_id);
+
+      if (completedLeadIds.length > 0) {
+        const { error: leadUpdateError } = await supabase
+          .from('leads')
+          .update({
+            last_contact_date: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .in('id', completedLeadIds);
+
+        if (leadUpdateError) {
+          console.error('Error updating lead last_contact_date for bulk activities:', leadUpdateError);
+          // Don't fail the entire operation if lead update fails
+        }
+      }
+
+      return {
+        success: true,
+        data: {
+          created_count: insertedActivities.length,
+          activity_ids: insertedActivities.map(a => a.id)
+        }
+      };
     } catch (error) {
       console.error('Error creating bulk activities:', error);
       return { success: false, error: error.message };
