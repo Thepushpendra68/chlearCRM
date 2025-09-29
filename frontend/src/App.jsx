@@ -30,6 +30,7 @@ function App() {
             {/* Public routes */}
             <Route path="/" element={<Homepage />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Navigate to="/register-company" replace />} />
             <Route path="/register-company" element={<RegisterCompany />} />
             <Route path="/dashboard" element={<Navigate to="/app/dashboard" replace />} />
             

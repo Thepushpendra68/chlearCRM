@@ -97,7 +97,10 @@
       "Bash(./start-local.bat --no-pause)",
       "Bash(npm run debug-user-lookup:*)",
       "mcp__context7__resolve-library-id",
-      "Bash(npm run dev:clean:*)"
+      "Bash(npm run dev:clean:*)",
+      "Read(//c/Users/Vishaka/**)",
+      "Read(//c/c/Users/Vishaka/**)",
+      "WebFetch(domain:ai.google.dev)"
     ],
     "deny": [],
     "ask": []

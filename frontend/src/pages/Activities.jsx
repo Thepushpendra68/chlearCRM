@@ -59,6 +59,7 @@ const Activities = () => {
   const handleEditActivity = (activity) => {
     setSelectedActivity(activity);
     setSelectedLeadId(activity.lead_id);
+    setActivityType(activity.activity_type);
     setShowActivityForm(true);
   };
 
@@ -78,6 +79,7 @@ const Activities = () => {
     setShowActivityDetail(false);
     setSelectedActivity(activity);
     setSelectedLeadId(activity.lead_id);
+    setActivityType(activity.activity_type);
     setShowActivityForm(true);
   };
 
