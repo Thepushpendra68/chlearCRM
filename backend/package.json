@@ -1,15 +1,15 @@
 {
   "name": "crm-backend",
   "version": "1.0.0",
-  "description": "CRM Backend API with Node.js and Express - USES POSTGRESQL ONLY (NO SQLITE3)",
+  "description": "CRM Backend API with Node.js and Express - USES SUPABASE ONLY (NO SQLITE3, NO KNEX)",
   "main": "src/app.js",
   "scripts": {
     "start": "node --no-deprecation src/app.js",
     "dev": "nodemon src/app.js",
     "dev:clean": "npx kill-port 5000 && npm run dev",
-    "migrate": "knex migrate:latest",
-    "migrate:rollback": "knex migrate:rollback",
-    "seed": "knex seed:run",
+    "_migrate": "echo 'DEPRECATED: Use Supabase migrations instead'",
+    "_migrate:rollback": "echo 'DEPRECATED: Use Supabase migrations instead'",
+    "_seed": "echo 'DEPRECATED: Use Supabase SQL scripts instead'",
     "test": "jest",
     "test:watch": "jest --watch",
     "kill-port": "npx kill-port 5000"
@@ -40,7 +40,6 @@
   },
   "devDependencies": {
     "jest": "^29.7.0",
-    "knex": "^3.0.1",
     "nodemon": "^3.0.1",
     "supertest": "^6.3.3"
   },

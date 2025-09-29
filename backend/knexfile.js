@@ -1,5 +1,11 @@
+// ⚠️ DEPRECATED: This file is no longer used in the Supabase branch
+// Schema is now managed via Supabase - see SUPABASE_SETUP.md
+// This file is kept for reference only - DO NOT USE for new development
+// Use Supabase dashboard or MCP tools for database schema management
+
 require('dotenv').config();
 
+// LEGACY KNEX CONFIGURATION - DEPRECATED
 module.exports = {
   development: {
     client: 'postgresql',

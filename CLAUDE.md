@@ -29,11 +29,14 @@ cd backend
 npm run dev          # Start development server with nodemon
 npm run dev:clean    # Kill port 5000 and start dev server
 npm run start        # Start production server
-npm run migrate      # Run database migrations (PostgreSQL mode)
-npm run seed         # Seed database with sample data (PostgreSQL mode)
+# npm run migrate    # DEPRECATED - Use Supabase migrations instead
+# npm run seed       # DEPRECATED - Use Supabase SQL scripts instead
 npm run test         # Run tests with Jest
 npm run test:watch   # Run tests in watch mode
 npm run kill-port    # Kill port 5000 if needed
+
+# ✅ FOR DATABASE SETUP: Use Supabase dashboard or MCP tools
+# Database schema is managed via Supabase, not Knex migrations
 ```
 
 ### Frontend Development (React/Vite)
@@ -58,12 +61,18 @@ node test-api.js                     # Test API endpoints (if available)
 node test-token-verification.js      # Test JWT token validation (if available)
 ```
 
-### Database Operations
+### Database Operations (Legacy Knex - USE SUPABASE INSTEAD)
 ```bash
+# ⚠️ LEGACY COMMANDS - USE SUPABASE MIGRATIONS INSTEAD
 cd backend
-npm run migrate:rollback  # Rollback last migration
-knex migrate:make <name>  # Create new migration
-knex seed:make <name>     # Create new seed file
+npm run migrate:rollback  # Rollback last migration (legacy)
+# knex migrate:make <name>  # DEPRECATED - Use Supabase migration scripts
+# knex seed:make <name>     # DEPRECATED - Use Supabase SQL scripts
+
+# ✅ PREFERRED: Use Supabase CLI or direct SQL execution
+# Create migrations via Supabase dashboard or SQL scripts
+# Apply migrations via Supabase CLI: supabase db push
+# Or use the Supabase MCP tools for migrations
 ```
 
 ### Additional Commands
@@ -83,22 +92,22 @@ npm run lint         # Run ESLint checks
 This is a full-stack CRM application with separated backend and frontend:
 
 ### Backend Architecture
-- **Express.js** REST API with hybrid authentication system
-- **Database**: Supabase (PostgreSQL + Auth) on current branch, with legacy Knex.js support
-- **⚠️ CRITICAL: CURRENT BRANCH USES SUPABASE - NEVER USE SQLITE3**
-- **Authentication**: Dual-mode (Supabase Auth + JWT fallback)
-- **MVC pattern**: Controllers → Services → Database
+- **Express.js** REST API with Supabase integration
+- **Database**: Supabase (PostgreSQL + Auth + Real-time) - **EXCLUSIVELY USED**
+- **⚠️ CRITICAL: CURRENT BRANCH USES SUPABASE ONLY - NO KNEX, NO SQLITE3**
+- **Authentication**: Supabase Auth with JWT token validation
+- **MVC pattern**: Controllers → Services → Supabase Database
 - **Middleware**: Authentication, rate limiting, CORS, validation
 - **Structure**:
   - `src/controllers/` - Route handlers (auth, leads, users, dashboard, pipeline, activities, assignments, reports, tasks, import, search)
-  - `src/services/` - Business logic layer
+  - `src/services/` - Business logic layer with Supabase client
   - `src/middleware/` - Custom middleware (auth, error handling)
   - `src/routes/` - API route definitions
   - `src/validators/` - Input validation schemas
   - `src/utils/` - Utility functions (JWT, ApiError, assignment rules, report generator, parsers)
-  - `src/config/` - Configuration files
-  - `migrations/` - Database schema migrations
-  - `seeds/` - Database seed data
+  - `src/config/` - Supabase configuration
+  - `migrations/` - Legacy Knex migrations (reference only - use Supabase migrations)
+  - `seeds/` - Legacy seed data (reference only - use Supabase SQL)
 
 ### Frontend Architecture  
 - **React 18** with functional components and hooks
@@ -166,10 +175,10 @@ Backend `.env` for traditional setup:
 5. **API endpoints** follow `/api/<resource>` pattern
 6. **Error handling**: Centralized error middleware with ApiError class
 
-### Legacy Workflow
-1. **Database first**: Run migrations and seeds before starting servers
+### Legacy Workflow (DEPRECATED - Use Supabase)
+1. **Database first**: ~~Run migrations and seeds~~ → Use Supabase schema setup
 2. **Manual startup**: `npm run dev` in backend/frontend directories
-3. **Authentication**: JWT tokens in Authorization headers
+3. **Authentication**: ~~JWT tokens~~ → Supabase Auth tokens with JWT fallback
 
 ## Testing
 
@@ -199,11 +208,14 @@ Backend `.env` for traditional setup:
 
 ## Important Implementation Details
 
-### Database Schema Evolution
-- The leads table has been extended beyond the base migration (002_create_leads_table.js)
-- Pipeline integration added via migration 006_modify_leads_for_pipeline.js
-- Missing fields `created_by` and `priority` added via migration 011_add_missing_leads_fields.js
-- Always run `npm run migrate` after pulling changes to ensure schema is up to date
+### Database Schema Evolution (LEGACY REFERENCE)
+- ⚠️ **IMPORTANT**: Schema is now managed via Supabase, not Knex migrations
+- **Legacy migrations** (for reference only):
+  - The leads table was extended beyond the base migration (002_create_leads_table.js)
+  - Pipeline integration added via migration 006_modify_leads_for_pipeline.js
+  - Missing fields `created_by` and `priority` added via migration 011_add_missing_leads_fields.js
+- ✅ **CURRENT**: Schema changes applied via Supabase migrations or direct SQL
+- **DO NOT RUN** `npm run migrate` - use Supabase schema management instead
 
 ### API Response Patterns
 - All API responses follow consistent structure: `{ success: boolean, data: any, message?: string }`
@@ -224,8 +236,9 @@ Backend `.env` for traditional setup:
 ### Development Workflow Notes
 - Backend server runs on port 5000 with auto-reload via nodemon
 - Frontend runs on port 3000 with Vite hot module replacement
-- Database changes require migration files - never modify existing migrations
+- **Database changes**: Use Supabase dashboard or MCP tools - legacy migration files are reference only
 - Frontend changes auto-reload in browser during development
+- **Schema management**: All database changes via Supabase, not Knex migrations
 
 ### Docker & Deployment
 - **Docker Compose**: Full containerization with backend and frontend services (PostgreSQL replaced by Supabase)
@@ -248,14 +261,15 @@ Backend `.env` for traditional setup:
 - **ApiError Class**: Custom error class with proper HTTP status codes and consistent error response format
 
 ### Database Constraints & Relationships
-- **DATABASE TYPE: POSTGRESQL (Supabase or traditional) - NEVER USE SQLITE3**
-- **Current Branch**: Uses Supabase with RLS policies and auth triggers
+- **DATABASE TYPE: SUPABASE (PostgreSQL + Auth + RLS) - EXCLUSIVELY USED**
+- **Current Branch**: Uses Supabase ONLY with RLS policies and auth triggers
 - **Foreign Key Constraints**: `pipeline_stage_id` references `pipeline_stages.id`, `assigned_to` references `users.id`
-- **Migration Dependencies**:
-  - **Supabase**: Use migration scripts in root directory or manual SQL execution
-  - **Legacy**: Always run `npm run migrate` after pulling changes
+- **Schema Management**:
+  - **✅ CURRENT**: Use Supabase dashboard, SQL editor, or MCP tools for migrations
+  - **❌ DEPRECATED**: Knex migrations (`npm run migrate`) - DO NOT USE
 - **Data Integrity**: Empty string validation converted to NULL prevents constraint violations during updates
 - **Multi-tenancy**: Company-based data isolation with Row Level Security (RLS) policies
+- **Real-time**: Supabase provides real-time subscriptions for live data updates
 
 ### Form & State Management Patterns
 - **Frontend Validation**: React Hook Form with schemas matching backend express-validator rules

@@ -52,10 +52,10 @@ A modern, full-stack Customer Relationship Management (CRM) system built with cu
 
 ### Backend
 - **Node.js** with Express.js
-- **PostgreSQL** database
-- **Knex.js** for database migrations and queries
-- **JWT** for authentication
-- **bcryptjs** for password hashing
+- **Supabase** (PostgreSQL + Auth + Real-time)
+- **Supabase Client** for database operations and authentication
+- **JWT** for token validation (Supabase managed)
+- **bcryptjs** for password hashing (legacy fallback)
 - **express-validator** for input validation
 
 ### Frontend
@@ -113,18 +113,18 @@ chlearCRM/
 
 ### 🏗️ Architecture Overview
 
-- **Backend**: RESTful API with Express.js, PostgreSQL database, JWT authentication
+- **Backend**: RESTful API with Express.js, Supabase integration, JWT token validation
 - **Frontend**: Single Page Application with React 18, Vite build tool, Tailwind CSS
-- **Database**: PostgreSQL with Knex.js ORM for migrations and queries
-- **Authentication**: JWT-based with role-based access control
-- **Deployment**: Docker-ready with CI/CD pipeline support
+- **Database**: Supabase (PostgreSQL + Auth + Real-time + RLS policies)
+- **Authentication**: Supabase Auth with JWT tokens and role-based access control
+- **Deployment**: Docker-ready with CI/CD pipeline support, Supabase hosted database
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
 - Node.js (v18 or higher)
-- PostgreSQL (v12 or higher)
+- Supabase account and project (replaces PostgreSQL setup)
 - npm or yarn
 
 ### 1. Clone and Setup
@@ -142,26 +142,20 @@ cd ../frontend
 npm install
 ```
 
-### 2. Database Setup
+### 2. Supabase Setup
 
-```sql
--- Create database
-CREATE DATABASE crm_database;
-
--- Create user (optional)
-CREATE USER crm_user WITH PASSWORD 'your_password';
-GRANT ALL PRIVILEGES ON DATABASE crm_database TO crm_user;
-```
+1. **Create Supabase Project**: Go to [supabase.com](https://supabase.com) and create a new project
+2. **Get Credentials**: Copy your Project URL and anon/service keys from Settings > API
+3. **Schema Setup**: Run the SQL schema from `SUPABASE_SETUP.md` in the SQL editor
+4. **Authentication**: Enable Row Level Security (RLS) and configure auth policies
 
 ### 3. Environment Configuration
 
 **Backend** (`backend/.env`):
 ```env
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=crm_database
-DB_USER=postgres
-DB_PASSWORD=your_password_here
+SUPABASE_URL=your_supabase_project_url
+SUPABASE_SERVICE_KEY=your_supabase_service_role_key
+# Legacy JWT settings (optional for fallback)
 JWT_SECRET=your_super_secret_jwt_key_here_change_in_production
 JWT_EXPIRES_IN=24h
 PORT=5000
@@ -169,12 +163,25 @@ NODE_ENV=development
 FRONTEND_URL=http://localhost:3000
 ```
 
-### 4. Database Migration
+**Frontend** (`frontend/.env`):
+```env
+VITE_SUPABASE_URL=your_supabase_project_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+### 4. Schema Setup (Supabase)
+
+✅ **Schema is managed via Supabase - No local migrations needed**
+
+1. **Apply Schema**: Run SQL from `SUPABASE_SETUP.md` in Supabase SQL editor
+2. **Verify Setup**: Check that tables and RLS policies are created
+3. **Test Authentication**: Register a company via `/api/auth/register-company`
 
 ```bash
-cd backend
-npm run migrate
-npm run seed
+# ❌ Legacy commands (DO NOT USE):
+# cd backend
+# npm run migrate
+# npm run seed
 ```
 
 ### 5. Start the Application
@@ -197,15 +204,20 @@ npm run dev
 - **Backend API**: http://localhost:5000
 - **Health Check**: http://localhost:5000/health
 
-## 👤 Default Users
+## 👤 User Authentication
 
-After running the seed command, you can login with:
+**Supabase Auth Integration**: Users register via company registration endpoint
 
+🔐 **Company Registration**: Use `/api/auth/register-company` to create your organization and admin user
+
+📝 **Test Users** (for development, if seeded via legacy scripts):
 | Role | Email | Password |
 |------|-------|----------|
 | Admin | admin@crm.com | admin123 |
 | Manager | manager@crm.com | admin123 |
 | Sales Rep | sales@crm.com | admin123 |
+
+⚠️ **Note**: These test users are from legacy seed data. In production, use Supabase Auth registration.
 
 ## 📊 API Endpoints
 
@@ -242,7 +254,7 @@ After running the seed command, you can login with:
 - **Input Validation**: Server-side validation with express-validator
 - **CORS Protection**: Configured for specific origins
 - **Helmet**: Security headers
-- **SQL Injection Prevention**: Parameterized queries with Knex.js
+- **SQL Injection Prevention**: Supabase client with automatic parameterized queries
 
 ## 🎨 UI Features
 
@@ -259,8 +271,8 @@ After running the seed command, you can login with:
 ```bash
 cd backend
 npm run dev          # Start with nodemon
-npm run migrate      # Run migrations
-npm run seed         # Seed database
+# npm run migrate    # DEPRECATED - Use Supabase schema setup
+# npm run seed       # DEPRECATED - Use Supabase SQL or company registration
 npm test            # Run tests
 ```
 
