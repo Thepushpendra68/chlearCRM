@@ -488,7 +488,7 @@ const searchLeads = async (query, limit = 5, currentUser = null) => {
         *,
         user_profiles!assigned_to(first_name, last_name)
       `)
-      .or(`first_name.ilike.%${query}%,last_name.ilike.%${query}%,email.ilike.%${query}%,company.ilike.%${query}%,phone.ilike.%${query}%,notes.ilike.%${query}%`)
+      .or(`name.ilike.%${query}%,first_name.ilike.%${query}%,last_name.ilike.%${query}%,email.ilike.%${query}%,company.ilike.%${query}%,phone.ilike.%${query}%,notes.ilike.%${query}%`)
       .order('created_at', { ascending: false })
       .limit(limit);
 

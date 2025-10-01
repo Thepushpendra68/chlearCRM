@@ -28,6 +28,80 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
 });
 
+// Session management helpers ensure we always have a cached auth session
+let cachedSession = null;
+let sessionReady = false;
+let sessionInitPromise = null;
+const sessionSubscribers = new Set();
+
+function notifySessionSubscribers(session) {
+  sessionSubscribers.forEach((subscriber) => {
+    try {
+      subscriber(session);
+    } catch (subscriberError) {
+      console.error('dY"? [SUPABASE] Session subscriber error:', subscriberError);
+    }
+  });
+}
+
+function setCachedSession(session) {
+  cachedSession = session ?? null;
+  sessionReady = true;
+  notifySessionSubscribers(cachedSession);
+}
+
+export function getCachedSession() {
+  return cachedSession;
+}
+
+export function isSessionInitialized() {
+  return sessionReady;
+}
+
+export function onSessionChange(callback) {
+  sessionSubscribers.add(callback);
+  if (sessionReady) {
+    try {
+      callback(cachedSession);
+    } catch (subscriberError) {
+      console.error('dY"? [SUPABASE] Session subscriber error:', subscriberError);
+    }
+  }
+  return () => sessionSubscribers.delete(callback);
+}
+
+export async function ensureSessionInitialized() {
+  if (sessionReady && !sessionInitPromise) {
+    return cachedSession;
+  }
+
+  if (!sessionInitPromise) {
+    sessionInitPromise = supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        setCachedSession(data?.session ?? null);
+        return cachedSession;
+      })
+      .catch((error) => {
+        console.error('dY"? [SUPABASE] Failed to initialize session:', error);
+        setCachedSession(null);
+        return null;
+      })
+      .finally(() => {
+        sessionInitPromise = null;
+      });
+  }
+
+  return sessionInitPromise;
+}
+
+// Warm the session cache immediately so downstream code can rely on it
+ensureSessionInitialized();
+
+supabase.auth.onAuthStateChange((event, session) => {
+  console.log('dY", [SUPABASE] Auth state change:', event);
+  setCachedSession(session ?? null);
+});
 /**
  * Auth helper functions
  */
@@ -132,18 +206,18 @@ export async function getCurrentSession() {
  * @returns {object} User profile data
  */
 export async function getCurrentUserProfile() {
-  console.log('🔍 [SUPABASE] Getting current user profile...')
+  console.log('[SUPABASE] Getting current user profile...')
 
   try {
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
     if (sessionError || !session?.user) {
-      console.log('❌ [SUPABASE] No active session found');
+      console.log('[SUPABASE] No active session found');
       return { profile: null, error: sessionError };
     }
 
     const userId = session.user.id;
-    console.log('🔍 [SUPABASE] Fetching profile for user:', userId);
+    console.log('[SUPABASE] Fetching profile for user:', userId);
 
     // Fetch user profile from database
     const { data: profile, error: profileError } = await supabase
@@ -156,7 +230,7 @@ export async function getCurrentUserProfile() {
       .single();
 
     if (profileError) {
-      console.error('❌ [SUPABASE] Error fetching user profile:', profileError);
+      console.error('[SUPABASE] Error fetching user profile:', profileError);
       return { profile: null, error: profileError };
     }
 
@@ -201,11 +275,11 @@ export async function getCurrentUserProfile() {
       updated_at: profileRecord.updated_at
     };
 
-    console.log('✅ [SUPABASE] Profile fetched successfully:', userProfile.email, userProfile.role);
+    console.log('[SUPABASE] Profile fetched successfully:', userProfile.email, userProfile.role);
     return { profile: userProfile, error: null };
 
   } catch (error) {
-    console.error('❌ [SUPABASE] Error getting user profile:', error);
+    console.error('[SUPABASE] Error getting user profile:', error);
     return { profile: null, error };
   }
 }

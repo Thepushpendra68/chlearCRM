@@ -41,6 +41,12 @@ const authReducer = (state, action) => {
         error: null,
         loading: false
       }
+    case 'UPDATE_SESSION':
+      return {
+        ...state,
+        session: action.payload,
+        loading: false
+      }
     case 'UPDATE_USER':
       return {
         ...state,
@@ -77,24 +83,24 @@ export const AuthProvider = ({ children }) => {
   // Initialize auth state on mount
   useEffect(() => {
     const initializeAuth = async () => {
-      console.log('🔍 [AUTH] Initializing auth...')
+      console.log('[AUTH] Initializing auth...')
 
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
 
         if (error) {
-          console.error('❌ [AUTH] Session error:', error);
+          console.error('[AUTH] Session error:', error);
           dispatch({ type: 'AUTH_LOGOUT' });
           return;
         }
 
         if (session?.user) {
-          console.log('🔍 [AUTH] Existing session found, fetching profile...');
+          console.log('[AUTH] Existing session found, fetching profile...');
 
           const { profile, error: profileError } = await getCurrentUserProfile();
 
           if (profileError || !profile) {
-            console.error('❌ [AUTH] Profile fetch error:', profileError);
+            console.error('[AUTH] Profile fetch error:', profileError);
             dispatch({ type: 'AUTH_LOGOUT' });
             return;
           }
@@ -106,13 +112,13 @@ export const AuthProvider = ({ children }) => {
               session
             }
           });
-          console.log('✅ [AUTH] Auth initialized successfully');
+          console.log('[AUTH] Auth initialized successfully');
         } else {
-          console.log('ℹ️ [AUTH] No existing session found');
+          console.log('[AUTH] No existing session found');
           dispatch({ type: 'AUTH_LOGOUT' });
         }
       } catch (error) {
-        console.error('❌ [AUTH] Initialization error:', error);
+        console.error('[AUTH] Initialization error:', error);
         dispatch({ type: 'AUTH_LOGOUT' });
       } finally {
         initializedRef.current = true;
@@ -127,20 +133,20 @@ export const AuthProvider = ({ children }) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       // Skip the initial SIGNED_IN event that fires during initialization
       if (!initializedRef.current) {
-        console.log('🔄 [AUTH] Skipping auth event during initialization:', event);
+        console.log('[AUTH] Skipping auth event during initialization:', event);
         return;
       }
 
-      console.log('🔄 [AUTH] Auth state change:', event);
+      console.log('[AUTH] Auth state change:', event);
 
       if (event === 'SIGNED_IN' && session?.user) {
-        console.log('🔍 [AUTH] New sign in, fetching profile...');
+        console.log('[AUTH] New sign in, fetching profile...');
 
         try {
           const { profile, error } = await getCurrentUserProfile();
 
           if (error || !profile) {
-            console.error('❌ [AUTH] Failed to fetch user profile:', error);
+            console.error('[AUTH] Failed to fetch user profile:', error);
             dispatch({ type: 'AUTH_LOGOUT' });
             return;
           }
@@ -152,13 +158,25 @@ export const AuthProvider = ({ children }) => {
               session
             }
           });
-          console.log('✅ [AUTH] Sign in successful');
+          console.log('[AUTH] Sign in successful');
         } catch (error) {
-          console.error('❌ [AUTH] Error during sign in:', error);
+          console.error('[AUTH] Error during sign in:', error);
           dispatch({ type: 'AUTH_LOGOUT' });
         }
+      } else if (event === 'TOKEN_REFRESHED' && session?.user) {
+        console.log('[AUTH] Token refreshed; updating session cache');
+        dispatch({
+          type: 'UPDATE_SESSION',
+          payload: session
+        });
+      } else if (event === 'USER_UPDATED' && session?.user) {
+        console.log('[AUTH] Supabase user metadata updated; syncing session');
+        dispatch({
+          type: 'UPDATE_SESSION',
+          payload: session
+        });
       } else if (event === 'SIGNED_OUT') {
-        console.log('🚪 [AUTH] Sign out event');
+        console.log('[AUTH] Sign out event');
         dispatch({ type: 'AUTH_LOGOUT' });
       }
     });
@@ -182,24 +200,24 @@ export const AuthProvider = ({ children }) => {
 
   // Login function
   const login = async (email, password) => {
-    console.log('🔑 [AUTH] Starting login for:', email)
+    console.log('[AUTH] Starting login for:', email)
     dispatch({ type: 'AUTH_START' })
 
     try {
       const { data, error } = await signIn(email, password)
 
       if (error) {
-        console.log('❌ [AUTH] Login error:', error.message)
+        console.log('[AUTH] Login error:', error.message)
         throw error
       }
 
-      console.log('✅ [AUTH] Supabase sign in successful, waiting for state change...')
+      console.log('[AUTH] Supabase sign in successful, waiting for state change...')
       // Profile will be loaded automatically by the auth state change listener
       toast.success('Login successful!')
       return { success: true }
     } catch (error) {
       const errorMessage = error.message || 'Login failed'
-      console.log('❌ [AUTH] Login failed:', errorMessage)
+      console.log('[AUTH] Login failed:', errorMessage)
       dispatch({
         type: 'AUTH_FAILURE',
         payload: errorMessage
