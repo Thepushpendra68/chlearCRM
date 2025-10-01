@@ -40,12 +40,18 @@ A modern, full-stack Customer Relationship Management (CRM) system built with cu
 - **Performance Metrics** and team productivity insights
 
 ### 🎨 User Experience
-- **Responsive Design** optimized for all devices
+
 - **Modern UI/UX** with Tailwind CSS
 - **Accessibility Features** built with Headless UI
 - **Real-time Notifications** and toast messages
 - **Dark/Light Mode** support (coming soon)
 - **Progressive Web App** capabilities
+
+### ?? Chatbot Assistant
+- Executes lead lifecycle actions (create, update, search, stats) from natural-language prompts
+- Uses Google Gemini first and automatically falls back to the built-in rules engine when AI is unavailable
+- Shows confirmation summaries, missing field hints, and result data directly inside the chat widget
+- Works even without a GEMINI_API_KEY by enabling CHATBOT_FALLBACK_ONLY=true
 
 ## 🛠 Tech Stack
 
@@ -58,11 +64,19 @@ A modern, full-stack Customer Relationship Management (CRM) system built with cu
 - **express-validator** for input validation
 
 ### Frontend
-- **React 18** with Vite
-- **Tailwind CSS** for styling
-- **React Router v6** for routing
-- **React Hook Form** for form handling
-- **Axios** for API calls
+1. Build the application: npm run build
+2. Serve the dist folder or deploy to a static host
+3. Configure reverse proxy (nginx) when self-hosting
+4. Set up SSL certificates
+
+### Vercel Preview Deployments
+1. Connect the repository and set the project root to `frontend` (or keep the supplied vercel.json in the repository root).
+2. Configure environment variables:
+   - Frontend: VITE_API_URL, VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
+   - Backend: SUPABASE_* keys, GEMINI_API_KEY, optional CHATBOT_GEMINI_MODELS or CHATBOT_FALLBACK_ONLY
+3. The chatbot automatically falls back to the rules engine if Gemini is unavailable or the API key is missing.
+4. Trigger a Vercel build to generate a branch preview with the enhanced chat widget.
+
 - **Headless UI** for accessible components
 
 ## 📁 Project Architecture

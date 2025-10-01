@@ -4,6 +4,27 @@ const ChatMessage = ({ message }) => {
   const isUser = message.role === 'user';
   const isError = message.isError;
 
+  const formatKey = (key = '') =>
+    key
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, char => char.toUpperCase());
+
+  const sourceMap = {
+    gemini: { label: 'Gemini AI', className: 'bg-blue-100 text-blue-700' },
+    fallback: { label: 'Fallback mode', className: 'bg-orange-100 text-orange-700' },
+    system: { label: 'System', className: 'bg-gray-200 text-gray-700' }
+  };
+
+  const sourceMeta = message.meta?.source
+    ? sourceMap[message.meta.source] || { label: formatKey(message.meta.source), className: 'bg-gray-200 text-gray-700' }
+    : null;
+
+  const parameterEntries = !isUser && message.parameters && typeof message.parameters === 'object'
+    ? Object.entries(message.parameters).filter(([, value]) => value !== undefined && value !== null && value !== '')
+    : [];
+
+  const showPendingSummary = !isUser && message.data?.pending && parameterEntries.length > 0;
+
   // Format lead data if available
   const renderLeadData = (data) => {
     if (!data) return null;
@@ -158,6 +179,37 @@ const ChatMessage = ({ message }) => {
 
         {/* Render data if available */}
         {!isUser && message.data && renderLeadData(message.data)}
+
+        {!isUser && sourceMeta && (
+          <div className="mt-2 text-xs text-gray-500 flex items-center space-x-2">
+            <span className={`px-2 py-0.5 rounded-full font-medium ${sourceMeta.className}`}>
+              {sourceMeta.label}
+            </span>
+            {message.meta?.model && message.meta.source === 'gemini' && (
+              <span>Model: {message.meta.model}</span>
+            )}
+          </div>
+        )}
+
+        {!isUser && message.missingFields?.length > 0 && (
+          <div className="mt-2 bg-yellow-100 border border-yellow-200 text-yellow-900 text-xs rounded p-2">
+            Missing information needed: {message.missingFields.join(', ')}
+          </div>
+        )}
+
+        {showPendingSummary && (
+          <div className="mt-2 bg-white border border-yellow-200 rounded p-2 text-xs text-gray-700">
+            <p className="font-medium text-yellow-700 mb-1">Details to confirm</p>
+            <ul className="space-y-1">
+              {parameterEntries.map(([key, value]) => (
+                <li key={key} className="flex justify-between">
+                  <span className="font-medium">{formatKey(key)}</span>
+                  <span className="ml-3 text-right">{String(value)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {/* Timestamp */}
         <p className={`text-xs mt-1 ${isUser ? 'text-blue-100' : 'text-gray-500'}`}>

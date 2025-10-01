@@ -4,6 +4,101 @@ import ChatInput from './ChatInput';
 import chatbotService from '../../services/chatbotService';
 import toast from 'react-hot-toast';
 
+
+const ACTION_LABELS = {
+  CREATE_LEAD: 'Create lead',
+  UPDATE_LEAD: 'Update lead',
+  GET_LEAD: 'Get lead details',
+  SEARCH_LEADS: 'Search leads',
+  LIST_LEADS: 'List leads',
+  GET_STATS: 'Lead statistics'
+};
+
+const humanizeKey = (key = '') =>
+  key
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, char => char.toUpperCase());
+
+const getActionLabel = (action = '') => ACTION_LABELS[action] || humanizeKey(action);
+
+const buildActionSummary = (action, parameters = {}) => {
+  if (!parameters || typeof parameters !== 'object') {
+    return [];
+  }
+
+  const summary = [];
+  const add = (label, value) => {
+    if (value === undefined || value === null || value === '') return;
+    summary.push({ label, value });
+  };
+
+  switch (action) {
+    case 'CREATE_LEAD': {
+      const fullName = [parameters.first_name, parameters.last_name]
+        .filter(Boolean)
+        .join(' ')
+        .trim();
+      add('Name', fullName || parameters.name);
+      add('Email', parameters.email);
+      add('Company', parameters.company);
+      add('Phone', parameters.phone);
+      add('Status', parameters.status);
+      add('Source', parameters.lead_source);
+      add('Priority', parameters.priority);
+      add('Expected Close', parameters.expected_close_date);
+      add('Deal Value', parameters.deal_value);
+      break;
+    }
+    case 'UPDATE_LEAD': {
+      add('Target', parameters.email || parameters.lead_id);
+      [
+        'first_name',
+        'last_name',
+        'company',
+        'phone',
+        'status',
+        'lead_source',
+        'priority',
+        'deal_value',
+        'expected_close_date',
+        'notes'
+      ].forEach(key => {
+        if (parameters[key] !== undefined && parameters[key] !== null && parameters[key] !== '') {
+          add(humanizeKey(key), parameters[key]);
+        }
+      });
+      break;
+    }
+    case 'GET_LEAD': {
+      add('Lead ID', parameters.lead_id);
+      add('Email', parameters.email);
+      break;
+    }
+    case 'SEARCH_LEADS': {
+      add('Query', parameters.search);
+      add('Limit', parameters.limit);
+      break;
+    }
+    case 'LIST_LEADS': {
+      add('Status', parameters.status);
+      add('Source', parameters.source || parameters.lead_source);
+      add('Assigned To', parameters.assigned_to);
+      add('Sort By', parameters.sort_by);
+      add('Sort Order', parameters.sort_order);
+      add('Limit', parameters.limit);
+      break;
+    }
+    case 'GET_STATS': {
+      add('Scope', 'Company');
+      break;
+    }
+    default: {
+      Object.entries(parameters).forEach(([key, value]) => add(humanizeKey(key), value));
+    }
+  }
+
+  return summary;
+};
 const ChatbotWidget = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
@@ -75,6 +170,9 @@ const ChatbotWidget = () => {
     try {
       const response = await chatbotService.sendMessage(messageText);
 
+      const normalizedParameters = response.parameters && typeof response.parameters === 'object' ? response.parameters : {};
+      const normalizedMissingFields = Array.isArray(response.missingFields) ? response.missingFields : [];
+
       // Add assistant response
       const assistantMessage = {
         id: (Date.now() + 1).toString(),
@@ -82,16 +180,30 @@ const ChatbotWidget = () => {
         content: response.response,
         timestamp: new Date(),
         action: response.action,
-        data: response.data
+        data: response.data,
+        intent: response.intent,
+        parameters: normalizedParameters,
+        missingFields: normalizedMissingFields,
+        needsConfirmation: response.needsConfirmation,
+        meta: {
+          source: response.source,
+          model: response.model
+        }
       };
 
       setMessages(prev => [...prev, assistantMessage]);
 
       // Handle pending actions that need confirmation
       if (response.needsConfirmation && response.action !== 'CHAT') {
+        const pendingParameters = response.data?.parameters || normalizedParameters;
         setPendingAction({
           action: response.action,
-          parameters: response.data?.parameters || {}
+          parameters: pendingParameters,
+          summary: buildActionSummary(response.action, pendingParameters),
+          missingFields: normalizedMissingFields,
+          intent: response.intent,
+          source: response.source,
+          model: response.model
         });
       } else {
         setPendingAction(null);
@@ -104,7 +216,8 @@ const ChatbotWidget = () => {
         role: 'assistant',
         content: error.message || 'Sorry, I encountered an error. Please try again.',
         timestamp: new Date(),
-        isError: true
+        isError: true,
+        meta: { source: 'system' }
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
@@ -127,9 +240,12 @@ const ChatbotWidget = () => {
       const assistantMessage = {
         id: Date.now().toString(),
         role: 'assistant',
-        content: `✅ Action completed successfully! ${getActionSuccessMessage(pendingAction.action)}`,
+        content: `Action completed successfully. ${getActionSuccessMessage(pendingAction.action)}`,
         timestamp: new Date(),
-        data: response
+        action: pendingAction.action,
+        data: response,
+        parameters: pendingAction.parameters,
+        meta: { source: 'system' }
       };
 
       setMessages(prev => [...prev, assistantMessage]);
@@ -140,9 +256,10 @@ const ChatbotWidget = () => {
       const errorMessage = {
         id: Date.now().toString(),
         role: 'assistant',
-        content: `❌ Failed to complete action: ${error.message || 'Unknown error'}`,
+        content: `Failed to complete action: ${error.message || 'Unknown error'}`,
         timestamp: new Date(),
-        isError: true
+        isError: true,
+        meta: { source: 'system' }
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
@@ -157,7 +274,8 @@ const ChatbotWidget = () => {
       id: Date.now().toString(),
       role: 'assistant',
       content: 'Action cancelled. What else can I help you with?',
-      timestamp: new Date()
+      timestamp: new Date(),
+      meta: { source: 'system' }
     };
     setMessages(prev => [...prev, cancelMessage]);
   };
@@ -268,8 +386,49 @@ const ChatbotWidget = () => {
 
           {/* Pending Action Confirmation */}
           {pendingAction && (
-            <div className="border-t border-gray-200 bg-yellow-50 p-3">
-              <p className="text-sm text-gray-700 mb-2">Confirm this action?</p>
+            <div className="border-t border-gray-200 bg-yellow-50 p-3 space-y-3">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-yellow-700">Pending action</p>
+                  <p className="text-sm font-semibold text-gray-900">
+                    {getActionLabel(pendingAction.action)}
+                  </p>
+                  {pendingAction.intent && (
+                    <p className="text-xs text-gray-600 mt-0.5">{pendingAction.intent}</p>
+                  )}
+                </div>
+                {pendingAction.source && (
+                  <span
+                    className={`px-2 py-1 text-xs rounded-full font-medium ${
+                      pendingAction.source === 'fallback'
+                        ? 'bg-orange-100 text-orange-700'
+                        : 'bg-blue-100 text-blue-700'
+                    }`}
+                  >
+                    {pendingAction.source === 'fallback' ? 'Fallback mode' : 'Gemini AI'}
+                  </span>
+                )}
+              </div>
+
+              {pendingAction.summary?.length > 0 && (
+                <div className="bg-white border border-yellow-200 rounded p-2 text-xs text-gray-700">
+                  <ul className="space-y-1">
+                    {pendingAction.summary.map(item => (
+                      <li key={`${item.label}-${item.value}`} className="flex justify-between">
+                        <span className="font-medium">{item.label}</span>
+                        <span className="text-right ml-4">{item.value}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {pendingAction.missingFields?.length > 0 && (
+                <div className="text-xs text-yellow-900 bg-yellow-100 border border-yellow-200 rounded p-2">
+                  Missing information needed: {pendingAction.missingFields.join(', ')}
+                </div>
+              )}
+
               <div className="flex space-x-2">
                 <button
                   onClick={confirmAction}

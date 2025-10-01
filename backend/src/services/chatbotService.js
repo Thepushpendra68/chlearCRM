@@ -3,6 +3,23 @@ const leadService = require('./leadService');
 const ApiError = require('../utils/ApiError');
 const chatbotFallback = require('./chatbotFallback');
 
+const VALID_ACTIONS = new Set([
+  'CHAT',
+  'CREATE_LEAD',
+  'UPDATE_LEAD',
+  'GET_LEAD',
+  'SEARCH_LEADS',
+  'LIST_LEADS',
+  'GET_STATS'
+]);
+
+const DEFAULT_GEMINI_MODELS = [
+  'gemini-2.0-flash-exp',
+  'gemini-1.5-flash-latest',
+  'gemini-1.5-pro-latest',
+  'gemini-pro-latest'
+];
+
 /**
  * Chatbot Service for Lead Management
  * Uses Google Gemini AI to process natural language queries
@@ -11,35 +28,41 @@ class ChatbotService {
   constructor() {
     this.conversationHistory = new Map(); // Store conversation context per user
     this.useFallbackOnly = process.env.CHATBOT_FALLBACK_ONLY === 'true';
+    this.modelCache = new Map();
+    this.geminiModels = [];
 
     // If fallback-only mode, skip AI initialization
     if (this.useFallbackOnly) {
-      console.log('⚠️ [CHATBOT] Running in FALLBACK-ONLY mode (AI disabled)');
-      console.log('✅ [CHATBOT] Pattern matching chatbot initialized');
+      console.log('[CHATBOT] Running in FALLBACK-ONLY mode (AI disabled)');
+      console.log('[CHATBOT] Pattern matching chatbot initialized');
       return;
     }
 
+    const apiKey = process.env.GEMINI_API_KEY;
+
     // Validate API key
-    if (!process.env.GEMINI_API_KEY) {
-      console.warn('⚠️ GEMINI_API_KEY is not set - will use fallback pattern matching');
+    if (!apiKey) {
+      console.warn('[CHATBOT] GEMINI_API_KEY is not set - will use fallback pattern matching');
       this.useFallbackOnly = true;
       return;
     }
 
     try {
-      console.log('✅ Initializing Gemini AI with API key:', process.env.GEMINI_API_KEY.substring(0, 10) + '...');
+      console.log('[CHATBOT] Initializing Gemini AI with API key:', apiKey.substring(0, 10) + '...');
 
       // Initialize Gemini AI
-      this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+      this.genAI = new GoogleGenerativeAI(apiKey);
 
-      // Use gemini-pro-latest (stable model) - more reliable than experimental models
-      // Note: gemini-2.0-flash-exp can have 500 errors, gemini-pro-latest is more stable
-      this.model = this.genAI.getGenerativeModel({ model: 'gemini-pro-latest' });
+      const configuredModels = process.env.CHATBOT_GEMINI_MODELS
+        ? process.env.CHATBOT_GEMINI_MODELS.split(',').map(model => model.trim()).filter(Boolean)
+        : DEFAULT_GEMINI_MODELS;
 
-      console.log('✅ Gemini AI chatbot service initialized successfully with model: gemini-pro-latest');
+      this.geminiModels = configuredModels.length > 0 ? configuredModels : DEFAULT_GEMINI_MODELS;
+
+      console.log('[CHATBOT] Gemini AI chatbot service initialized with model order:', this.geminiModels.join(', '));
     } catch (error) {
-      console.error('❌ Failed to initialize Gemini AI:', error.message);
-      console.log('🔄 Falling back to pattern matching mode');
+      console.error('[CHATBOT] Failed to initialize Gemini AI:', error.message);
+      console.log('[CHATBOT] Falling back to pattern matching mode');
       this.useFallbackOnly = true;
     }
   }
@@ -208,6 +231,102 @@ Response:
   /**
    * Process user message with Gemini AI
    */
+  sanitizeJsonText(rawText) {
+    if (!rawText || !rawText.trim()) {
+      throw new Error('Empty response from Gemini');
+    }
+
+    let cleanText = rawText
+      .replace(/```json\s*/gi, '')
+      .replace(/```\s*/g, '')
+      .trim();
+
+    const firstBrace = cleanText.indexOf('{');
+    const lastBrace = cleanText.lastIndexOf('}');
+
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace >= firstBrace) {
+      cleanText = cleanText.slice(firstBrace, lastBrace + 1);
+    }
+
+    return cleanText;
+  }
+
+  parseGeminiResponse(rawText) {
+    const cleanText = this.sanitizeJsonText(rawText);
+    return JSON.parse(cleanText);
+  }
+
+  isValidResponse(payload) {
+    if (!payload || typeof payload !== 'object') {
+      return false;
+    }
+
+    if (typeof payload.response !== 'string' || payload.response.trim().length === 0) {
+      return false;
+    }
+
+    if (!payload.action || typeof payload.action !== 'string' || !VALID_ACTIONS.has(payload.action)) {
+      return false;
+    }
+
+    if (payload.parameters && typeof payload.parameters !== 'object') {
+      return false;
+    }
+
+    if (payload.missingFields && !Array.isArray(payload.missingFields)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  buildFallbackResponse(userMessage, reason) {
+    console.warn(`[CHATBOT] Falling back to pattern matching (${reason})`);
+    try {
+      const fallbackPayload = chatbotFallback.parseMessage(userMessage);
+      return {
+        payload: fallbackPayload,
+        source: 'fallback',
+        model: 'pattern-matching'
+      };
+    } catch (error) {
+      console.error('[CHATBOT] Fallback handler failed:', error);
+      throw new ApiError('Unable to process your message. Please try again.', 500);
+    }
+  }
+
+  async generateWithGemini(prompt) {
+    if (!this.genAI || this.geminiModels.length === 0) {
+      throw new Error('Gemini models are not available');
+    }
+
+    let lastError = null;
+
+    for (const modelName of this.geminiModels) {
+      try {
+        if (!this.modelCache.has(modelName)) {
+          this.modelCache.set(modelName, this.genAI.getGenerativeModel({ model: modelName }));
+        }
+
+        const model = this.modelCache.get(modelName);
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
+
+        if (!text || !text.trim()) {
+          throw new Error('Empty response from Gemini');
+        }
+
+        console.log(`[CHATBOT] Gemini model ${modelName} responded successfully`);
+        return { text, modelName };
+      } catch (error) {
+        lastError = error;
+        console.error(`[CHATBOT] Gemini model ${modelName} error:`, error.message);
+      }
+    }
+
+    throw lastError || new Error('All Gemini models failed');
+  }
   async processMessage(userId, userMessage, currentUser) {
     try {
       // Add user message to history
@@ -236,65 +355,45 @@ ${userMessage}
 
 Analyze the message and respond ONLY with valid JSON. Do not include any markdown formatting or code blocks.`;
 
-      // Use fallback if in fallback-only mode, otherwise try AI first
-      let text;
+      let parsedResponse;
+      let source = 'gemini';
+      let modelUsed = null;
 
       if (this.useFallbackOnly) {
-        console.log('🔄 [CHATBOT] Using fallback pattern matching (AI disabled)...');
-        try {
-          const fallbackResponse = chatbotFallback.parseMessage(userMessage);
-          text = JSON.stringify(fallbackResponse);
-          console.log('✅ [CHATBOT] Fallback response generated successfully');
-        } catch (fallbackError) {
-          console.error('❌ [CHATBOT] Fallback failed:', fallbackError);
-          throw new ApiError('Unable to process your message. Please try again.', 500);
-        }
+        const fallback = this.buildFallbackResponse(userMessage, 'fallback_only_mode');
+        parsedResponse = fallback.payload;
+        source = fallback.source;
+        modelUsed = fallback.model;
       } else {
-        // Call Gemini AI
-        console.log('🤖 [CHATBOT] Calling Gemini AI...');
         try {
-          const result = await this.model.generateContent(prompt);
-          const response = await result.response;
-          text = response.text();
-          console.log('✅ [CHATBOT] Gemini AI response received:', text.substring(0, 100) + '...');
-        } catch (geminiError) {
-          console.error('❌ [CHATBOT] Gemini API error:', geminiError.message);
-          console.log('🔄 [CHATBOT] Switching to fallback pattern matching...');
+          const { text, modelName } = await this.generateWithGemini(prompt);
+          modelUsed = modelName;
+          parsedResponse = this.parseGeminiResponse(text);
 
-          // Use fallback pattern matching when AI fails
-          try {
-            const fallbackResponse = chatbotFallback.parseMessage(userMessage);
-            text = JSON.stringify(fallbackResponse);
-            console.log('✅ [CHATBOT] Fallback response generated successfully');
-          } catch (fallbackError) {
-            console.error('❌ [CHATBOT] Fallback also failed:', fallbackError);
-            throw new ApiError('Unable to process your message. Please try again later.', 500);
+          if (!this.isValidResponse(parsedResponse)) {
+            throw new Error('Invalid response structure from Gemini');
           }
+        } catch (geminiError) {
+          console.error('[CHATBOT] Gemini processing error:', geminiError);
+          const fallback = this.buildFallbackResponse(userMessage, geminiError.message || 'gemini_error');
+          parsedResponse = fallback.payload;
+          source = fallback.source;
+          modelUsed = fallback.model;
         }
       }
 
-      // Parse the response
-      let parsedResponse;
-      try {
-        // Remove markdown code blocks if present
-        const cleanText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-        parsedResponse = JSON.parse(cleanText);
-        console.log('✅ [CHATBOT] Parsed response action:', parsedResponse.action);
-      } catch (parseError) {
-        console.error('❌ [CHATBOT] Failed to parse Gemini response:', text);
-        console.error('Parse error:', parseError);
-        throw new ApiError('Failed to understand the request. Please try again.', 500);
-      }
+      parsedResponse.parameters = parsedResponse.parameters && typeof parsedResponse.parameters === 'object'
+        ? parsedResponse.parameters
+        : {};
 
-      // Add assistant response to history
       this.addToHistory(userId, 'assistant', parsedResponse.response);
 
       // Execute action if needed
       let actionResult = null;
       if (parsedResponse.action && parsedResponse.action !== 'CHAT') {
-        console.log('🎬 [CHATBOT] Executing action:', parsedResponse.action);
-        console.log('📋 [CHATBOT] Parameters:', JSON.stringify(parsedResponse.parameters));
-        console.log('❓ [CHATBOT] Needs confirmation:', parsedResponse.needsConfirmation);
+        console.log(`[CHATBOT] Executing action: ${parsedResponse.action}`);
+        console.log(`[CHATBOT] Parameters: ${JSON.stringify(parsedResponse.parameters)}`);
+        console.log(`[CHATBOT] Needs confirmation: ${parsedResponse.needsConfirmation === true}`);
 
         actionResult = await this.executeAction(
           parsedResponse.action,
@@ -303,20 +402,22 @@ Analyze the message and respond ONLY with valid JSON. Do not include any markdow
           parsedResponse.needsConfirmation
         );
 
-        console.log('✅ [CHATBOT] Action result:', actionResult ? `${Object.keys(actionResult).join(', ')}` : 'null');
         if (actionResult?.leads) {
-          console.log('📊 [CHATBOT] Found leads:', actionResult.leads.length);
+          console.log(`[CHATBOT] Found leads: ${actionResult.leads.length}`);
         }
       }
 
       return {
         success: true,
         response: parsedResponse.response,
-        action: parsedResponse.action,
-        intent: parsedResponse.intent,
-        needsConfirmation: parsedResponse.needsConfirmation || false,
-        missingFields: parsedResponse.missingFields || [],
-        data: actionResult
+        action: parsedResponse.action || 'CHAT',
+        intent: parsedResponse.intent || null,
+        parameters: parsedResponse.parameters,
+        needsConfirmation: Boolean(parsedResponse.needsConfirmation) && parsedResponse.action !== 'CHAT',
+        missingFields: Array.isArray(parsedResponse.missingFields) ? parsedResponse.missingFields : [],
+        data: actionResult,
+        source,
+        model: modelUsed
       };
     } catch (error) {
       console.error('Chatbot processing error:', error);
