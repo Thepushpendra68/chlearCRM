@@ -1,4 +1,4 @@
-const db = require('../config/database');
+const { supabaseAdmin } = require('../config/supabase');
 
 class TimelineService {
   // Get comprehensive lead timeline with all related data
@@ -15,25 +15,41 @@ class TimelineService {
 
       const timeline = [];
 
-      // Get activities
-      if (includeActivities) {
-        const activities = await db('activities')
-          .select(
-            'activities.*',
-            'users.first_name',
-            'users.last_name',
-            'users.email as user_email'
-          )
-          .leftJoin('users', 'activities.user_id', 'users.id')
-          .where('activities.lead_id', leadId)
-          .modify((query) => {
-            if (dateFrom) query.where('activities.created_at', '>=', dateFrom);
-            if (dateTo) query.where('activities.created_at', '<=', dateTo);
-          })
-          .orderBy('activities.created_at', 'desc')
-          .limit(limit);
+      // Build base query for activities
+      let activitiesQuery = supabaseAdmin
+        .from('activities')
+        .select(`
+          *,
+          user_profiles!activities_user_id_fkey(first_name, last_name, email),
+          leads!activities_lead_id_fkey(company),
+          pipeline_stages(name, color)
+        `)
+        .eq('lead_id', leadId);
 
-        activities.forEach(activity => {
+      // Apply date filters
+      if (dateFrom) {
+        activitiesQuery = activitiesQuery.gte('created_at', dateFrom);
+      }
+      if (dateTo) {
+        activitiesQuery = activitiesQuery.lte('created_at', dateTo);
+      }
+
+      const { data: allActivities, error } = await activitiesQuery.order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching activities:', error);
+        return { success: false, error: error.message };
+      }
+
+      // Process activities by type
+      allActivities.forEach(activity => {
+        const user = activity.user_profiles ? {
+          id: activity.user_id,
+          name: `${activity.user_profiles.first_name || ''} ${activity.user_profiles.last_name || ''}`.trim(),
+          email: activity.user_profiles.email
+        } : null;
+
+        if (includeActivities && activity.activity_type !== 'stage_change' && activity.activity_type !== 'assignment_change') {
           timeline.push({
             id: activity.id,
             type: 'activity',
@@ -47,103 +63,52 @@ class TimelineService {
             outcome: activity.outcome,
             metadata: activity.metadata,
             created_at: activity.created_at,
-            user: {
-              id: activity.user_id,
-              name: `${activity.first_name || ''} ${activity.last_name || ''}`.trim(),
-              email: activity.user_email
-            }
+            user
           });
-        });
-      }
+        }
 
-      // Get stage changes (from activities with type 'stage_change')
-      if (includeStageChanges) {
-        const stageChanges = await db('activities')
-          .select(
-            'activities.*',
-            'pipeline_stages.name as stage_name',
-            'pipeline_stages.color as stage_color',
-            'users.first_name',
-            'users.last_name'
-          )
-          .leftJoin('pipeline_stages', 'activities.metadata->>new_stage_id', 'pipeline_stages.id')
-          .leftJoin('users', 'activities.user_id', 'users.id')
-          .where('activities.lead_id', leadId)
-          .where('activities.activity_type', 'stage_change')
-          .modify((query) => {
-            if (dateFrom) query.where('activities.created_at', '>=', dateFrom);
-            if (dateTo) query.where('activities.created_at', '<=', dateTo);
-          })
-          .orderBy('activities.created_at', 'desc');
-
-        stageChanges.forEach(change => {
+        // Handle stage changes
+        if (includeStageChanges && activity.activity_type === 'stage_change') {
           timeline.push({
-            id: change.id,
+            id: activity.id,
             type: 'stage_change',
             activity_type: 'stage_change',
-            subject: change.subject || `Moved to ${change.stage_name}`,
-            description: change.description,
-            metadata: change.metadata,
-            created_at: change.created_at,
+            subject: activity.subject || `Moved to ${activity.pipeline_stages?.name || 'Unknown'}`,
+            description: activity.description,
+            metadata: activity.metadata,
+            created_at: activity.created_at,
             stage: {
-              name: change.stage_name,
-              color: change.stage_color
+              name: activity.pipeline_stages?.name,
+              color: activity.pipeline_stages?.color
             },
-            user: {
-              id: change.user_id,
-              name: `${change.first_name || ''} ${change.last_name || ''}`.trim()
-            }
+            user
           });
-        });
-      }
+        }
 
-      // Get assignment changes (from activities with type 'assignment_change')
-      if (includeAssignments) {
-        const assignmentChanges = await db('activities')
-          .select(
-            'activities.*',
-            'prev_user.first_name as prev_first_name',
-            'prev_user.last_name as prev_last_name',
-            'new_user.first_name as new_first_name',
-            'new_user.last_name as new_last_name',
-            'assigned_by_user.first_name as assigned_by_first_name',
-            'assigned_by_user.last_name as assigned_by_last_name'
-          )
-          .leftJoin('users as prev_user', 'activities.metadata->>previous_assigned_to', 'prev_user.id')
-          .leftJoin('users as new_user', 'activities.metadata->>new_assigned_to', 'new_user.id')
-          .leftJoin('users as assigned_by_user', 'activities.user_id', 'assigned_by_user.id')
-          .where('activities.lead_id', leadId)
-          .where('activities.activity_type', 'assignment_change')
-          .modify((query) => {
-            if (dateFrom) query.where('activities.created_at', '>=', dateFrom);
-            if (dateTo) query.where('activities.created_at', '<=', dateTo);
-          })
-          .orderBy('activities.created_at', 'desc');
-
-        assignmentChanges.forEach(change => {
+        // Handle assignment changes
+        if (includeAssignments && activity.activity_type === 'assignment_change') {
+          // For assignment changes, we need to get the metadata to understand the change
+          const metadata = activity.metadata || {};
           timeline.push({
-            id: change.id,
+            id: activity.id,
             type: 'assignment_change',
             activity_type: 'assignment_change',
-            subject: change.subject || 'Lead assignment changed',
-            description: change.description,
-            metadata: change.metadata,
-            created_at: change.created_at,
+            subject: activity.subject || 'Lead assignment changed',
+            description: activity.description,
+            metadata: activity.metadata,
+            created_at: activity.created_at,
             assignment: {
               previous: {
-                name: `${change.prev_first_name || ''} ${change.prev_last_name || ''}`.trim()
+                name: metadata.previous_assigned_to_name || 'Unassigned'
               },
               new: {
-                name: `${change.new_first_name || ''} ${change.new_last_name || ''}`.trim()
+                name: metadata.new_assigned_to_name || 'Unassigned'
               }
             },
-            user: {
-              id: change.user_id,
-              name: `${change.assigned_by_first_name || ''} ${change.assigned_by_last_name || ''}`.trim()
-            }
+            user
           });
-        });
-      }
+        }
+      });
 
       // Sort timeline by created_at desc
       timeline.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -161,20 +126,41 @@ class TimelineService {
   // Get timeline summary for a lead
   async getLeadTimelineSummary(leadId) {
     try {
-      const summary = await db('activities')
-        .select(
-          db.raw('COUNT(*) as total_activities'),
-          db.raw('COUNT(CASE WHEN activity_type = ? THEN 1 END) as calls', ['call']),
-          db.raw('COUNT(CASE WHEN activity_type = ? THEN 1 END) as emails', ['email']),
-          db.raw('COUNT(CASE WHEN activity_type = ? THEN 1 END) as meetings', ['meeting']),
-          db.raw('COUNT(CASE WHEN activity_type = ? THEN 1 END) as notes', ['note']),
-          db.raw('COUNT(CASE WHEN activity_type = ? THEN 1 END) as tasks', ['task']),
-          db.raw('COUNT(CASE WHEN is_completed = true THEN 1 END) as completed_activities'),
-          db.raw('MAX(created_at) as last_activity_date'),
-          db.raw('MIN(created_at) as first_activity_date')
-        )
-        .where('lead_id', leadId)
-        .first();
+      // Get all activities for this lead
+      const { data: activities, error } = await supabaseAdmin
+        .from('activities')
+        .select('activity_type, is_completed, created_at')
+        .eq('lead_id', leadId);
+
+      if (error) {
+        console.error('Error fetching activities for summary:', error);
+        return { success: false, error: error.message };
+      }
+
+      // Calculate summary statistics
+      const totalActivities = activities.length;
+      const calls = activities.filter(a => a.activity_type === 'call').length;
+      const emails = activities.filter(a => a.activity_type === 'email').length;
+      const meetings = activities.filter(a => a.activity_type === 'meeting').length;
+      const notes = activities.filter(a => a.activity_type === 'note').length;
+      const tasks = activities.filter(a => a.activity_type === 'task').length;
+      const completedActivities = activities.filter(a => a.is_completed).length;
+
+      const dates = activities.map(a => new Date(a.created_at));
+      const lastActivityDate = dates.length > 0 ? Math.max(...dates) : null;
+      const firstActivityDate = dates.length > 0 ? Math.min(...dates) : null;
+
+      const summary = {
+        total_activities: totalActivities,
+        calls,
+        emails,
+        meetings,
+        notes,
+        tasks,
+        completed_activities: completedActivities,
+        last_activity_date: lastActivityDate ? lastActivityDate.toISOString() : null,
+        first_activity_date: firstActivityDate ? firstActivityDate.toISOString() : null
+      };
 
       return { success: true, data: summary };
     } catch (error) {
@@ -193,33 +179,45 @@ class TimelineService {
         activityTypes = null
       } = options;
 
-      let query = db('activities')
-        .select(
-          'activities.*',
-          'leads.company',
-          db.raw("CONCAT(leads.first_name, ' ', leads.last_name) as contact_name"),
-          'leads.email as lead_email'
-        )
-        .leftJoin('leads', 'activities.lead_id', 'leads.id')
-        .where('activities.user_id', userId);
+      let query = supabaseAdmin
+        .from('activities')
+        .select(`
+          *,
+          leads!activities_lead_id_fkey(first_name, last_name, company, email)
+        `)
+        .eq('user_id', userId);
 
       if (dateFrom) {
-        query = query.where('activities.created_at', '>=', dateFrom);
+        query = query.gte('created_at', dateFrom);
       }
 
       if (dateTo) {
-        query = query.where('activities.created_at', '<=', dateTo);
+        query = query.lte('created_at', dateTo);
       }
 
       if (activityTypes && Array.isArray(activityTypes)) {
-        query = query.whereIn('activities.activity_type', activityTypes);
+        query = query.in('activity_type', activityTypes);
       }
 
-      const activities = await query
-        .orderBy('activities.created_at', 'desc')
+      const { data: activities, error } = await query
+        .order('created_at', { ascending: false })
         .limit(limit);
 
-      return { success: true, data: activities };
+      if (error) {
+        console.error('Error fetching user timeline:', error);
+        return { success: false, error: error.message };
+      }
+
+      // Format the response to match expected structure
+      const formattedActivities = activities.map(activity => ({
+        ...activity,
+        contact_name: activity.leads ? `${activity.leads.first_name} ${activity.leads.last_name}` : '',
+        lead_email: activity.leads?.email || '',
+        company: activity.leads?.company || '',
+        leads: undefined // Remove nested object
+      }));
+
+      return { success: true, data: formattedActivities };
     } catch (error) {
       console.error('Error fetching user timeline:', error);
       return { success: false, error: error.message };
@@ -236,36 +234,50 @@ class TimelineService {
         activityTypes = null
       } = options;
 
-      let query = db('activities')
-        .select(
-          'activities.*',
-          'leads.company',
-          db.raw("CONCAT(leads.first_name, ' ', leads.last_name) as contact_name"),
-          'users.first_name',
-          'users.last_name',
-          'users.email as user_email'
-        )
-        .leftJoin('leads', 'activities.lead_id', 'leads.id')
-        .leftJoin('users', 'activities.user_id', 'users.id')
-        .whereIn('activities.user_id', teamUserIds);
+      let query = supabaseAdmin
+        .from('activities')
+        .select(`
+          *,
+          leads!activities_lead_id_fkey(first_name, last_name, company, email),
+          user_profiles!activities_user_id_fkey(first_name, last_name, email)
+        `)
+        .in('user_id', teamUserIds);
 
       if (dateFrom) {
-        query = query.where('activities.created_at', '>=', dateFrom);
+        query = query.gte('created_at', dateFrom);
       }
 
       if (dateTo) {
-        query = query.where('activities.created_at', '<=', dateTo);
+        query = query.lte('created_at', dateTo);
       }
 
       if (activityTypes && Array.isArray(activityTypes)) {
-        query = query.whereIn('activities.activity_type', activityTypes);
+        query = query.in('activity_type', activityTypes);
       }
 
-      const activities = await query
-        .orderBy('activities.created_at', 'desc')
+      const { data: activities, error } = await query
+        .order('created_at', { ascending: false })
         .limit(limit);
 
-      return { success: true, data: activities };
+      if (error) {
+        console.error('Error fetching team timeline:', error);
+        return { success: false, error: error.message };
+      }
+
+      // Format the response to match expected structure
+      const formattedActivities = activities.map(activity => ({
+        ...activity,
+        contact_name: activity.leads ? `${activity.leads.first_name} ${activity.leads.last_name}` : '',
+        lead_email: activity.leads?.email || '',
+        company: activity.leads?.company || '',
+        first_name: activity.user_profiles?.first_name || '',
+        last_name: activity.user_profiles?.last_name || '',
+        user_email: activity.user_profiles?.email || '',
+        leads: undefined, // Remove nested objects
+        user_profiles: undefined
+      }));
+
+      return { success: true, data: formattedActivities };
     } catch (error) {
       console.error('Error fetching team timeline:', error);
       return { success: false, error: error.message };
@@ -283,47 +295,88 @@ class TimelineService {
         groupBy = 'day' // 'day', 'week', 'month'
       } = filters;
 
-      let query = db('activities');
+      // Get activities with filters
+      let query = supabaseAdmin
+        .from('activities')
+        .select('activity_type, is_completed, created_at');
 
       if (user_id) {
-        query = query.where('user_id', user_id);
+        query = query.eq('user_id', user_id);
       }
 
       if (lead_id) {
-        query = query.where('lead_id', lead_id);
+        query = query.eq('lead_id', lead_id);
       }
 
       if (dateFrom) {
-        query = query.where('created_at', '>=', dateFrom);
+        query = query.gte('created_at', dateFrom);
       }
 
       if (dateTo) {
-        query = query.where('created_at', '<=', dateTo);
+        query = query.lte('created_at', dateTo);
       }
 
-      let dateFormat;
-      switch (groupBy) {
-        case 'week':
-          dateFormat = "DATE_TRUNC('week', created_at)";
-          break;
-        case 'month':
-          dateFormat = "DATE_TRUNC('month', created_at)";
-          break;
-        default:
-          dateFormat = "DATE_TRUNC('day', created_at)";
+      const { data: activities, error } = await query;
+
+      if (error) {
+        console.error('Error fetching activities for trends:', error);
+        return { success: false, error: error.message };
       }
 
-      const trends = await query
-        .select(
-          db.raw(`${dateFormat} as period`),
-          db.raw('COUNT(*) as total_activities'),
-          db.raw('COUNT(CASE WHEN activity_type = ? THEN 1 END) as calls', ['call']),
-          db.raw('COUNT(CASE WHEN activity_type = ? THEN 1 END) as emails', ['email']),
-          db.raw('COUNT(CASE WHEN activity_type = ? THEN 1 END) as meetings', ['meeting']),
-          db.raw('COUNT(CASE WHEN is_completed = true THEN 1 END) as completed')
-        )
-        .groupBy('period')
-        .orderBy('period', 'asc');
+      // Group activities by date period and calculate aggregations
+      const trendsMap = new Map();
+
+      activities.forEach(activity => {
+        const date = new Date(activity.created_at);
+        let periodKey;
+
+        switch (groupBy) {
+          case 'week':
+            // Get start of week (Sunday)
+            const weekStart = new Date(date);
+            weekStart.setDate(date.getDate() - date.getDay());
+            periodKey = weekStart.toISOString().split('T')[0];
+            break;
+          case 'month':
+            periodKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-01`;
+            break;
+          default: // day
+            periodKey = date.toISOString().split('T')[0];
+        }
+
+        if (!trendsMap.has(periodKey)) {
+          trendsMap.set(periodKey, {
+            period: periodKey,
+            total_activities: 0,
+            calls: 0,
+            emails: 0,
+            meetings: 0,
+            completed: 0
+          });
+        }
+
+        const trend = trendsMap.get(periodKey);
+        trend.total_activities++;
+
+        switch (activity.activity_type) {
+          case 'call':
+            trend.calls++;
+            break;
+          case 'email':
+            trend.emails++;
+            break;
+          case 'meeting':
+            trend.meetings++;
+            break;
+        }
+
+        if (activity.is_completed) {
+          trend.completed++;
+        }
+      });
+
+      // Convert map to array and sort by period
+      const trends = Array.from(trendsMap.values()).sort((a, b) => a.period.localeCompare(b.period));
 
       return { success: true, data: trends };
     } catch (error) {

@@ -1,4 +1,5 @@
 import api from './api';
+import supabase from '../config/supabase';
 
 class ImportService {
   /**
@@ -37,8 +38,8 @@ class ImportService {
       });
 
       // Check if user is authenticated
-      const token = localStorage.getItem('token');
-      if (!token) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
         throw new Error('You must be logged in to export leads');
       }
 

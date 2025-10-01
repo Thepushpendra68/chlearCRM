@@ -23,11 +23,11 @@ const errorHandler = (error, req, res, next) => {
     statusCode = 400;
     message = 'Invalid ID format';
     code = 'INVALID_ID';
-  } else if (error.code === '23505') { // PostgreSQL unique violation
+  } else if (error.code === '23505') { // Supabase unique violation (Postgres code)
     statusCode = 409;
     message = 'Resource already exists';
     code = 'DUPLICATE_ENTRY';
-  } else if (error.code === '23503') { // PostgreSQL foreign key violation
+  } else if (error.code === '23503') { // Supabase foreign key violation (Postgres code)
     statusCode = 400;
     message = 'Referenced resource does not exist';
     code = 'FOREIGN_KEY_VIOLATION';

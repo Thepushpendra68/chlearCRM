@@ -59,10 +59,19 @@ const ActivityForm = ({
   useEffect(() => {
     setInternalLeadId(leadId);
     setInternalSelectedLead(selectedLead);
-  }, [leadId, selectedLead]);
+
+    // If we have an activity (editing mode) and no selectedLead, find it from leads
+    if (activity && leadId && !selectedLead && leads.length > 0) {
+      const lead = leads.find(l => l.id === leadId);
+      if (lead) {
+        setInternalSelectedLead(lead);
+      }
+    }
+  }, [leadId, selectedLead, activity, leads]);
 
   useEffect(() => {
     if (activity) {
+      // Editing mode: populate form with activity data
       setFormData({
         activity_type: activity.activity_type || initialType,
         subject: activity.subject || '',
@@ -72,7 +81,12 @@ const ActivityForm = ({
         outcome: activity.outcome || '',
         is_completed: activity.is_completed || false
       });
+      // Ensure lead is set for editing
+      if (activity.lead_id) {
+        setInternalLeadId(activity.lead_id);
+      }
     } else {
+      // Add mode: reset form to defaults
       setFormData({
         activity_type: initialType,
         subject: '',

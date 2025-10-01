@@ -1,5 +1,6 @@
 const express = require('express');
 const authController = require('../controllers/authController');
+const supabaseAuthController = require('../controllers/supabaseAuthController');
 const { authenticate } = require('../middleware/authMiddleware');
 const {
   registerValidation,
@@ -7,6 +8,7 @@ const {
   updateProfileValidation,
   changePasswordValidation
 } = require('../validators/authValidators');
+const { validateCompanyRegistration } = require('../validators/companyValidators');
 
 const router = express.Router();
 
@@ -16,6 +18,13 @@ const router = express.Router();
  * @access  Public
  */
 router.post('/register', registerValidation, authController.register);
+
+/**
+ * @route   POST /api/auth/register-company
+ * @desc    Register a new company with admin user (Supabase)
+ * @access  Public
+ */
+router.post('/register-company', validateCompanyRegistration, supabaseAuthController.registerCompany);
 
 /**
  * @route   POST /api/auth/login

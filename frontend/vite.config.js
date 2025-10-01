@@ -11,6 +11,7 @@ export default defineConfig({
         target: 'http://localhost:5000',
         changeOrigin: true,
         secure: false,
+        timeout: 30000,
       },
     },
   },
@@ -19,7 +20,9 @@ export default defineConfig({
     sourcemap: true,
   },
   define: {
-    // Ensure environment variables are available at build time
-    'import.meta.env.VITE_API_URL': JSON.stringify(process.env.VITE_API_URL || 'http://localhost:5000/api'),
+    // Default to the local API unless explicitly overridden
+    'import.meta.env.VITE_API_URL': JSON.stringify(
+      process.env.VITE_API_URL || 'http://localhost:5000/api'
+    ),
   },
 })

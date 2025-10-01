@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { PlusIcon, MagnifyingGlassIcon, ArrowDownTrayIcon, ArrowUpTrayIcon } from '@heroicons/react/24/outline'
+import { PlusIcon, MagnifyingGlassIcon, ArrowDownTrayIcon, ArrowUpTrayIcon, TrashIcon } from '@heroicons/react/24/outline'
 import ImportWizard from '../components/Import/ImportWizard'
 import ExportModal from '../components/Export/ExportModal'
 import LeadForm from '../components/LeadForm'
 import { useLeads } from '../context/LeadContext'
 import pipelineService from '../services/pipelineService'
+import leadService from '../services/leadService'
 import toast from 'react-hot-toast'
 
 const Leads = () => {
@@ -13,10 +14,14 @@ const Leads = () => {
   const [showImportWizard, setShowImportWizard] = useState(false)
   const [showExportModal, setShowExportModal] = useState(false)
   const [showAddLeadForm, setShowAddLeadForm] = useState(false)
+  const [showEditLeadForm, setShowEditLeadForm] = useState(false)
+  const [editingLead, setEditingLead] = useState(null)
+  const [selectedLeads, setSelectedLeads] = useState([])
+  const [showBulkActions, setShowBulkActions] = useState(false)
   const [pipelineStages, setPipelineStages] = useState([])
   
   // Use the global leads context
-  const { leads, loading, fetchLeads, addLead, lastUpdated, refreshLeads } = useLeads()
+  const { leads, loading, fetchLeads, addLead, updateLead, deleteLead, lastUpdated, refreshLeads } = useLeads()
 
   // Load leads and pipeline stages on component mount
   useEffect(() => {
@@ -111,10 +116,89 @@ const Leads = () => {
   }
 
   // Handle lead creation success
-  const handleLeadCreated = (newLead) => {
+  const handleLeadSaved = (leadData) => {
     setShowAddLeadForm(false)
-    addLead(newLead) // Add the new lead to the global state
-    toast.success('Lead created successfully')
+    // LeadForm already handles adding to global state
+  }
+
+  // Handle lead edit
+  const handleEditLead = (lead) => {
+    setEditingLead(lead)
+    setShowEditLeadForm(true)
+  }
+
+  // Handle lead update success
+  const handleLeadUpdated = (leadData) => {
+    setShowEditLeadForm(false)
+    setEditingLead(null)
+    // LeadForm already handles updating global state
+  }
+
+  // Handle delete lead
+  const handleDeleteLead = async (lead) => {
+    if (!window.confirm(`Are you sure you want to delete ${lead.first_name} ${lead.last_name}?`)) {
+      return
+    }
+
+    try {
+      await leadService.deleteLead(lead.id)
+      deleteLead(lead.id)
+      toast.success(`${lead.first_name} ${lead.last_name} deleted successfully`)
+    } catch (error) {
+      console.error('Failed to delete lead:', error)
+      toast.error('Failed to delete lead')
+    }
+  }
+
+  // Handle bulk selection
+  const handleSelectLead = (leadId) => {
+    setSelectedLeads(prev => {
+      const newSelection = prev.includes(leadId)
+        ? prev.filter(id => id !== leadId)
+        : [...prev, leadId]
+
+      setShowBulkActions(newSelection.length > 0)
+      return newSelection
+    })
+  }
+
+  // Handle select all
+  const handleSelectAll = () => {
+    if (selectedLeads.length === leads.length) {
+      setSelectedLeads([])
+      setShowBulkActions(false)
+    } else {
+      setSelectedLeads(leads.map(lead => lead.id))
+      setShowBulkActions(true)
+    }
+  }
+
+  // Handle bulk delete
+  const handleBulkDelete = async () => {
+    if (!window.confirm(`Are you sure you want to delete ${selectedLeads.length} lead(s)?`)) {
+      return
+    }
+
+    try {
+      // Delete leads one by one
+      const deletePromises = selectedLeads.map(id => leadService.deleteLead(id))
+      await Promise.all(deletePromises)
+
+      // Update state
+      selectedLeads.forEach(id => deleteLead(id))
+      setSelectedLeads([])
+      setShowBulkActions(false)
+      toast.success(`${selectedLeads.length} lead(s) deleted successfully`)
+    } catch (error) {
+      console.error('Failed to delete leads:', error)
+      toast.error('Failed to delete leads')
+    }
+  }
+
+  // Clear selection
+  const clearSelection = () => {
+    setSelectedLeads([])
+    setShowBulkActions(false)
   }
 
   // Debug: Log leads data
@@ -204,6 +288,36 @@ const Leads = () => {
         </div>
       </div>
 
+      {/* Bulk Actions Bar */}
+      {showBulkActions && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <span className="text-sm font-medium text-blue-800">
+                  {selectedLeads.length} lead(s) selected
+                </span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={handleBulkDelete}
+                  className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                >
+                  <TrashIcon className="h-4 w-4 mr-1" />
+                  Delete Selected
+                </button>
+                <button
+                  onClick={clearSelection}
+                  className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  Clear Selection
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Enhanced Search and Filters */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -271,6 +385,14 @@ const Leads = () => {
                 <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
                   <tr>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      <input
+                        type="checkbox"
+                        checked={selectedLeads.length === leads.length && leads.length > 0}
+                        onChange={handleSelectAll}
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      />
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                       Contact
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
@@ -295,12 +417,20 @@ const Leads = () => {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-100">
                   {leads.map((lead) => (
-                    <tr 
-                      key={lead.id} 
-                      className="hover:bg-gradient-to-r hover:from-primary-50 hover:to-transparent cursor-pointer transition-all duration-200 group" 
-                      onClick={() => navigate(`/leads/${lead.id}`)}
+                    <tr
+                      key={lead.id}
+                      className="hover:bg-gradient-to-r hover:from-primary-50 hover:to-transparent transition-all duration-200 group"
                     >
                       <td className="px-6 py-5 whitespace-nowrap">
+                        <input
+                          type="checkbox"
+                          checked={selectedLeads.includes(lead.id)}
+                          onChange={() => handleSelectLead(lead.id)}
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </td>
+                      <td className="px-6 py-5 whitespace-nowrap cursor-pointer" onClick={() => navigate(`/app/leads/${lead.id}`)}>
                         <div className="flex items-center">
                           <div className="flex-shrink-0 h-12 w-12">
                             <div className="h-12 w-12 rounded-full bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center shadow-sm group-hover:shadow-md transition-shadow duration-200">
@@ -320,7 +450,7 @@ const Leads = () => {
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-5 whitespace-nowrap">
+                      <td className="px-6 py-5 whitespace-nowrap cursor-pointer" onClick={() => navigate(`/app/leads/${lead.id}`)}>
                         <div className="text-sm font-medium text-gray-900">
                           {lead.company || <span className="text-gray-400 italic">No company</span>}
                         </div>
@@ -328,7 +458,7 @@ const Leads = () => {
                           <div className="text-sm text-gray-500">{lead.job_title}</div>
                         )}
                       </td>
-                      <td className="px-6 py-5 whitespace-nowrap">
+                      <td className="px-6 py-5 whitespace-nowrap cursor-pointer" onClick={() => navigate(`/app/leads/${lead.id}`)}>
                         <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(lead.status)} shadow-sm`}>
                           <div className={`w-2 h-2 rounded-full mr-2 ${
                             lead.status === 'new' ? 'bg-green-400' :
@@ -340,17 +470,17 @@ const Leads = () => {
                           {lead.status.charAt(0).toUpperCase() + lead.status.slice(1)}
                         </span>
                       </td>
-                      <td className="px-6 py-5 whitespace-nowrap">
+                      <td className="px-6 py-5 whitespace-nowrap cursor-pointer" onClick={() => navigate(`/app/leads/${lead.id}`)}>
                         <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${getSourceColor(lead.lead_source)} shadow-sm`}>
                           {lead.lead_source?.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) || '-'}
                         </span>
                       </td>
-                      <td className="px-6 py-5 whitespace-nowrap">
+                      <td className="px-6 py-5 whitespace-nowrap cursor-pointer" onClick={() => navigate(`/app/leads/${lead.id}`)}>
                         <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${getStageColor(lead.pipeline_stage_id)} shadow-sm`}>
                           {getStageName(lead.pipeline_stage_id)}
                         </span>
                       </td>
-                      <td className="px-6 py-5 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 py-5 whitespace-nowrap text-sm text-gray-500 cursor-pointer" onClick={() => navigate(`/app/leads/${lead.id}`)}>
                         <div className="flex flex-col">
                           <span>{new Date(lead.created_at).toLocaleDateString()}</span>
                           <span className="text-xs text-gray-400">
@@ -360,18 +490,24 @@ const Leads = () => {
                       </td>
                       <td className="px-6 py-5 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex items-center justify-end space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                          <button 
+                          <button
                             className="text-primary-600 hover:text-primary-800 p-2 rounded-lg hover:bg-primary-50 transition-all duration-200"
-                            onClick={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleEditLead(lead)
+                            }}
                             title="Edit lead"
                           >
                             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                             </svg>
                           </button>
-                          <button 
+                          <button
                             className="text-red-600 hover:text-red-800 p-2 rounded-lg hover:bg-red-50 transition-all duration-200"
-                            onClick={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDeleteLead(lead)
+                            }}
                             title="Delete lead"
                           >
                             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -470,7 +606,19 @@ const Leads = () => {
       {showAddLeadForm && (
         <LeadForm
           onClose={() => setShowAddLeadForm(false)}
-          onSuccess={handleLeadCreated}
+          onSuccess={handleLeadSaved}
+        />
+      )}
+
+      {/* Edit Lead Modal */}
+      {showEditLeadForm && editingLead && (
+        <LeadForm
+          lead={editingLead}
+          onClose={() => {
+            setShowEditLeadForm(false)
+            setEditingLead(null)
+          }}
+          onSuccess={handleLeadUpdated}
         />
       )}
     </div>

@@ -1,23 +1,31 @@
+import { Suspense, lazy } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { AuthProvider } from './context/AuthContext'
 import { LeadProvider } from './context/LeadContext'
 import ProtectedRoute from './components/ProtectedRoute'
+import RoleProtectedRoute from './components/RoleProtectedRoute'
 import ErrorBoundary from './components/ErrorBoundary'
-import Login from './pages/Login'
-import Register from './pages/Register'
-import Homepage from './pages/Homepage'
-import Dashboard from './pages/Dashboard'
-import Leads from './pages/Leads'
-import LeadDetail from './pages/LeadDetail'
-import Pipeline from './pages/Pipeline'
-import Activities from './pages/Activities'
-import Assignments from './pages/Assignments'
-import Users from './pages/Users'
-import Reports from './pages/Reports'
-import Tasks from './pages/Tasks'
-import SearchResults from './pages/SearchResults'
-import Layout from './components/Layout/Layout'
+const Homepage = lazy(() => import('./pages/Homepage'))
+const Login = lazy(() => import('./pages/Login'))
+const RegisterCompany = lazy(() => import('./pages/RegisterCompany'))
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Leads = lazy(() => import('./pages/Leads'))
+const LeadDetail = lazy(() => import('./pages/LeadDetail'))
+const Pipeline = lazy(() => import('./pages/Pipeline'))
+const Activities = lazy(() => import('./pages/Activities'))
+const Assignments = lazy(() => import('./pages/Assignments'))
+const Users = lazy(() => import('./pages/Users'))
+const Reports = lazy(() => import('./pages/Reports'))
+const Tasks = lazy(() => import('./pages/Tasks'))
+const SearchResults = lazy(() => import('./pages/SearchResults'))
+const Layout = lazy(() => import('./components/Layout/Layout'))
+
+const RouteLoadingFallback = () => (
+  <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="h-12 w-12 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin"></div>
+  </div>
+)
 
 function App() {
   return (
@@ -25,11 +33,13 @@ function App() {
       <AuthProvider>
         <LeadProvider>
           <div className="min-h-screen bg-gray-50">
-          <Routes>
+          <Suspense fallback={<RouteLoadingFallback />}><Routes>
             {/* Public routes */}
             <Route path="/" element={<Homepage />} />
             <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
+            <Route path="/register" element={<Navigate to="/register-company" replace />} />
+            <Route path="/register-company" element={<RegisterCompany />} />
+            <Route path="/dashboard" element={<Navigate to="/app/dashboard" replace />} />
             
             {/* Protected routes */}
             <Route path="/app" element={
@@ -43,16 +53,28 @@ function App() {
               <Route path="leads/:id" element={<LeadDetail />} />
               <Route path="pipeline" element={<Pipeline />} />
               <Route path="activities" element={<Activities />} />
-              <Route path="assignments" element={<Assignments />} />
-              <Route path="users" element={<Users />} />
-              <Route path="reports" element={<Reports />} />
+              <Route path="assignments" element={
+                <RoleProtectedRoute allowedRoles={['manager', 'company_admin', 'super_admin']}>
+                  <Assignments />
+                </RoleProtectedRoute>
+              } />
+              <Route path="users" element={
+                <RoleProtectedRoute allowedRoles={['company_admin', 'super_admin']}>
+                  <Users />
+                </RoleProtectedRoute>
+              } />
+              <Route path="reports" element={
+                <RoleProtectedRoute allowedRoles={['manager', 'company_admin', 'super_admin']}>
+                  <Reports />
+                </RoleProtectedRoute>
+              } />
               <Route path="tasks" element={<Tasks />} />
               <Route path="search" element={<SearchResults />} />
             </Route>
             
             {/* Catch all route */}
             <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+          </Routes></Suspense>
           
           {/* Toast notifications */}
           <Toaster

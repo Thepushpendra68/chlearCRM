@@ -96,7 +96,7 @@ const GlobalSearch = ({
     setQuery('')
     
     // Navigate to search results page or perform action
-    navigate(`/search?q=${encodeURIComponent(searchQuery)}`)
+    navigate(`/app/search?q=${encodeURIComponent(searchQuery)}`)
     onClose?.()
   }
 

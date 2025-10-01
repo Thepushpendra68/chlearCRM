@@ -54,6 +54,6 @@ router.get('/lead-status', getLeadStatus);
  * @desc    Get user performance metrics (admin only)
  * @access  Private (Admin)
  */
-router.get('/user-performance', authorize('admin'), getUserPerformance);
+router.get('/user-performance', authorize(['company_admin', 'super_admin']), getUserPerformance);
 
 module.exports = router;

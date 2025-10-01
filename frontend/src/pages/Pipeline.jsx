@@ -12,7 +12,7 @@ const Pipeline = () => {
 
   const handleLeadClick = (lead) => {
     // Navigate to lead detail page or open lead modal
-    navigate(`/leads/${lead.id}`);
+    navigate(`/app/leads/${lead.id}`);
   };
 
   const handleAddLead = (stageId) => {

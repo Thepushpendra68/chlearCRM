@@ -6,12 +6,12 @@ class AssignmentController {
   // Get all assignment rules
   async getRules(req, res, next) {
     try {
-      const result = await assignmentService.getAllRules();
-      
+      const result = await assignmentService.getAllRules(req.user);
+
       if (!result.success) {
         throw new ApiError(400, result.error);
       }
-      
+
       res.json({
         success: true,
         data: result.data
@@ -24,12 +24,12 @@ class AssignmentController {
   // Get active assignment rules
   async getActiveRules(req, res, next) {
     try {
-      const result = await assignmentService.getActiveRules();
-      
+      const result = await assignmentService.getActiveRules(req.user);
+
       if (!result.success) {
         throw new ApiError(400, result.error);
       }
-      
+
       res.json({
         success: true,
         data: result.data
@@ -43,12 +43,12 @@ class AssignmentController {
   async getRuleById(req, res, next) {
     try {
       const { id } = req.params;
-      const result = await assignmentService.getRuleById(id);
-      
+      const result = await assignmentService.getRuleById(id, req.user);
+
       if (!result.success) {
         throw new ApiError(404, result.error);
       }
-      
+
       res.json({
         success: true,
         data: result.data
@@ -62,12 +62,12 @@ class AssignmentController {
   async createRule(req, res, next) {
     try {
       const ruleData = req.body;
-      const result = await assignmentService.createRule(ruleData);
-      
+      const result = await assignmentService.createRule(ruleData, req.user);
+
       if (!result.success) {
         throw new ApiError(400, result.error);
       }
-      
+
       res.status(201).json({
         success: true,
         data: result.data,
@@ -83,12 +83,12 @@ class AssignmentController {
     try {
       const { id } = req.params;
       const ruleData = req.body;
-      const result = await assignmentService.updateRule(id, ruleData);
-      
+      const result = await assignmentService.updateRule(id, ruleData, req.user);
+
       if (!result.success) {
         throw new ApiError(400, result.error);
       }
-      
+
       res.json({
         success: true,
         data: result.data,
@@ -103,12 +103,12 @@ class AssignmentController {
   async deleteRule(req, res, next) {
     try {
       const { id } = req.params;
-      const result = await assignmentService.deleteRule(id);
-      
+      const result = await assignmentService.deleteRule(id, req.user);
+
       if (!result.success) {
         throw new ApiError(400, result.error);
       }
-      
+
       res.json({
         success: true,
         message: result.message
@@ -124,17 +124,17 @@ class AssignmentController {
       const { leadId } = req.params;
       const { assignedTo, reason } = req.body;
       const assignedBy = req.user.id; // From auth middleware
-      
+
       if (!assignedTo) {
         throw new ApiError(400, 'assignedTo is required');
       }
-      
-      const result = await assignmentService.assignLead(leadId, assignedTo, assignedBy, reason);
-      
+
+      const result = await assignmentService.assignLead(leadId, assignedTo, assignedBy, reason, req.user);
+
       if (!result.success) {
         throw new ApiError(400, result.error);
       }
-      
+
       res.json({
         success: true,
         message: result.message
@@ -149,21 +149,21 @@ class AssignmentController {
     try {
       const { leadIds, assignedTo, reason } = req.body;
       const assignedBy = req.user.id; // From auth middleware
-      
+
       if (!leadIds || !Array.isArray(leadIds) || leadIds.length === 0) {
         throw new ApiError(400, 'leadIds array is required');
       }
-      
+
       if (!assignedTo) {
         throw new ApiError(400, 'assignedTo is required');
       }
-      
-      const result = await assignmentService.bulkAssignLeads(leadIds, assignedTo, assignedBy, reason);
-      
+
+      const result = await assignmentService.bulkAssignLeads(leadIds, assignedTo, assignedBy, reason, req.user);
+
       if (!result.success) {
         throw new ApiError(400, result.error);
       }
-      
+
       res.json({
         success: true,
         message: result.message,
@@ -178,12 +178,12 @@ class AssignmentController {
   async getLeadAssignmentHistory(req, res, next) {
     try {
       const { leadId } = req.params;
-      const result = await assignmentService.getLeadAssignmentHistory(leadId);
-      
+      const result = await assignmentService.getLeadAssignmentHistory(leadId, req.user);
+
       if (!result.success) {
         throw new ApiError(400, result.error);
       }
-      
+
       res.json({
         success: true,
         data: result.data
@@ -196,12 +196,12 @@ class AssignmentController {
   // Get team workload distribution
   async getTeamWorkload(req, res, next) {
     try {
-      const result = await assignmentService.getTeamWorkload();
-      
+      const result = await assignmentService.getTeamWorkload(req.user);
+
       if (!result.success) {
         throw new ApiError(400, result.error);
       }
-      
+
       res.json({
         success: true,
         data: result.data
@@ -215,12 +215,12 @@ class AssignmentController {
   async redistributeLeads(req, res, next) {
     try {
       const assignedBy = req.user.id; // From auth middleware
-      const result = await assignmentService.redistributeLeads(assignedBy);
-      
+      const result = await assignmentService.redistributeLeads(assignedBy, req.user);
+
       if (!result.success) {
         throw new ApiError(400, result.error);
       }
-      
+
       res.json({
         success: true,
         message: result.message,
@@ -234,12 +234,12 @@ class AssignmentController {
   // Get assignment statistics
   async getAssignmentStats(req, res, next) {
     try {
-      const result = await assignmentService.getAssignmentStats();
-      
+      const result = await assignmentService.getAssignmentStats(req.user);
+
       if (!result.success) {
         throw new ApiError(400, result.error);
       }
-      
+
       res.json({
         success: true,
         data: result.data

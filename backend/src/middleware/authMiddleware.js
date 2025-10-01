@@ -1,9 +1,8 @@
-const { verifyToken, extractTokenFromHeader } = require('../utils/jwtUtils');
+const { extractTokenFromHeader, verifyAndGetUser, requireRole, requirePermission } = require('../utils/supabaseAuthUtils');
 const ApiError = require('../utils/ApiError');
-const db = require('../config/database');
 
 /**
- * Authentication middleware to verify JWT tokens
+ * Authentication middleware to verify Supabase JWT tokens
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  * @param {Function} next - Express next function
@@ -14,37 +13,35 @@ const authenticate = async (req, res, next) => {
     const token = extractTokenFromHeader(authHeader);
 
     if (!token) {
+      console.log('No token provided in auth header:', authHeader);
       throw ApiError.unauthorized('Access token is required');
     }
 
-    // Verify token
-    const decoded = verifyToken(token);
-    
-    // Check if user still exists and is active
-    const user = await db('users')
-      .select('id', 'email', 'first_name', 'last_name', 'role', 'is_active')
-      .where('id', decoded.userId)
-      .first();
+    console.log('Authenticating token:', token.substring(0, 50) + '...');
+    console.log('Token length:', token.length);
+
+    // Verify token and get user data with Supabase
+    const user = await verifyAndGetUser(token);
 
     if (!user) {
-      throw ApiError.unauthorized('User not found');
+      console.log('Token verification failed - no user returned');
+      throw ApiError.unauthorized('Invalid or expired token');
     }
 
     if (!user.is_active) {
+      console.log('User account is deactivated:', user.id);
       throw ApiError.unauthorized('User account is deactivated');
     }
 
-    // Add user to request object
+    console.log('Authentication successful for user:', user.email, 'role:', user.role);
+
+    // Add user to request object with enhanced data
     req.user = user;
+    req.token = token; // Keep token for Supabase client operations
     next();
   } catch (error) {
-    if (error.name === 'JsonWebTokenError') {
-      next(ApiError.unauthorized('Invalid token'));
-    } else if (error.name === 'TokenExpiredError') {
-      next(ApiError.unauthorized('Token expired'));
-    } else {
-      next(error);
-    }
+    console.error('Authentication error:', error);
+    next(ApiError.unauthorized('Authentication failed'));
   }
 };
 
@@ -62,11 +59,12 @@ const authorize = (allowedRoles) => {
     const userRole = req.user.role;
     const roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
 
-    if (!roles.includes(userRole)) {
-      return next(ApiError.forbidden('Insufficient permissions'));
+    // Super admin can access everything
+    if (userRole === 'super_admin' || roles.includes(userRole)) {
+      return next();
     }
 
-    next();
+    return next(ApiError.forbidden('Insufficient permissions'));
   };
 };
 
@@ -82,14 +80,11 @@ const optionalAuth = async (req, res, next) => {
     const token = extractTokenFromHeader(authHeader);
 
     if (token) {
-      const decoded = verifyToken(token);
-      const user = await db('users')
-        .select('id', 'email', 'first_name', 'last_name', 'role', 'is_active')
-        .where('id', decoded.userId)
-        .first();
+      const user = await verifyAndGetUser(token);
 
       if (user && user.is_active) {
         req.user = user;
+        req.token = token;
       }
     }
 
@@ -103,5 +98,7 @@ const optionalAuth = async (req, res, next) => {
 module.exports = {
   authenticate,
   authorize,
-  optionalAuth
+  optionalAuth,
+  requireRole,
+  requirePermission
 };

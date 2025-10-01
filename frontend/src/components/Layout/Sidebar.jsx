@@ -150,9 +150,9 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, isCollapsed, setIsCollapsed }) =
                   <div className="flex items-center px-4 mb-6">
                     <div className="flex items-center">
                       <div className="flex-shrink-0 w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
-                        <span className="text-white font-bold text-sm">C</span>
+                        <span className="text-white font-bold text-sm">S</span>
                       </div>
-                      <span className="ml-3 text-xl font-bold text-gray-900">CRM</span>
+                      <span className="ml-3 text-xl font-bold text-gray-900">Sakha</span>
                     </div>
                   </div>
 
@@ -261,14 +261,14 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, isCollapsed, setIsCollapsed }) =
               {!isCollapsed && (
                 <div className="flex items-center">
                   <div className="flex-shrink-0 w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
-                    <span className="text-white font-bold text-sm">C</span>
+                    <span className="text-white font-bold text-sm">S</span>
                   </div>
-                  <span className="ml-3 text-xl font-bold text-gray-900">CRM</span>
+                  <span className="ml-3 text-xl font-bold text-gray-900">Sakha</span>
                 </div>
               )}
               {isCollapsed && (
                 <div className="flex-shrink-0 w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center mx-auto">
-                  <span className="text-white font-bold text-sm">C</span>
+                  <span className="text-white font-bold text-sm">S</span>
                 </div>
               )}
               <button
