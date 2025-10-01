@@ -54,9 +54,9 @@ const Header = ({ setSidebarOpen, isCollapsed, currentPath }) => {
           {/* Logo - only show on mobile when sidebar is closed */}
           <div className="md:hidden flex items-center">
             <div className="flex-shrink-0 w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">C</span>
+              <span className="text-white font-bold text-sm">S</span>
             </div>
-            <span className="ml-2 text-xl font-bold text-gray-900">CRM</span>
+            <span className="ml-2 text-xl font-bold text-gray-900">Sakha</span>
           </div>
           
           {/* Breadcrumbs - hidden on mobile, shown on desktop */}

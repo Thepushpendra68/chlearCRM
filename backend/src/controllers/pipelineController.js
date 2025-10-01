@@ -5,12 +5,12 @@ class PipelineController {
   // Get all pipeline stages
   async getStages(req, res, next) {
     try {
-      const result = await pipelineService.getAllStages();
-      
+      const result = await pipelineService.getAllStages(req.user);
+
       if (!result.success) {
         throw new ApiError(400, result.error);
       }
-      
+
       res.json({
         success: true,
         data: result.data
@@ -24,17 +24,17 @@ class PipelineController {
   async createStage(req, res, next) {
     try {
       const { name, color, order_position } = req.body;
-      
+
       const result = await pipelineService.createStage({
         name,
         color,
         order_position
-      });
-      
+      }, req.user);
+
       if (!result.success) {
         throw new ApiError(400, result.error);
       }
-      
+
       res.status(201).json({
         success: true,
         data: result.data,
@@ -50,13 +50,13 @@ class PipelineController {
     try {
       const { id } = req.params;
       const updateData = req.body;
-      
-      const result = await pipelineService.updateStage(id, updateData);
-      
+
+      const result = await pipelineService.updateStage(id, updateData, req.user);
+
       if (!result.success) {
         throw new ApiError(400, result.error);
       }
-      
+
       res.json({
         success: true,
         data: result.data,
@@ -71,13 +71,13 @@ class PipelineController {
   async deleteStage(req, res, next) {
     try {
       const { id } = req.params;
-      
-      const result = await pipelineService.deleteStage(id);
-      
+
+      const result = await pipelineService.deleteStage(id, req.user);
+
       if (!result.success) {
         throw new ApiError(400, result.error);
       }
-      
+
       res.json({
         success: true,
         message: result.message
@@ -91,13 +91,13 @@ class PipelineController {
   async reorderStages(req, res, next) {
     try {
       const { stageOrders } = req.body;
-      
-      const result = await pipelineService.reorderStages(stageOrders);
-      
+
+      const result = await pipelineService.reorderStages(stageOrders, req.user);
+
       if (!result.success) {
         throw new ApiError(400, result.error);
       }
-      
+
       res.json({
         success: true,
         data: result.data,
@@ -111,12 +111,12 @@ class PipelineController {
   // Get pipeline overview
   async getPipelineOverview(req, res, next) {
     try {
-      const result = await pipelineService.getPipelineOverview();
-      
+      const result = await pipelineService.getPipelineOverview(req.user);
+
       if (!result.success) {
         throw new ApiError(400, result.error);
       }
-      
+
       res.json({
         success: true,
         data: result.data
@@ -132,13 +132,13 @@ class PipelineController {
       const { id } = req.params;
       const { stage_id } = req.body;
       const userId = req.user.id;
-      
-      const result = await pipelineService.moveLeadToStage(id, stage_id, userId);
-      
+
+      const result = await pipelineService.moveLeadToStage(id, stage_id, userId, req.user);
+
       if (!result.success) {
         throw new ApiError(400, result.error);
       }
-      
+
       res.json({
         success: true,
         data: result.data,
@@ -152,12 +152,12 @@ class PipelineController {
   // Get conversion rates
   async getConversionRates(req, res, next) {
     try {
-      const result = await pipelineService.getConversionRates();
-      
+      const result = await pipelineService.getConversionRates(req.user);
+
       if (!result.success) {
         throw new ApiError(400, result.error);
       }
-      
+
       res.json({
         success: true,
         data: result.data

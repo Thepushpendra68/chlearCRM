@@ -10,22 +10,22 @@ A Node.js/Express backend API for a Customer Relationship Management (CRM) syste
 - 📈 Dashboard Analytics
 - 🛡️ Security Middleware (Helmet, CORS, Rate Limiting)
 - ✅ Input Validation & Error Handling
-- 🗄️ PostgreSQL Database with Knex.js
+- 🗄️ Supabase Database (hosted database + Auth + Real-time)
 
 ## Tech Stack
 
 - **Runtime**: Node.js
 - **Framework**: Express.js
-- **Database**: PostgreSQL
-- **ORM**: Knex.js
-- **Authentication**: JWT
+- **Database**: Supabase (hosted database + Auth + Real-time)
+- **Database Client**: Supabase JavaScript Client
+- **Authentication**: Supabase Auth + JWT validation
 - **Validation**: express-validator
 - **Security**: Helmet, CORS, bcryptjs
 
 ## Prerequisites
 
 - Node.js (v18 or higher)
-- PostgreSQL (v12 or higher)
+- Supabase account and project
 - npm or yarn
 
 ## Installation
@@ -41,34 +41,25 @@ A Node.js/Express backend API for a Customer Relationship Management (CRM) syste
    cp .env.example .env
    ```
 
-3. **Set up PostgreSQL database**:
-   ```sql
-   CREATE DATABASE crm_database;
-   CREATE USER crm_user WITH PASSWORD 'your_password';
-   GRANT ALL PRIVILEGES ON DATABASE crm_database TO crm_user;
-   ```
+3. **Set up Supabase project**:
+   - Create a new project at [supabase.com](https://supabase.com)
+   - Copy your Project URL and Service Role key from Settings > API
+   - Run the SQL schema from `SUPABASE_SETUP.md` in the SQL editor
 
-4. **Run database migrations**:
+4. **(Optional) Seed demo data**:
    ```bash
-   npm run migrate
+   npm run seed:supabase
    ```
-
-5. **Seed the database** (optional):
-   ```bash
-   npm run seed
-   ```
+   This uses the Supabase service role key to create a demo company, team members, and sample leads.
 
 ## Environment Variables
 
 ```env
-# Database Configuration
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=crm_database
-DB_USER=postgres
-DB_PASSWORD=your_password_here
+# Supabase Configuration
+SUPABASE_URL=your_supabase_project_url
+SUPABASE_SERVICE_KEY=your_supabase_service_role_key
 
-# JWT Configuration
+# JWT Configuration (optional for fallback)
 JWT_SECRET=your_super_secret_jwt_key_here_change_in_production
 JWT_EXPIRES_IN=24h
 
@@ -88,9 +79,7 @@ RATE_LIMIT_MAX_REQUESTS=100
 
 - `npm start` - Start the production server
 - `npm run dev` - Start the development server with nodemon
-- `npm run migrate` - Run database migrations
-- `npm run migrate:rollback` - Rollback database migrations
-- `npm run seed` - Run database seeds
+- `npm run seed:supabase` - Seed demo data in Supabase (creates demo company, team members, and sample leads)
 - `npm test` - Run tests
 - `npm run test:watch` - Run tests in watch mode
 
@@ -125,39 +114,35 @@ RATE_LIMIT_MAX_REQUESTS=100
 
 ## Database Schema
 
-### Users Table
-- `id` (UUID, Primary Key)
-- `email` (VARCHAR, Unique)
-- `password_hash` (VARCHAR)
-- `first_name` (VARCHAR)
-- `last_name` (VARCHAR)
-- `role` (ENUM: admin, manager, sales_rep)
-- `is_active` (BOOLEAN)
-- `created_at` (TIMESTAMP)
-- `updated_at` (TIMESTAMP)
+**✅ Schema is managed via Supabase** - See `SUPABASE_SETUP.md` for complete schema
 
-### Leads Table
-- `id` (UUID, Primary Key)
-- `first_name` (VARCHAR)
-- `last_name` (VARCHAR)
-- `email` (VARCHAR)
-- `phone` (VARCHAR)
-- `company` (VARCHAR)
-- `job_title` (VARCHAR)
-- `lead_source` (ENUM)
-- `status` (ENUM)
-- `assigned_to` (UUID, Foreign Key)
-- `notes` (TEXT)
-- `created_at` (TIMESTAMP)
-- `updated_at` (TIMESTAMP)
+### Key Tables (managed in Supabase)
+- **Users/User Profiles** - User management with company-based multi-tenancy
+- **Leads** - Lead management with pipeline integration
+- **Pipeline Stages** - Customizable sales pipeline stages
+- **Activities** - Activity tracking and timeline
+- **Tasks** - Task management system
+- **Import History** - Import tracking
+- **Lead Assignment Rules** - Automated assignment rules
 
-## Default Users
+### Authentication & Security
+- **Supabase Auth** - Built-in authentication system
+- **Row Level Security (RLS)** - Company-based data isolation
+- **Auth Triggers** - Automatic user profile creation
 
-After running seeds, you'll have these default users:
+## User Authentication
 
-- **Admin**: admin@crm.com / admin123
-- **Manager**: manager@crm.com / admin123
-- **Sales Rep**: sales@crm.com / admin123
+**🔐 Supabase Auth Integration**: Users register via company registration
+
+- **Company Registration**: Use `/api/auth/register-company` to create your organization
+- **User Management**: Handled via Supabase Auth with custom user profiles
+
+**Demo Accounts** (created by `npm run seed:supabase`):
+- **Admin**: admin@demo-company.com / Admin123!
+- **Manager**: manager@demo-company.com / Demo123!
+- **Sales Rep**: sales@demo-company.com / Demo123!
+
+Note: In production, use Supabase Auth registration instead of the seed accounts.
 
 ## Security Features
 
@@ -167,7 +152,9 @@ After running seeds, you'll have these default users:
 - CORS protection
 - Helmet security headers
 - Input validation and sanitization
-- SQL injection prevention with parameterized queries
+- SQL injection prevention with Supabase client (automatic parameterized queries)
+- Row Level Security (RLS) for data isolation
+- Supabase Auth for secure authentication
 
 ## Development
 

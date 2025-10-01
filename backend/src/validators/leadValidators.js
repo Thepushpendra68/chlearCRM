@@ -38,6 +38,15 @@ const validateLead = [
     .isLength({ max: 20 })
     .withMessage('Phone number must not exceed 20 characters'),
 
+  // CRM Business Rule: Must have at least one contact method
+  body().custom((value, { req }) => {
+    const { email, phone } = req.body;
+    if (!email && !phone) {
+      throw new Error('At least one contact method (email or phone) is required for a lead');
+    }
+    return true;
+  }),
+
   body('company')
     .optional()
     .trim()

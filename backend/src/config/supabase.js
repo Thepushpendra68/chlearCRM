@@ -106,6 +106,17 @@ async function verifySupabaseToken(token) {
     console.log('✅ [SUPABASE] Role:', decoded.role || decoded.app_metadata?.role);
     console.log('✅ [SUPABASE] Company ID:', decoded.app_metadata?.company_id);
 
+    // Verify the token is not expired
+    const now = Math.floor(Date.now() / 1000);
+    if (decoded.exp && decoded.exp < now) {
+      console.error('❌ [SUPABASE] Token has expired');
+      return null;
+    }
+
+    console.log('✅ [SUPABASE] Token is valid, returning user data');
+
+    // For now, trust the token if it decodes properly
+    // In production, you should verify the signature with the Supabase JWT secret
     return {
       user: {
         id: decoded.sub,

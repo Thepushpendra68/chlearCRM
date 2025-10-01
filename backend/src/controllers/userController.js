@@ -28,6 +28,7 @@ const getUsers = async (req, res, next) => {
     };
 
     const result = await userService.getUsers(
+      req.user,
       parseInt(page),
       parseInt(limit),
       filters
@@ -60,11 +61,11 @@ const getUserById = async (req, res, next) => {
     const { id } = req.params;
     
     // Users can only view their own profile unless they're admin
-    if (req.user.role !== 'admin' && req.user.id !== id) {
+    if (!['company_admin', 'super_admin'].includes(req.user.role) && req.user.id !== id) {
       throw new ApiError('Access denied', 403);
     }
 
-    const user = await userService.getUserById(id);
+    const user = await userService.getUserById(id, req.user);
 
     if (!user) {
       throw new ApiError('User not found', 404);
@@ -96,7 +97,7 @@ const createUser = async (req, res, next) => {
     }
 
     const userData = req.body;
-    const user = await userService.createUser(userData);
+    const user = await userService.createUser(userData, req.user);
 
     // Remove sensitive information
     delete user.password_hash;
@@ -128,12 +129,12 @@ const updateUser = async (req, res, next) => {
     const userData = req.body;
 
     // Users can only update their own profile unless they're admin
-    if (req.user.role !== 'admin' && req.user.id !== id) {
+    if (!['company_admin', 'super_admin'].includes(req.user.role) && req.user.id !== id) {
       throw new ApiError('Access denied', 403);
     }
 
     // Non-admin users cannot change their role
-    if (req.user.role !== 'admin' && userData.role) {
+    if (!['company_admin', 'super_admin'].includes(req.user.role) && userData.role) {
       delete userData.role;
     }
 
@@ -170,7 +171,7 @@ const deactivateUser = async (req, res, next) => {
       throw new ApiError('Cannot deactivate your own account', 400);
     }
 
-    const deactivated = await userService.deactivateUser(id);
+    const deactivated = await userService.deactivateUser(id, req.user);
 
     if (!deactivated) {
       throw new ApiError('User not found', 404);
@@ -192,7 +193,7 @@ const deactivateUser = async (req, res, next) => {
  */
 const getCurrentUser = async (req, res, next) => {
   try {
-    const user = await userService.getUserById(req.user.id);
+    const user = await userService.getUserById(req.user.id, req.user);
 
     if (!user) {
       throw new ApiError('User not found', 404);

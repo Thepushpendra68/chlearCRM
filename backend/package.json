@@ -1,18 +1,19 @@
 {
-  "name": "crm-backend",
+  "name": "sakha-backend",
   "version": "1.0.0",
-  "description": "CRM Backend API with Node.js and Express - USES POSTGRESQL ONLY (NO SQLITE3)",
+  "description": "Sakha - Your Friend in CRM - Backend API with Node.js and Express - USES SUPABASE ONLY (NO SQLITE3, NO KNEX)",
   "main": "src/app.js",
   "scripts": {
-    "start": "node src/app.js",
+    "start": "node --no-deprecation src/app.js",
     "dev": "nodemon src/app.js",
     "dev:clean": "npx kill-port 5000 && npm run dev",
-    "migrate": "knex migrate:latest",
-    "migrate:rollback": "knex migrate:rollback",
-    "seed": "knex seed:run",
+    "_migrate": "echo 'DEPRECATED: Use Supabase migrations instead'",
+    "_migrate:rollback": "echo 'DEPRECATED: Use Supabase migrations instead'",
+    "_seed": "echo 'DEPRECATED: Use Supabase SQL scripts instead'",
     "test": "jest",
     "test:watch": "jest --watch",
-    "kill-port": "npx kill-port 5000"
+    "kill-port": "npx kill-port 5000",
+    "seed:supabase": "node scripts/seedSupabaseSampleData.js"
   },
   "keywords": [
     "crm",
@@ -23,6 +24,8 @@
   "author": "Your Name",
   "license": "MIT",
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@supabase/supabase-js": "^2.58.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "csv-parser": "^3.0.0",
@@ -32,9 +35,7 @@
     "express-validator": "^7.0.1",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
-    "knex": "^3.0.1",
     "multer": "^1.4.5-lts.1",
-    "pg": "^8.11.3",
     "uuid": "^9.0.1",
     "xlsx": "^0.18.5"
   },

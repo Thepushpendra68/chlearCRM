@@ -1,40 +1,37 @@
-const knex = require('knex');
-const knexConfig = require('../../knexfile');
+// Supabase Migration: Knex/PostgreSQL connection completely removed
+// Using Supabase as the ONLY database - no Knex for application code
+// Knex is only kept for database migrations via CLI commands
 
-const environment = process.env.NODE_ENV || 'development';
-const config = knexConfig[environment];
+let db = null;
 
-// Enhanced database configuration with better connection management
-const enhancedConfig = {
-  ...config,
-  pool: {
-    min: 1,
-    max: 5,
-    acquireTimeoutMillis: 30000,
-    createTimeoutMillis: 30000,
-    destroyTimeoutMillis: 5000,
-    idleTimeoutMillis: 300000, // 5 minutes
-    reapIntervalMillis: 1000,
-    createRetryIntervalMillis: 200,
-    propagateCreateError: false
-  },
-  acquireConnectionTimeout: 30000,
-  debug: false // Disabled to prevent excessive logging
+// Knex is now completely disabled for application use
+// Only available through migration CLI commands
+const initializeKnex = () => {
+  console.warn('⚠️  Knex is disabled for application code. Use Supabase instead.');
+  return null;
 };
 
-const db = knex(enhancedConfig);
+// Database connection completely disabled - using Supabase only
+// db = initializeKnex(); // Completely removed for Supabase migration
 
-// Test database connection with retry logic
+// Test database connection - now uses Supabase
 const testConnection = async (retries = 3) => {
   for (let i = 0; i < retries; i++) {
     try {
-      await db.raw('SELECT 1');
-      console.log('✅ Database connected successfully');
+      // Test Supabase connection instead of Knex
+      const { supabaseAdmin } = require('./supabase');
+      const { data, error } = await supabaseAdmin.from('companies').select('count').limit(1);
+
+      if (error) {
+        throw error;
+      }
+
+      console.log('✅ Supabase database connected successfully');
       return;
     } catch (error) {
-      console.error(`❌ Database connection attempt ${i + 1} failed:`, error.message);
+      console.error(`❌ Supabase connection attempt ${i + 1} failed:`, error.message);
       if (i === retries - 1) {
-        console.error('❌ Database connection failed after all retries');
+        console.error('❌ Supabase connection failed after all retries');
         process.exit(1);
       }
       await new Promise(resolve => setTimeout(resolve, 2000));
@@ -42,14 +39,12 @@ const testConnection = async (retries = 3) => {
   }
 };
 
-testConnection();
+// Database connection completely disabled - using Supabase only
+console.log('🎉 Migration Complete: Using Supabase as ONLY database');
+console.log('📦 Knex removed from application code, kept only for migrations');
 
-// Handle database connection errors
-db.on('error', (err) => {
-  console.error('Database connection error:', err);
-  if (err.code === 'PROTOCOL_CONNECTION_LOST') {
-    console.log('Database connection lost, attempting to reconnect...');
-  }
-});
+// Handle database connection errors - now Supabase only
+console.log('✅ Database (Supabase) configuration loaded - Knex completely removed from app');
 
+// Export null for backward compatibility, but services should use Supabase directly
 module.exports = db;

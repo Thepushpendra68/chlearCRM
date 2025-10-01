@@ -30,7 +30,7 @@ const LeadDetail = () => {
     } catch (error) {
       console.error('Failed to fetch lead:', error)
       toast.error('Failed to load lead details')
-      navigate('/leads')
+      navigate('/app/leads')
     } finally {
       setLoading(false)
     }
@@ -85,7 +85,7 @@ const LeadDetail = () => {
     try {
       await leadService.deleteLead(id)
       toast.success('Lead deleted successfully')
-      navigate('/leads')
+      navigate('/app/leads')
     } catch (error) {
       console.error('Failed to delete lead:', error)
       toast.error('Failed to delete lead')
@@ -93,8 +93,10 @@ const LeadDetail = () => {
   }
 
   const handleActivitySubmit = (activityData) => {
+    console.log('Activity submitted for lead:', activityData)
     toast.success('Activity added successfully')
     setShowActivityForm(false)
+    // Could refresh lead data or update timeline here if needed
   }
 
   const handleTaskSubmit = async (taskData) => {
@@ -134,7 +136,7 @@ const LeadDetail = () => {
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Lead not found</h3>
             <p className="text-sm text-gray-600 mb-6">The lead you're looking for doesn't exist or has been removed.</p>
             <button
-              onClick={() => navigate('/leads')}
+              onClick={() => navigate('/app/leads')}
               className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
             >
               <ArrowLeftIcon className="h-4 w-4 mr-2" />
@@ -155,7 +157,7 @@ const LeadDetail = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <button
-                  onClick={() => navigate('/leads')}
+                  onClick={() => navigate('/app/leads')}
                   className="p-1.5 text-gray-400 hover:text-gray-600 rounded-md hover:bg-gray-100 transition-colors"
                 >
                   <ArrowLeftIcon className="h-4 w-4" />
@@ -271,7 +273,7 @@ const LeadDetail = () => {
                 <h2 className="text-lg font-semibold text-gray-900">Lead Details</h2>
               </div>
               <div className="px-6 py-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div>
                     <p className="text-sm font-medium text-gray-500 mb-1">Lead Source</p>
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getSourceColor(lead.lead_source)}`}>
@@ -284,20 +286,92 @@ const LeadDetail = () => {
                       {lead.status?.charAt(0).toUpperCase() + lead.status?.slice(1)}
                     </span>
                   </div>
-                  {lead.priority && (
-                    <div>
-                      <p className="text-sm font-medium text-gray-500 mb-1">Priority</p>
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        lead.priority === 'urgent' ? 'bg-red-100 text-red-800' :
-                        lead.priority === 'high' ? 'bg-orange-100 text-orange-800' :
-                        lead.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                  <div>
+                    <p className="text-sm font-medium text-gray-500 mb-1">Priority</p>
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      lead.priority === 'urgent' ? 'bg-red-100 text-red-800' :
+                      lead.priority === 'high' ? 'bg-orange-100 text-orange-800' :
+                      lead.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-green-100 text-green-800'
+                    }`}>
+                      {lead.priority?.charAt(0).toUpperCase() + lead.priority?.slice(1) || 'Medium'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Pipeline & Deal Information Card */}
+            <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h2 className="text-lg font-semibold text-gray-900">Pipeline & Deal Information</h2>
+              </div>
+              <div className="px-6 py-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500 mb-1">Pipeline Stage</p>
+                    <p className="text-sm text-gray-900 font-medium">
+                      {lead.pipeline_stage_id ? 'Stage Assigned' : 'No Stage'}
+                    </p>
+                    {lead.pipeline_stage_id && (
+                      <p className="text-xs text-gray-500">ID: {lead.pipeline_stage_id.substring(0, 8)}...</p>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-500 mb-1">Deal Value</p>
+                    {lead.deal_value ? (
+                      <p className="text-sm font-bold text-green-600">
+                        ${parseFloat(lead.deal_value).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-gray-400">No value set</p>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-500 mb-1">Probability</p>
+                    {lead.probability !== null && lead.probability !== undefined ? (
+                      <div className="flex items-center space-x-2">
+                        <div className="flex-1 bg-gray-200 rounded-full h-2">
+                          <div
+                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${lead.probability}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-sm font-medium text-gray-700">{lead.probability}%</span>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-400">Not set</p>
+                    )}
+                  </div>
+                </div>
+
+                {lead.expected_close_date && (
+                  <div className="mt-4 pt-4 border-t border-gray-100">
+                    <p className="text-sm font-medium text-gray-500 mb-1">Expected Close Date</p>
+                    <div className="flex items-center space-x-2">
+                      <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      <p className="text-sm text-gray-900 font-medium">
+                        {new Date(lead.expected_close_date).toLocaleDateString('en-US', {
+                          weekday: 'long',
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric'
+                        })}
+                      </p>
+                      <span className={`px-2 py-1 text-xs rounded-full ${
+                        new Date(lead.expected_close_date) < new Date() ? 'bg-red-100 text-red-800' :
+                        new Date(lead.expected_close_date) < new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) ? 'bg-yellow-100 text-yellow-800' :
                         'bg-green-100 text-green-800'
                       }`}>
-                        {lead.priority?.charAt(0).toUpperCase() + lead.priority?.slice(1)}
+                        {new Date(lead.expected_close_date) < new Date() ? 'Overdue' :
+                         new Date(lead.expected_close_date) < new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) ? 'Due Soon' :
+                         'Future'}
                       </span>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -324,32 +398,128 @@ const LeadDetail = () => {
               <div className="px-4 py-3">
                 <dl className="space-y-3">
                   <div className="flex justify-between items-center">
+                    <dt className="text-xs font-medium text-gray-500">Lead ID</dt>
+                    <dd className="text-xs text-gray-900 font-mono">
+                      {lead.id?.substring(0, 8)}...
+                    </dd>
+                  </div>
+                  <div className="flex justify-between items-center">
                     <dt className="text-xs font-medium text-gray-500">Created</dt>
                     <dd className="text-xs text-gray-900">
                       {new Date(lead.created_at).toLocaleDateString('en-US', {
                         month: 'short',
-                        day: 'numeric'
+                        day: 'numeric',
+                        year: 'numeric'
                       })}
                     </dd>
                   </div>
                   <div className="flex justify-between items-center">
-                    <dt className="text-xs font-medium text-gray-500">Updated</dt>
+                    <dt className="text-xs font-medium text-gray-500">Last Updated</dt>
                     <dd className="text-xs text-gray-900">
                       {new Date(lead.updated_at).toLocaleDateString('en-US', {
                         month: 'short',
-                        day: 'numeric'
+                        day: 'numeric',
+                        year: 'numeric'
                       })}
                     </dd>
                   </div>
                   {(lead.assigned_user_first_name || lead.assigned_user_last_name) && (
                     <div className="flex justify-between items-center">
-                      <dt className="text-xs font-medium text-gray-500">Assigned</dt>
+                      <dt className="text-xs font-medium text-gray-500">Assigned To</dt>
                       <dd className="text-xs text-gray-900">
                         {lead.assigned_user_first_name} {lead.assigned_user_last_name}
                       </dd>
                     </div>
                   )}
+                  {lead.assigned_at && (
+                    <div className="flex justify-between items-center">
+                      <dt className="text-xs font-medium text-gray-500">Assigned Date</dt>
+                      <dd className="text-xs text-gray-900">
+                        {new Date(lead.assigned_at).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric'
+                        })}
+                      </dd>
+                    </div>
+                  )}
                 </dl>
+              </div>
+            </div>
+
+            {/* Deal Value Card */}
+            {lead.deal_value && (
+              <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg border border-green-200 shadow-sm">
+                <div className="px-4 py-3 border-b border-green-200">
+                  <h3 className="text-sm font-semibold text-green-900">Deal Value</h3>
+                </div>
+                <div className="px-4 py-4 text-center">
+                  <p className="text-2xl font-bold text-green-600 mb-1">
+                    ${parseFloat(lead.deal_value).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </p>
+                  <p className="text-xs text-green-700">Estimated Revenue</p>
+                  {lead.probability !== null && lead.probability !== undefined && (
+                    <div className="mt-2 pt-2 border-t border-green-200">
+                      <p className="text-xs text-green-600">
+                        Expected Value: ${(parseFloat(lead.deal_value) * (lead.probability / 100)).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Lead Score/Health */}
+            <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+              <div className="px-4 py-3 border-b border-gray-200">
+                <h3 className="text-sm font-semibold text-gray-900">Lead Health</h3>
+              </div>
+              <div className="px-4 py-3">
+                <div className="space-y-3">
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-xs font-medium text-gray-500">Contact Info</span>
+                      <span className={`text-xs font-medium ${(lead.email && lead.phone) ? 'text-green-600' : (lead.email || lead.phone) ? 'text-yellow-600' : 'text-red-600'}`}>
+                        {(lead.email && lead.phone) ? 'Complete' : (lead.email || lead.phone) ? 'Partial' : 'Missing'}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-1.5">
+                      <div
+                        className={`h-1.5 rounded-full ${(lead.email && lead.phone) ? 'bg-green-500' : (lead.email || lead.phone) ? 'bg-yellow-500' : 'bg-red-500'}`}
+                        style={{ width: `${(lead.email && lead.phone) ? '100' : (lead.email || lead.phone) ? '50' : '0'}%` }}
+                      ></div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-xs font-medium text-gray-500">Company Info</span>
+                      <span className={`text-xs font-medium ${(lead.company && lead.job_title) ? 'text-green-600' : lead.company ? 'text-yellow-600' : 'text-red-600'}`}>
+                        {(lead.company && lead.job_title) ? 'Complete' : lead.company ? 'Partial' : 'Missing'}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-1.5">
+                      <div
+                        className={`h-1.5 rounded-full ${(lead.company && lead.job_title) ? 'bg-green-500' : lead.company ? 'bg-yellow-500' : 'bg-red-500'}`}
+                        style={{ width: `${(lead.company && lead.job_title) ? '100' : lead.company ? '50' : '0'}%` }}
+                      ></div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-xs font-medium text-gray-500">Deal Details</span>
+                      <span className={`text-xs font-medium ${lead.deal_value ? 'text-green-600' : 'text-gray-500'}`}>
+                        {lead.deal_value ? 'Set' : 'Not Set'}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-1.5">
+                      <div
+                        className={`h-1.5 rounded-full ${lead.deal_value ? 'bg-green-500' : 'bg-gray-300'}`}
+                        style={{ width: `${lead.deal_value ? '100' : '0'}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -403,20 +573,40 @@ const LeadDetail = () => {
               </div>
             </div>
 
-            {/* Value Information */}
-            {lead.value && (
-              <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-                <div className="px-4 py-3 border-b border-gray-200">
-                  <h3 className="text-sm font-semibold text-gray-900">Lead Value</h3>
-                </div>
-                <div className="px-4 py-4 text-center">
-                  <p className="text-2xl font-bold text-green-600 mb-1">
-                    ${parseFloat(lead.value).toLocaleString()}
-                  </p>
-                  <p className="text-xs text-gray-500">Estimated Value</p>
-                </div>
+            {/* Lead Metadata */}
+            <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+              <div className="px-4 py-3 border-b border-gray-200">
+                <h3 className="text-sm font-semibold text-gray-900">Additional Information</h3>
               </div>
-            )}
+              <div className="px-4 py-3">
+                <dl className="space-y-2">
+                  <div className="flex justify-between items-center text-xs">
+                    <dt className="font-medium text-gray-500">Assignment Method</dt>
+                    <dd className="text-gray-900 capitalize">
+                      {lead.assignment_source || 'Manual'}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <dt className="font-medium text-gray-500">Full Name</dt>
+                    <dd className="text-gray-900">
+                      {lead.name || `${lead.first_name || ''} ${lead.last_name || ''}`.trim()}
+                    </dd>
+                  </div>
+                  {lead.created_by && (
+                    <div className="flex justify-between items-center text-xs">
+                      <dt className="font-medium text-gray-500">Created By</dt>
+                      <dd className="text-gray-900">User ID: {lead.created_by.substring(0, 8)}...</dd>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center text-xs">
+                    <dt className="font-medium text-gray-500">Record Age</dt>
+                    <dd className="text-gray-900">
+                      {Math.floor((new Date() - new Date(lead.created_at)) / (1000 * 60 * 60 * 24))} days
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+            </div>
           </div>
         </div>
       </div>

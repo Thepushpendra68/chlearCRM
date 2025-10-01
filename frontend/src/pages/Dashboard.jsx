@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { ChartBarIcon, UsersIcon, UserGroupIcon, CurrencyDollarIcon } from '@heroicons/react/24/outline';
 import dashboardService from '../services/dashboardService';
 import toast from 'react-hot-toast';
@@ -8,66 +8,105 @@ const Dashboard = () => {
     total_leads: 0,
     new_leads: 0,
     converted_leads: 0,
-    conversion_rate: '0.0%'
+    conversion_rate: '0.0%',
+    total_leads_change: '+0%',
+    new_leads_change: '+0%',
+    converted_leads_change: '+0%',
+    conversion_rate_change: '+0%'
   });
   const [recentLeads, setRecentLeads] = useState([]);
   const [leadSources, setLeadSources] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
+  // Memoize stats data to prevent unnecessary recalculations
+  const statsData = useMemo(() => [
+    {
+      name: 'Total Leads',
+      value: stats.total_leads.toLocaleString(),
+      icon: UsersIcon,
+      change: stats.total_leads_change || '+0%',
+      changeType: stats.total_leads_change?.startsWith('+') ? 'increase' : 'decrease'
+    },
+    {
+      name: 'New Leads',
+      value: stats.new_leads.toLocaleString(),
+      icon: UserGroupIcon,
+      change: stats.new_leads_change || '+0%',
+      changeType: stats.new_leads_change?.startsWith('+') ? 'increase' : 'decrease'
+    },
+    {
+      name: 'Converted',
+      value: stats.converted_leads.toLocaleString(),
+      icon: CurrencyDollarIcon,
+      change: stats.converted_leads_change || '+0%',
+      changeType: stats.converted_leads_change?.startsWith('+') ? 'increase' : 'decrease'
+    },
+    {
+      name: 'Conversion Rate',
+      value: stats.conversion_rate,
+      icon: ChartBarIcon,
+      change: stats.conversion_rate_change || '+0%',
+      changeType: stats.conversion_rate_change?.startsWith('+') ? 'increase' : 'decrease'
+    },
+  ], [stats]);
 
-  const loadDashboardData = async () => {
+  // Memoize the data loading function to prevent recreation on every render
+  const loadDashboardData = useCallback(async () => {
     try {
+      console.log('🔍 [DASHBOARD] Loading dashboard data...');
       setLoading(true);
-      const [statsResponse, recentLeadsResponse, sourcesResponse] = await Promise.all([
+
+      // Use Promise.allSettled to handle partial failures gracefully
+      const results = await Promise.allSettled([
         dashboardService.getDashboardStats(),
         dashboardService.getRecentLeads(5),
         dashboardService.getLeadSources()
       ]);
 
-      setStats(statsResponse.data);
-      setRecentLeads(recentLeadsResponse.data);
-      setLeadSources(sourcesResponse.data);
+      console.log('📊 [DASHBOARD] Results:', results);
+
+      // Process results, using fallbacks for failed requests
+      const statsResult = results[0].status === 'fulfilled' ? results[0].value : { data: {
+        total_leads: 0,
+        new_leads: 0,
+        converted_leads: 0,
+        conversion_rate: '0.0%',
+        total_leads_change: '+0%',
+        new_leads_change: '+0%',
+        converted_leads_change: '+0%',
+        conversion_rate_change: '+0%'
+      }};
+      const recentLeadsResult = results[1].status === 'fulfilled' ? results[1].value : { data: [] };
+      const sourcesResult = results[2].status === 'fulfilled' ? results[2].value : { data: [] };
+
+      const finalStats = statsResult.data || {
+        total_leads: 0,
+        new_leads: 0,
+        converted_leads: 0,
+        conversion_rate: '0.0%',
+        total_leads_change: '+0%',
+        new_leads_change: '+0%',
+        converted_leads_change: '+0%',
+        conversion_rate_change: '+0%'
+      };
+
+      console.log('📈 [DASHBOARD] Final stats to set:', finalStats);
+
+      setStats(finalStats);
+      setRecentLeads(recentLeadsResult.data || []);
+      setLeadSources(sourcesResult.data || []);
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
       toast.error('Failed to load dashboard data');
     } finally {
       setLoading(false);
     }
-  };
+  }, []); // Remove stats dependency to prevent infinite loop
 
-  const statsData = [
-    { 
-      name: 'Total Leads', 
-      value: stats.total_leads.toLocaleString(), 
-      icon: UsersIcon, 
-      change: '+12%', 
-      changeType: 'increase' 
-    },
-    { 
-      name: 'New Leads', 
-      value: stats.new_leads.toLocaleString(), 
-      icon: UserGroupIcon, 
-      change: '+5%', 
-      changeType: 'increase' 
-    },
-    { 
-      name: 'Converted', 
-      value: stats.converted_leads.toLocaleString(), 
-      icon: CurrencyDollarIcon, 
-      change: '+8%', 
-      changeType: 'increase' 
-    },
-    { 
-      name: 'Conversion Rate', 
-      value: stats.conversion_rate, 
-      icon: ChartBarIcon, 
-      change: '-2%', 
-      changeType: 'decrease' 
-    },
-  ]
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
+
 
   return (
     <div>

@@ -35,14 +35,14 @@ router.put('/profile/me', validateUserUpdate, updateCurrentUser);
  * @desc    Get all users (admin only)
  * @access  Private (Admin)
  */
-router.get('/', authorize('admin'), getUsers);
+router.get('/', authorize(['company_admin', 'super_admin']), getUsers);
 
 /**
  * @route   POST /api/users
  * @desc    Create new user (admin only)
  * @access  Private (Admin)
  */
-router.post('/', authorize('admin'), validateUser, createUser);
+router.post('/', authorize(['company_admin', 'super_admin']), validateUser, createUser);
 
 /**
  * @route   GET /api/users/:id
@@ -63,6 +63,6 @@ router.put('/:id', validateUserUpdate, updateUser);
  * @desc    Deactivate user (admin only)
  * @access  Private (Admin)
  */
-router.delete('/:id', authorize('admin'), deactivateUser);
+router.delete('/:id', authorize(['company_admin', 'super_admin']), deactivateUser);
 
 module.exports = router;

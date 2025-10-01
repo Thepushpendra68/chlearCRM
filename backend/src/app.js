@@ -1,5 +1,8 @@
 require('dotenv').config();
 const express = require('express');
+
+console.log('🚀 [APP] Starting backend application...');
+console.log('🚀 [APP] Environment variables loaded:', !!process.env.SUPABASE_URL);
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
@@ -26,11 +29,12 @@ process.on('SIGINT', () => {
   process.exit(0);
 });
 
-// Import database connection
-require('./config/database');
+// Legacy database connection (disabled - now using Supabase)
+// require('./config/database');
 
 // Import routes
 const authRoutes = require('./routes/authRoutes');
+const supabaseAuthRoutes = require('./routes/supabaseAuthRoutes');
 const userRoutes = require('./routes/userRoutes');
 const leadRoutes = require('./routes/leadRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
@@ -41,12 +45,22 @@ const reportRoutes = require('./routes/reportRoutes');
 const taskRoutes = require('./routes/taskRoutes');
 const importRoutes = require('./routes/importRoutes');
 const searchRoutes = require('./routes/searchRoutes');
+const chatbotRoutes = require('./routes/chatbotRoutes');
 
 // Import middleware
 const errorHandler = require('./middleware/errorMiddleware');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// Debug middleware to log all requests (placed FIRST)
+app.use((req, res, next) => {
+  console.log('🌐 [REQUEST DEBUG] Method:', req.method, 'URL:', req.url);
+  console.log('🌐 [REQUEST DEBUG] Headers received:', !!req.headers);
+  console.log('🌐 [REQUEST DEBUG] Authorization header:', req.headers.authorization ? 'PRESENT' : 'MISSING');
+  console.log('🌐 [REQUEST DEBUG] Full URL:', req.url);
+  next();
+});
 
 // Security middleware
 app.use(helmet());
@@ -67,8 +81,10 @@ if (process.env.NODE_ENV === 'production') {
 app.use(cors({
   origin: [
     process.env.FRONTEND_URL || 'http://localhost:3000',
-    'http://localhost:3001', // Development frontend
-    'http://localhost:3000'  // Production frontend
+    'http://localhost:3000',  // Production frontend
+    'http://localhost:3001',  // Development frontend
+    'http://localhost:3002',  // Development frontend
+    'http://localhost:3003'   // Development frontend
   ],
   credentials: true
 }));
@@ -82,12 +98,68 @@ app.get('/health', (req, res) => {
   res.status(200).json({
     status: 'OK',
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development'
+    environment: process.env.NODE_ENV || 'development',
+    uptime: process.uptime(),
+    memory: process.memoryUsage()
+  });
+});
+
+// Cache statistics endpoint
+app.get('/admin/cache-stats', (req, res) => {
+  try {
+    const cache = require('./utils/cache');
+    const stats = cache.getStats();
+
+    res.status(200).json({
+      status: 'OK',
+      cache: stats,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'ERROR',
+      message: 'Failed to get cache stats',
+      error: error.message
+    });
+  }
+});
+
+// Performance metrics endpoint
+app.get('/admin/performance', (req, res) => {
+  try {
+    const cache = require('./utils/cache');
+
+    res.status(200).json({
+      status: 'OK',
+      performance: {
+        uptime: process.uptime(),
+        memory: process.memoryUsage(),
+        cache: cache.getStats(),
+        environment: process.env.NODE_ENV || 'development'
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'ERROR',
+      message: 'Failed to get performance metrics',
+      error: error.message
+    });
+  }
+});
+
+// Debug endpoint to check headers
+app.get('/debug-headers', (req, res) => {
+  res.status(200).json({
+    headers: req.headers,
+    authorization: req.headers.authorization,
+    userAgent: req.headers['user-agent']
   });
 });
 
 // API routes
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', authRoutes); // Legacy auth routes (keep for backward compatibility during migration)
+app.use('/api/supabase-auth', supabaseAuthRoutes); // New Supabase auth routes
 app.use('/api/users', userRoutes);
 app.use('/api/leads', leadRoutes);
 app.use('/api/dashboard', dashboardRoutes);
@@ -98,6 +170,7 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/import', importRoutes);
 app.use('/api/search', searchRoutes);
+app.use('/api/chatbot', chatbotRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {

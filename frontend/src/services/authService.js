@@ -6,9 +6,14 @@ const authService = {
     return api.post('/auth/login', { email, password })
   },
 
-  // Register user
+  // Register user (legacy)
   register: (userData) => {
     return api.post('/auth/register', userData)
+  },
+
+  // Register company with admin user via Supabase-enabled backend
+  registerCompany: (payload) => {
+    return api.post('/auth/register-company', payload)
   },
 
   // Logout user
