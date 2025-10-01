@@ -1,7 +1,7 @@
 {
-  "name": "crm-backend",
+  "name": "sakha-backend",
   "version": "1.0.0",
-  "description": "CRM Backend API with Node.js and Express - USES SUPABASE ONLY (NO SQLITE3, NO KNEX)",
+  "description": "Sakha - Your Friend in CRM - Backend API with Node.js and Express - USES SUPABASE ONLY (NO SQLITE3, NO KNEX)",
   "main": "src/app.js",
   "scripts": {
     "start": "node --no-deprecation src/app.js",
@@ -12,7 +12,8 @@
     "_seed": "echo 'DEPRECATED: Use Supabase SQL scripts instead'",
     "test": "jest",
     "test:watch": "jest --watch",
-    "kill-port": "npx kill-port 5000"
+    "kill-port": "npx kill-port 5000",
+    "seed:supabase": "node scripts/seedSupabaseSampleData.js"
   },
   "keywords": [
     "crm",
@@ -35,7 +36,6 @@
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^1.4.5-lts.1",
-    "pg": "^8.11.3",
     "uuid": "^9.0.1",
     "xlsx": "^0.18.5"
   },

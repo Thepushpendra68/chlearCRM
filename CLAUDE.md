@@ -2,26 +2,29 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Project Name
+**Sakha** - Your Friend in CRM (formerly CHLEAR CRM)
+
 ## ⚠️ CRITICAL DATABASE REQUIREMENTS ⚠️
 **THIS PROJECT SUPPORTS TWO DATABASE CONFIGURATIONS:**
-1. **TRADITIONAL**: PostgreSQL with local/Docker setup (legacy)
-2. **MODERN**: Supabase (PostgreSQL + Auth + Real-time) - **CURRENT ACTIVE BRANCH**
+1. **TRADITIONAL**: Standalone database setup (legacy)
+2. **MODERN**: Supabase (hosted database + Auth + Real-time) - **CURRENT ACTIVE BRANCH**
 
 **NEVER INSTALL, USE, OR REFERENCE SQLITE3 IN ANY FORM**
 **CURRENT BRANCH: `auth-supabase-multi-user-role` - Uses Supabase exclusively**
 
 ## Development Commands
 
-### 🚀 **AUTOMATED STARTUP SCRIPTS (RECOMMENDED)**
+### 🚀 **AUTOMATED STARTUP SCRIPTS (RECOMMENDED - Windows Only)**
 ```bash
 # Windows batch scripts for seamless development:
-start-dev.bat        # Docker mode: Backend on :5000, Frontend on :3000
+start-dev.bat        # Legacy alias for local mode: Backend on :5000, Frontend on :3000
 start-local.bat      # Local mode: Backend on :5000, Frontend on :3000
 stop-all.bat         # Stop all services and clean ports
 start-frontend.bat   # Frontend only (requires backend running)
-# Note: docker-dev.bat and docker-start.bat may need to be created if needed
 ```
 **These scripts automatically handle port conflicts and configuration**
+**Note**: These are Windows-specific batch files. On macOS/Linux, use commands directly from Backend/Frontend Development sections.
 
 ### Backend Development (Node.js/Express)
 ```bash
@@ -61,19 +64,15 @@ node test-api.js                     # Test API endpoints (if available)
 node test-token-verification.js      # Test JWT token validation (if available)
 ```
 
-### Database Operations (Legacy Knex - USE SUPABASE INSTEAD)
+### Database Operations (Supabase only)
 ```bash
-# ⚠️ LEGACY COMMANDS - USE SUPABASE MIGRATIONS INSTEAD
 cd backend
-npm run migrate:rollback  # Rollback last migration (legacy)
-# knex migrate:make <name>  # DEPRECATED - Use Supabase migration scripts
-# knex seed:make <name>     # DEPRECATED - Use Supabase SQL scripts
-
-# ✅ PREFERRED: Use Supabase CLI or direct SQL execution
-# Create migrations via Supabase dashboard or SQL scripts
-# Apply migrations via Supabase CLI: supabase db push
-# Or use the Supabase MCP tools for migrations
+npm run seed:supabase    # Bootstraps demo data via Supabase Admin API (optional)
 ```
+
+- Schema changes live in the Supabase SQL files in the repo root (`supabase_migration*.sql`).
+- Use the Supabase SQL editor or `supabase db push` to apply structural changes.
+- Legacy Knex CLI commands and directories were removed; do not reference them.
 
 ### Additional Commands
 ```bash
@@ -89,25 +88,25 @@ npm run lint         # Run ESLint checks
 
 ## Architecture Overview
 
-This is a full-stack CRM application with separated backend and frontend:
+This is **Sakha**, a full-stack CRM application with separated backend and frontend:
 
 ### Backend Architecture
 - **Express.js** REST API with Supabase integration
-- **Database**: Supabase (PostgreSQL + Auth + Real-time) - **EXCLUSIVELY USED**
+- **Database**: Supabase (hosted database + Auth + Real-time) - **EXCLUSIVELY USED**
 - **⚠️ CRITICAL: CURRENT BRANCH USES SUPABASE ONLY - NO KNEX, NO SQLITE3**
 - **Authentication**: Supabase Auth with JWT token validation
+- **AI Integration**: Google Gemini AI (`@google/generative-ai`) for chatbot functionality
 - **MVC pattern**: Controllers → Services → Supabase Database
 - **Middleware**: Authentication, rate limiting, CORS, validation
 - **Structure**:
-  - `src/controllers/` - Route handlers (auth, leads, users, dashboard, pipeline, activities, assignments, reports, tasks, import, search)
-  - `src/services/` - Business logic layer with Supabase client
+  - `src/controllers/` - Route handlers (auth, leads, users, dashboard, pipeline, activities, assignments, reports, tasks, import, search, chatbot)
+  - `src/services/` - Business logic layer with Supabase client and AI services
   - `src/middleware/` - Custom middleware (auth, error handling)
   - `src/routes/` - API route definitions
   - `src/validators/` - Input validation schemas
   - `src/utils/` - Utility functions (JWT, ApiError, assignment rules, report generator, parsers)
-  - `src/config/` - Supabase configuration
-  - `migrations/` - Legacy Knex migrations (reference only - use Supabase migrations)
-  - `seeds/` - Legacy seed data (reference only - use Supabase SQL)
+  - `src/config/` - Supabase and AI configuration
+  - `scripts/` - Supabase maintenance utilities (demo seeding, SQL execution helpers)
 
 ### Frontend Architecture  
 - **React 18** with functional components and hooks
@@ -134,6 +133,7 @@ This is a full-stack CRM application with separated backend and frontend:
 - **Global search**: Cross-module search functionality with suggestions
 - **Dashboard**: Analytics and recent activity
 - **User management**: Admin-only user administration
+- **AI Chatbot**: Google Gemini AI integration for intelligent assistance
 
 ## Environment Setup
 
@@ -148,22 +148,19 @@ Backend requires `.env` file with:
 ```bash
 SUPABASE_URL=your_supabase_project_url
 SUPABASE_SERVICE_KEY=your_supabase_service_role_key
+GEMINI_API_KEY=your_google_gemini_api_key  # For AI chatbot functionality
+JWT_SECRET=your_jwt_secret_for_fallback    # Legacy JWT fallback
+PORT=5000
+NODE_ENV=development
+FRONTEND_URL=http://localhost:3000
 ```
-
-### Legacy PostgreSQL Configuration
-Backend `.env` for traditional setup:
-- Database connection: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`
-- JWT configuration: `JWT_SECRET`, `JWT_EXPIRES_IN`
-- CORS configuration: `FRONTEND_URL`
-- Rate limiting: `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_MAX_REQUESTS`
-- Environment: `NODE_ENV`, `PORT`
 
 ### Authentication Setup
 **Supabase Mode**: Register via `/register-company` endpoint for multi-tenant setup
 **Legacy Mode**: Default credentials after seeding:
-- Admin: `admin@crm.com` / `admin123`
-- Manager: `manager@crm.com` / `admin123`
-- Sales Rep: `sales@crm.com` / `admin123`
+- Admin: `admin@sakha.com` / `admin123`
+- Manager: `manager@sakha.com` / `admin123`
+- Sales Rep: `sales@sakha.com` / `admin123`
 
 ## Development Flow
 
@@ -196,14 +193,14 @@ Backend `.env` for traditional setup:
 - **Company registration**: Ensure auth triggers are properly configured in Supabase
 
 ### Legacy Issues
-- Ensure PostgreSQL is running before starting backend
+- Ensure Supabase environment variables are configured before starting backend
 - CORS configured for localhost:3000 development
 - Rate limiting may block rapid API calls during development
 - JWT tokens expire based on JWT_EXPIRES_IN setting
 
 ### Automated Scripts Troubleshooting
 - If scripts fail, run `stop-all.bat` and wait 10 seconds before retrying
-- Check that Docker is running for `start-dev.bat`
+- Check that local prerequisites are ready for `start-dev.bat`
 - Ensure no other applications are using ports 3000 or 5000
 
 ## Important Implementation Details
@@ -240,12 +237,12 @@ Backend `.env` for traditional setup:
 - Frontend changes auto-reload in browser during development
 - **Schema management**: All database changes via Supabase, not Knex migrations
 
-### Docker & Deployment
-- **Docker Compose**: Full containerization with backend and frontend services (PostgreSQL replaced by Supabase)
-- **Health Checks**: Configured for all services with graceful shutdown
-- **Development Profiles**: Use `docker-compose --profile dev up` for hot-reload frontend on port 3001
-- **Production**: Use `docker-compose up` for production containers
-- **Resource Limits**: CPU and memory constraints configured for optimal performance
+### Local Deployment
+- **Local Scripts**: Use start-local.bat or manual npm commands to run backend on :5000 and frontend on :3000
+- **Health Checks**: Configured for backend and frontend services with graceful shutdown
+- **Hot Reloading**: Vite and nodemon provide automatic reload during development
+- **Production**: Deploy the backend with a Node.js process manager (e.g., PM2) and host the frontend build via static hosting
+- **Resource Management**: Monitor CPU and memory using your operating system tools as needed
 - **Vercel Integration**: Frontend deployment configuration available
 
 ## Critical Implementation Details
@@ -256,12 +253,12 @@ Backend `.env` for traditional setup:
 - **Lead Form Integration**: LeadForm component handles both creation and editing modes with proper form field population and validation
 
 ### Error Handling Architecture
-- **Centralized Error Middleware** (`src/middleware/errorMiddleware.js`): Handles PostgreSQL-specific errors (23505 unique violations, 23503 foreign key violations)
+- **Centralized Error Middleware** (`src/middleware/errorMiddleware.js`): Handles Supabase-specific error codes (23505 unique violations, 23503 foreign key violations)
 - **Development Error Logging**: Full error details including stack traces, request context, and body data logged in development mode
 - **ApiError Class**: Custom error class with proper HTTP status codes and consistent error response format
 
 ### Database Constraints & Relationships
-- **DATABASE TYPE: SUPABASE (PostgreSQL + Auth + RLS) - EXCLUSIVELY USED**
+- **DATABASE TYPE: SUPABASE (hosted database + Auth + RLS) - EXCLUSIVELY USED**
 - **Current Branch**: Uses Supabase ONLY with RLS policies and auth triggers
 - **Foreign Key Constraints**: `pipeline_stage_id` references `pipeline_stages.id`, `assigned_to` references `users.id`
 - **Schema Management**:

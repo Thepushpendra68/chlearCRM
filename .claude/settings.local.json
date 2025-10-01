@@ -100,7 +100,8 @@
       "Bash(npm run dev:clean:*)",
       "Read(//c/Users/Vishaka/**)",
       "Read(//c/c/Users/Vishaka/**)",
-      "WebFetch(domain:ai.google.dev)"
+      "WebFetch(domain:ai.google.dev)",
+      "Bash(powershell:*)"
     ],
     "deny": [],
     "ask": []

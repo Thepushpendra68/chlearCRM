@@ -1,7 +1,7 @@
 @echo off
 setlocal
 
-echo [INFO] Docker-based development mode has been retired.
+echo [INFO] The legacy container-based development mode has been retired.
 echo [INFO] Launching local backend and frontend services instead...
 
 call "%~dp0start-local.bat" --no-pause

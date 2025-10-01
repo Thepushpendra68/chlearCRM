@@ -1,5 +1,6 @@
 import { createContext, useContext, useReducer, useEffect, useRef } from 'react'
-import supabase, { signIn, signUpWithCompany, signOut, getCurrentSession, updateUserProfile, getCurrentUserProfile } from '../config/supabase'
+import supabase, { signIn, signOut, updateUserProfile, getCurrentUserProfile } from '../config/supabase'
+import authService from '../services/authService'
 import toast from 'react-hot-toast'
 
 const AuthContext = createContext()
@@ -213,17 +214,28 @@ export const AuthProvider = ({ children }) => {
     dispatch({ type: 'AUTH_START' })
 
     try {
-      const { data, error } = await signUpWithCompany(userData, companyData)
-
-      if (error) {
-        throw error
+      const payload = {
+        companyName: companyData.name,
+        subdomain: companyData.subdomain,
+        industry: companyData.industry,
+        size: companyData.size,
+        country: companyData.country,
+        email: userData.email,
+        password: userData.password,
+        firstName: userData.first_name,
+        lastName: userData.last_name
       }
 
-      // User will be automatically signed in after email confirmation
-      toast.success('Company registered successfully! Please check your email to verify your account.')
+      const response = await authService.registerCompany(payload)
+
+      dispatch({ type: 'SET_LOADING', payload: false })
+      dispatch({ type: 'CLEAR_ERROR' })
+
+      const successMessage = response?.data?.message || 'Company registered successfully! Please check your email to verify your account.'
+      toast.success(successMessage)
       return { success: true }
     } catch (error) {
-      const errorMessage = error.message || 'Registration failed'
+      const errorMessage = error?.response?.data?.message || error.message || 'Registration failed'
       dispatch({
         type: 'AUTH_FAILURE',
         payload: errorMessage

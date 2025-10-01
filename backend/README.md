@@ -10,13 +10,13 @@ A Node.js/Express backend API for a Customer Relationship Management (CRM) syste
 - 📈 Dashboard Analytics
 - 🛡️ Security Middleware (Helmet, CORS, Rate Limiting)
 - ✅ Input Validation & Error Handling
-- 🗄️ Supabase Database (PostgreSQL + Auth + Real-time)
+- 🗄️ Supabase Database (hosted database + Auth + Real-time)
 
 ## Tech Stack
 
 - **Runtime**: Node.js
 - **Framework**: Express.js
-- **Database**: Supabase (PostgreSQL + Auth + Real-time)
+- **Database**: Supabase (hosted database + Auth + Real-time)
 - **Database Client**: Supabase JavaScript Client
 - **Authentication**: Supabase Auth + JWT validation
 - **Validation**: express-validator
@@ -46,11 +46,11 @@ A Node.js/Express backend API for a Customer Relationship Management (CRM) syste
    - Copy your Project URL and Service Role key from Settings > API
    - Run the SQL schema from `SUPABASE_SETUP.md` in the SQL editor
 
-4. **Database setup** (DEPRECATED - Use Supabase instead):
+4. **(Optional) Seed demo data**:
    ```bash
-   # npm run migrate     # DEPRECATED - Use Supabase schema
-   # npm run seed        # DEPRECATED - Use Supabase SQL or company registration
+   npm run seed:supabase
    ```
+   This uses the Supabase service role key to create a demo company, team members, and sample leads.
 
 ## Environment Variables
 
@@ -79,9 +79,7 @@ RATE_LIMIT_MAX_REQUESTS=100
 
 - `npm start` - Start the production server
 - `npm run dev` - Start the development server with nodemon
-- ~~`npm run migrate`~~ - DEPRECATED - Use Supabase schema management
-- ~~`npm run migrate:rollback`~~ - DEPRECATED - Use Supabase migrations
-- ~~`npm run seed`~~ - DEPRECATED - Use Supabase SQL or company registration
+- `npm run seed:supabase` - Seed demo data in Supabase (creates demo company, team members, and sample leads)
 - `npm test` - Run tests
 - `npm run test:watch` - Run tests in watch mode
 
@@ -139,12 +137,12 @@ RATE_LIMIT_MAX_REQUESTS=100
 - **Company Registration**: Use `/api/auth/register-company` to create your organization
 - **User Management**: Handled via Supabase Auth with custom user profiles
 
-**Legacy Test Users** (if using legacy seed data):
-- **Admin**: admin@crm.com / admin123
-- **Manager**: manager@crm.com / admin123
-- **Sales Rep**: sales@crm.com / admin123
+**Demo Accounts** (created by `npm run seed:supabase`):
+- **Admin**: admin@demo-company.com / Admin123!
+- **Manager**: manager@demo-company.com / Demo123!
+- **Sales Rep**: sales@demo-company.com / Demo123!
 
-⚠️ **Note**: In production, use Supabase Auth registration instead of legacy seed users.
+Note: In production, use Supabase Auth registration instead of the seed accounts.
 
 ## Security Features
 

@@ -89,7 +89,7 @@ const Homepage = () => {
   const inclusiveFeatures = [
     {
       title: 'Designed for Everyone',
-      description: 'No technical expertise needed. If you can have a conversation, you can use CHLEAR CRM.',
+      description: 'No technical expertise needed. If you can have a conversation, you can use Sakha.',
       icon: UserGroupIcon
     },
     {
@@ -177,7 +177,7 @@ const Homepage = () => {
                 <SparklesIcon className="h-6 w-6 text-white" />
               </div>
               <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
-                CHLEAR CRM
+                Sakha
               </span>
             </Link>
           </div>
@@ -231,7 +231,7 @@ const Homepage = () => {
                     <SparklesIcon className="h-5 w-5 text-white" />
                   </div>
                   <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                    CHLEAR CRM
+                    Sakha
                   </span>
                 </Link>
                 <button
@@ -435,7 +435,7 @@ const Homepage = () => {
               Perfect for Your Business
             </h2>
             <p className="text-lg text-gray-600">
-              Small businesses of all types trust CHLEAR CRM to grow
+              Small businesses of all types trust Sakha to grow
             </p>
           </div>
 
@@ -459,7 +459,7 @@ const Homepage = () => {
               Real Stories from Real Businesses
             </h2>
             <p className="text-lg text-blue-200">
-              See how CHLEAR CRM is helping small businesses worldwide
+              See how Sakha is helping small businesses worldwide
             </p>
           </div>
 
@@ -491,7 +491,7 @@ const Homepage = () => {
               Ready to Grow Your Business?
             </h2>
             <p className="text-xl text-white/90 mb-8 max-w-2xl mx-auto">
-              Join thousands of small businesses using CHLEAR CRM.
+              Join thousands of small businesses using Sakha.
               Start free, no credit card required, cancel anytime.
             </p>
 
@@ -529,7 +529,7 @@ const Homepage = () => {
                 <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 flex items-center justify-center">
                   <SparklesIcon className="h-6 w-6 text-white" />
                 </div>
-                <span className="text-2xl font-bold">CHLEAR CRM</span>
+                <span className="text-2xl font-bold">Sakha</span>
               </Link>
               <p className="text-gray-400 max-w-md mb-6">
                 The first truly inclusive CRM platform designed for small businesses worldwide.
@@ -566,7 +566,7 @@ const Homepage = () => {
 
           <div className="mt-12 pt-8 border-t border-gray-800">
             <p className="text-center text-gray-400 text-sm">
-              © 2025 CHLEAR CRM. Made with ❤️ for small businesses everywhere.
+              © 2025 Sakha - Your Friend in CRM. Made with ❤️ for small businesses everywhere.
               <span className="mx-2">•</span>
               English • हिन्दी • Español
             </p>

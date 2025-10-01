@@ -69,7 +69,7 @@ class SupabaseAuthController {
 
       res.status(201).json({
         success: true,
-        message: 'Company and admin user created successfully',
+        message: 'Company registered successfully. Please check your email to verify your account.',
         data: {
           company: result.company,
           user: {
@@ -77,6 +77,7 @@ class SupabaseAuthController {
             email: result.user.email,
             role: 'company_admin',
           },
+          profile: result.profile,
         },
       });
     } catch (error) {

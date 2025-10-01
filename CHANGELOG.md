@@ -34,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.0] - 2025-01-27
 
 ### Added
-- Initial release of CHLEAR CRM
+- Initial release of Sakha - Your Friend in CRM (formerly CHLEAR CRM)
 - Complete user management system
 - Lead tracking and management
 - Dashboard with real-time statistics
@@ -48,11 +48,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Technical Details
 - Backend: Node.js with Express.js
 - Frontend: React 18 with Vite
-- Database: PostgreSQL with Knex.js
+- Database: Supabase-compatible SQL schema managed with Knex.js
 - Authentication: JWT tokens
 - Styling: Tailwind CSS
 - Testing: Jest for backend, ESLint for frontend
-- Deployment: Docker-ready configuration
+- Deployment: local environment configuration
 
 ---
 

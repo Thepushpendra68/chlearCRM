@@ -1,15 +1,14 @@
-# CHLEAR CRM - Customer Relationship Management System
+# Sakha - Your Friend in CRM
 
 <div align="center">
 
-![CHLEAR CRM](https://img.shields.io/badge/CHLEAR-CRM-blue?style=for-the-badge&logo=react&logoColor=white)
+![Sakha](https://img.shields.io/badge/Sakha-CRM-blue?style=for-the-badge&logo=react&logoColor=white)
 ![Version](https://img.shields.io/badge/version-1.0.0-green?style=for-the-badge)
 ![License](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)
 ![Node.js](https://img.shields.io/badge/Node.js-18+-green?style=for-the-badge&logo=node.js)
 ![React](https://img.shields.io/badge/React-18+-blue?style=for-the-badge&logo=react)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-12+-blue?style=for-the-badge&logo=postgresql)
 
-A modern, full-stack Customer Relationship Management (CRM) system built with cutting-edge web technologies. Designed for scalability, security, and user experience.
+A modern, full-stack Customer Relationship Management (CRM) system built with cutting-edge web technologies. Sakha (meaning friend, companion, or playmate) is designed for scalability, security, and user experience.
 
 [🚀 Quick Start](#-quick-start) • [📖 Documentation](#-documentation) • [🤝 Contributing](#-contributing) • [📄 License](#-license)
 
@@ -52,7 +51,7 @@ A modern, full-stack Customer Relationship Management (CRM) system built with cu
 
 ### Backend
 - **Node.js** with Express.js
-- **Supabase** (PostgreSQL + Auth + Real-time)
+- **Supabase** (hosted database + Auth + Real-time)
 - **Supabase Client** for database operations and authentication
 - **JWT** for token validation (Supabase managed)
 - **bcryptjs** for password hashing (legacy fallback)
@@ -69,7 +68,7 @@ A modern, full-stack Customer Relationship Management (CRM) system built with cu
 ## 📁 Project Architecture
 
 ```
-chlearCRM/
+sakha/
 ├── 📁 backend/                    # Node.js/Express API Server
 │   ├── 📁 src/
 │   │   ├── 📁 controllers/        # Route controllers & business logic
@@ -81,8 +80,7 @@ chlearCRM/
 │   │   ├── 📁 config/             # Database & app configuration
 │   │   ├── 📁 validators/         # Input validation schemas
 │   │   └── 📄 app.js              # Express application setup
-│   ├── 📁 migrations/             # Database schema migrations
-│   ├── 📁 seeds/                  # Database seed data
+│   ├── 📁 scripts/                # Supabase maintenance scripts (demo seed, SQL runners)
 │   └── 📄 package.json            # Backend dependencies
 ├── 📁 frontend/                   # React.js Frontend Application
 │   ├── 📁 src/
@@ -115,23 +113,23 @@ chlearCRM/
 
 - **Backend**: RESTful API with Express.js, Supabase integration, JWT token validation
 - **Frontend**: Single Page Application with React 18, Vite build tool, Tailwind CSS
-- **Database**: Supabase (PostgreSQL + Auth + Real-time + RLS policies)
+- **Database**: Supabase (hosted database + Auth + Real-time + RLS policies)
 - **Authentication**: Supabase Auth with JWT tokens and role-based access control
-- **Deployment**: Docker-ready with CI/CD pipeline support, Supabase hosted database
+- **Deployment**: Local-development-friendly with CI/CD pipeline support, Supabase hosted database
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
 - Node.js (v18 or higher)
-- Supabase account and project (replaces PostgreSQL setup)
+- Supabase account and project (replaces legacy database setup)
 - npm or yarn
 
 ### 1. Clone and Setup
 
 ```bash
 # Navigate to the project directory
-cd "C:\Users\Vishaka\Downloads\CHLEAR CRM"
+cd "C:\Users\Vishaka\Downloads\Sakha"
 
 # Install backend dependencies
 cd backend
@@ -213,9 +211,9 @@ npm run dev
 📝 **Test Users** (for development, if seeded via legacy scripts):
 | Role | Email | Password |
 |------|-------|----------|
-| Admin | admin@crm.com | admin123 |
-| Manager | manager@crm.com | admin123 |
-| Sales Rep | sales@crm.com | admin123 |
+| Admin | admin@sakha.com | admin123 |
+| Manager | manager@sakha.com | admin123 |
+| Sales Rep | sales@sakha.com | admin123 |
 
 ⚠️ **Note**: These test users are from legacy seed data. In production, use Supabase Auth registration.
 
@@ -337,16 +335,16 @@ This is a foundational CRM system. Future enhancements could include:
 
 ## 📈 Project Status
 
-![GitHub last commit](https://img.shields.io/github/last-commit/Thepushpendra68/chlearCRM?style=flat-square)
-![GitHub issues](https://img.shields.io/github/issues/Thepushpendra68/chlearCRM?style=flat-square)
-![GitHub pull requests](https://img.shields.io/github/issues-pr/Thepushpendra68/chlearCRM?style=flat-square)
-![GitHub stars](https://img.shields.io/github/stars/Thepushpendra68/chlearCRM?style=flat-square)
+![GitHub last commit](https://img.shields.io/github/last-commit/yourusername/sakha?style=flat-square)
+![GitHub issues](https://img.shields.io/github/issues/yourusername/sakha?style=flat-square)
+![GitHub pull requests](https://img.shields.io/github/issues-pr/yourusername/sakha?style=flat-square)
+![GitHub stars](https://img.shields.io/github/stars/yourusername/sakha?style=flat-square)
 
 ### 🎯 Current Status: **Production Ready v1.0.0**
 
 - ✅ **Core Features**: Complete CRM functionality implemented
 - ✅ **Authentication**: JWT-based auth with role management
-- ✅ **Database**: PostgreSQL with proper migrations
+- ✅ **Database**: Supabase-managed database with proper migrations
 - ✅ **API**: RESTful endpoints with validation
 - ✅ **Frontend**: React SPA with responsive design
 - ✅ **Testing**: Backend tests with Jest
@@ -385,8 +383,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 <div align="center">
 
-**Made with ❤️ by the CHLEAR CRM Team**
+**Made with ❤️ by the Sakha Team**
 
-[⭐ Star this repo](https://github.com/Thepushpendra68/chlearCRM) • [🐛 Report Bug](https://github.com/Thepushpendra68/chlearCRM/issues) • [💡 Request Feature](https://github.com/Thepushpendra68/chlearCRM/issues)
+**Sakha** - *Your Friend in CRM*
+
+[⭐ Star this repo](https://github.com/yourusername/sakha) • [🐛 Report Bug](https://github.com/yourusername/sakha/issues) • [💡 Request Feature](https://github.com/yourusername/sakha/issues)
 
 </div>

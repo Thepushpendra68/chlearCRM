@@ -160,22 +160,45 @@ export async function getCurrentUserProfile() {
       return { profile: null, error: profileError };
     }
 
+    let profileRecord = profile;
+
+    // Auto-sync email verification state after user confirms their address
+    if (!profile.email_verified && session.user.email_confirmed_at) {
+      const { data: updatedProfile, error: emailSyncError } = await supabase
+        .from('user_profiles')
+        .update({
+          email_verified: true,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', userId)
+        .select(`
+          *,
+          companies(name, subdomain)
+        `)
+        .single();
+      if (!emailSyncError && updatedProfile) {
+        profileRecord = updatedProfile;
+      } else {
+        profileRecord = { ...profile, email_verified: true };
+      }
+    }
+
     // Combine with auth user data
     const userProfile = {
-      id: profile.id,
+      id: profileRecord.id,
       email: session.user.email,
       email_verified: session.user.email_confirmed_at !== null,
-      first_name: profile.first_name,
-      last_name: profile.last_name,
-      role: profile.role,
-      company_id: profile.company_id,
-      company_name: profile.companies?.name || '',
-      company_subdomain: profile.companies?.subdomain || '',
-      avatar_url: profile.avatar_url,
-      phone: profile.phone,
-      is_active: profile.is_active,
-      created_at: profile.created_at,
-      updated_at: profile.updated_at
+      first_name: profileRecord.first_name,
+      last_name: profileRecord.last_name,
+      role: profileRecord.role,
+      company_id: profileRecord.company_id,
+      company_name: profileRecord.companies?.name || '',
+      company_subdomain: profileRecord.companies?.subdomain || '',
+      avatar_url: profileRecord.avatar_url,
+      phone: profileRecord.phone,
+      is_active: profileRecord.is_active,
+      created_at: profileRecord.created_at,
+      updated_at: profileRecord.updated_at
     };
 
     console.log('✅ [SUPABASE] Profile fetched successfully:', userProfile.email, userProfile.role);

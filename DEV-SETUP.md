@@ -1,6 +1,6 @@
 # Local Development Setup
 
-This project now runs entirely on your local machine. Docker is no longer required for day-to-day development.
+This project now runs entirely on your local machine. No container tooling is required for day-to-day development.
 
 ## Available Scripts
 
@@ -12,7 +12,7 @@ This project now runs entirely on your local machine. Docker is no longer requir
 
 ### start-dev.bat
 - Legacy filename kept for convenience
-- Prints a reminder that Docker is retired and forwards to `start-local.bat`
+- Prints a reminder that the legacy container workflow is retired and forwards to `start-local.bat`
 
 ### start-frontend.bat
 - Starts only the React dev server on http://localhost:3000
@@ -53,4 +53,4 @@ The backend listens on http://localhost:5000 and exposes a `/health` endpoint. T
 2. Make sure `backend/.env` and `frontend/.env` contain the Supabase keys supplied in the repository.
 3. Confirm Node.js 18+ and npm 9+ are installed locally: `node -v`, `npm -v`.
 
-With these scripts, you can develop without ever starting Docker Desktop.
+With these scripts, you can develop without any container tooling.

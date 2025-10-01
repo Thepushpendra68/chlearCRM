@@ -193,11 +193,54 @@ async function getUserProfile(userId) {
  * @returns {object} Created company and user data
  */
 async function createCompanyWithAdmin(companyData, userData) {
+  const normalizedCompanyData = {
+    ...companyData,
+    name: companyData.name?.trim() || companyData.name,
+    subdomain: companyData.subdomain?.trim().toLowerCase() || null,
+    status: companyData.status || 'active',
+  };
+
+  const signupOptions = {
+    email: userData.email,
+    password: userData.password,
+    options: {
+      data: {
+        first_name: userData.first_name,
+        last_name: userData.last_name,
+        company_name: normalizedCompanyData.name,
+        role: 'company_admin',
+      },
+    },
+  };
+
+  if (process.env.SUPABASE_EMAIL_REDIRECT_TO) {
+    signupOptions.options.emailRedirectTo = process.env.SUPABASE_EMAIL_REDIRECT_TO;
+  }
+
+  let createdUser = null;
+  let createdCompany = null;
+
   try {
-    // Create company first
+    // 1. Create the user via Supabase Auth (sends confirmation email automatically)
+    const { data: signUpData, error: signUpError } = await supabaseAnon.auth.signUp(signupOptions);
+
+    if (signUpError) {
+      throw signUpError;
+    }
+
+    createdUser = signUpData?.user;
+
+    if (!createdUser?.id) {
+      throw new Error('Supabase sign up did not return a user ID');
+    }
+
+    // 2. Create the company record
     const { data: company, error: companyError } = await supabaseAdmin
       .from('companies')
-      .insert(companyData)
+      .insert({
+        ...normalizedCompanyData,
+        updated_at: new Date().toISOString(),
+      })
       .select()
       .single();
 
@@ -205,31 +248,76 @@ async function createCompanyWithAdmin(companyData, userData) {
       throw companyError;
     }
 
-    // Create user with company association
-    const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email: userData.email,
-      password: userData.password,
-      email_confirm: true,
+    createdCompany = company;
+
+    // 3. Ensure user has company metadata for RLS-aware JWTs
+    const { error: metadataError } = await supabaseAdmin.auth.admin.updateUserById(createdUser.id, {
+      app_metadata: {
+        ...(createdUser.app_metadata || {}),
+        company_id: company.id,
+        role: 'company_admin',
+      },
       user_metadata: {
+        ...(createdUser.user_metadata || {}),
         first_name: userData.first_name,
         last_name: userData.last_name,
         company_id: company.id,
+        company_name: normalizedCompanyData.name,
         role: 'company_admin',
       },
     });
 
-    if (authError) {
-      // Cleanup: delete the company if user creation failed
-      await supabaseAdmin.from('companies').delete().eq('id', company.id);
-      throw authError;
+    if (metadataError) {
+      throw metadataError;
+    }
+
+    // 4. Create user profile row (bypasses RLS with service role)
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('user_profiles')
+      .insert({
+        id: createdUser.id,
+        company_id: company.id,
+        role: 'company_admin',
+        first_name: userData.first_name,
+        last_name: userData.last_name,
+        email_verified: false,
+        is_active: true,
+        created_by: createdUser.id,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+
+    if (profileError) {
+      throw profileError;
     }
 
     return {
       company,
-      user: authUser.user,
+      user: {
+        id: createdUser.id,
+        email: createdUser.email,
+        app_metadata: {
+          ...(createdUser.app_metadata || {}),
+          company_id: company.id,
+          role: 'company_admin',
+        },
+      },
+      profile,
     };
   } catch (error) {
     console.error('Error creating company with admin:', error);
+
+    // Cleanup on failure
+    if (createdCompany?.id) {
+      await supabaseAdmin.from('companies').delete().eq('id', createdCompany.id);
+    }
+
+    if (createdUser?.id) {
+      await supabaseAdmin.auth.admin.deleteUser(createdUser.id);
+    }
+
     throw error;
   }
 }
