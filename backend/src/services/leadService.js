@@ -12,7 +12,7 @@ const getLeads = async (currentUser, page = 1, limit = 20, filters = {}) => {
     let query = supabaseAdmin
       .from('leads')
       .select(`
-        id, name, email, phone, company, title,
+        id, name, first_name, last_name, email, phone, company, title,
         status, source, deal_value, expected_close_date, notes,
         priority, created_at, updated_at, assigned_at,
         assigned_to, created_by, pipeline_stage_id,
@@ -80,16 +80,11 @@ const getLeads = async (currentUser, page = 1, limit = 20, filters = {}) => {
 
     // Format the data efficiently
     const formattedLeads = leadsResult.data.map(lead => {
-      // Split name into first and last for frontend compatibility
-      const nameParts = (lead.name || '').split(' ');
-      const first_name = nameParts[0] || '';
-      const last_name = nameParts.slice(1).join(' ') || '';
-
       return {
         id: lead.id,
         name: lead.name || '',
-        first_name,
-        last_name,
+        first_name: lead.first_name || '',
+        last_name: lead.last_name || '',
         email: lead.email,
         phone: lead.phone,
         company: lead.company,
@@ -147,15 +142,10 @@ const getLeadById = async (id) => {
 
     // Transform database fields to frontend expected format
     if (lead) {
-      // Split name into first and last for frontend compatibility
-      const nameParts = (lead.name || '').split(' ');
-      const first_name = nameParts[0] || '';
-      const last_name = nameParts.slice(1).join(' ') || '';
-
       return {
         ...lead,
-        first_name,
-        last_name,
+        first_name: lead.first_name || '',
+        last_name: lead.last_name || '',
         job_title: lead.title, // Map title to job_title for frontend
         lead_source: lead.source, // Map source to lead_source for frontend
         assigned_user_first_name: lead.user_profiles?.first_name || null,
@@ -180,7 +170,9 @@ const createLead = async (leadData) => {
     // Transform frontend field names to database column names
     const transformedData = {
       company_id: leadData.company_id,
-      name: `${leadData.first_name} ${leadData.last_name}`.trim(),
+      first_name: leadData.first_name,
+      last_name: leadData.last_name,
+      name: `${leadData.first_name} ${leadData.last_name}`.trim(), // Keep for backward compatibility
       email: leadData.email,
       phone: leadData.phone,
       company: leadData.company,
@@ -281,7 +273,10 @@ const updateLead = async (id, leadData, currentUser) => {
 
     // Transform frontend field names to database column names
     const transformedData = {};
+    if (leadData.first_name !== undefined) transformedData.first_name = leadData.first_name;
+    if (leadData.last_name !== undefined) transformedData.last_name = leadData.last_name;
     if (leadData.first_name !== undefined || leadData.last_name !== undefined) {
+      // Keep name field for backward compatibility
       transformedData.name = `${leadData.first_name || ''} ${leadData.last_name || ''}`.trim();
     }
     if (leadData.email !== undefined) transformedData.email = leadData.email;

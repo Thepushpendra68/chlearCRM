@@ -113,11 +113,30 @@ const getUserPerformance = async (req, res, next) => {
   }
 };
 
+/**
+ * @desc    Get sidebar badge counts
+ * @route   GET /api/dashboard/badge-counts
+ * @access  Private
+ */
+const getBadgeCounts = async (req, res, next) => {
+  try {
+    const counts = await analyticsService.getBadgeCounts(req.user);
+
+    res.json({
+      success: true,
+      data: counts
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getDashboardStats,
   getRecentLeads,
   getLeadTrends,
   getLeadSources,
   getLeadStatus,
-  getUserPerformance
+  getUserPerformance,
+  getBadgeCounts
 };

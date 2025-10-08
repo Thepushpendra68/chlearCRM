@@ -308,7 +308,7 @@ const ChatbotWidget = () => {
       {!isOpen && (
         <button
           onClick={toggleChat}
-          className="fixed bottom-6 right-6 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-110 z-50"
+          className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 w-12 h-12 sm:w-14 sm:h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-110 z-50"
           aria-label="Open chat"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -319,7 +319,7 @@ const ChatbotWidget = () => {
 
       {/* Chat Window */}
       {isOpen && (
-        <div className="fixed bottom-6 right-6 w-96 h-[600px] bg-white rounded-lg shadow-2xl flex flex-col z-50 border border-gray-200">
+        <div className="fixed bottom-6 right-6 w-80 sm:w-72 h-[500px] sm:h-[450px] bg-white rounded-lg shadow-2xl flex flex-col z-50 border border-gray-200">
           {/* Header */}
           <div className="bg-blue-600 text-white p-4 rounded-t-lg flex items-center justify-between">
             <div className="flex items-center space-x-2">

@@ -31,7 +31,7 @@ class ActivityService {
       }
 
       if (filters.activity_type || filters.type) {
-        query = query.eq('type', filters.activity_type || filters.type);
+        query = query.eq('activity_type', filters.activity_type || filters.type);
       }
 
       if (filters.date_from) {
@@ -152,15 +152,23 @@ class ActivityService {
         return { success: false, error: 'Lead not found or access denied' };
       }
 
-      // Set default values with proper field mapping (only existing columns)
+      // Set default values with proper field mapping
       const newActivity = {
         lead_id: activityData.lead_id,
         user_id: activityData.user_id,
         company_id: currentUser.company_id,
         type: activityType,
+        activity_type: activityType,
+        subject: activityData.subject || null,
         description: activityData.description || null,
+        scheduled_at: activityData.scheduled_at || null,
+        completed_at: activityData.completed_at || null,
+        is_completed: activityData.is_completed || false,
+        duration_minutes: activityData.duration_minutes || null,
+        outcome: activityData.outcome || null,
         metadata: activityData.metadata || {},
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
 
       const { data: createdActivity, error } = await supabase
@@ -182,25 +190,27 @@ class ActivityService {
   }
 
   // Update activity
-  async updateActivity(activityId, updateData) {
+  async updateActivity(activityId, updateData, currentUser) {
     try {
       const supabase = supabaseAdmin;
 
-      // Check if activity exists
+      // Check if activity exists and belongs to user's company
       const { data: existingActivity, error: fetchError } = await supabase
         .from('activities')
         .select('*')
         .eq('id', activityId)
+        .eq('company_id', currentUser.company_id)
         .single();
 
       if (fetchError || !existingActivity) {
-        throw new Error('Activity not found');
+        return { success: false, error: 'Activity not found' };
       }
 
       // Prepare update data
       const updateFields = {
         subject: updateData.subject,
         description: updateData.description,
+        activity_type: updateData.activity_type,
         scheduled_at: updateData.scheduled_at,
         completed_at: updateData.completed_at,
         is_completed: updateData.is_completed,
@@ -218,18 +228,25 @@ class ActivityService {
       });
 
       // Update the activity
-      const { error: updateError } = await supabase
+      const { data: updatedActivity, error: updateError } = await supabase
         .from('activities')
         .update(updateFields)
-        .eq('id', activityId);
+        .eq('id', activityId)
+        .select(`
+          *,
+          leads!activities_lead_id_fkey(company, name),
+          user_profiles!activities_user_id_fkey(first_name, last_name)
+        `)
+        .single();
 
       if (updateError) {
-        throw new Error(`Failed to update activity: ${updateError.message}`);
+        console.error('Error updating activity:', updateError);
+        return { success: false, error: `Failed to update activity: ${updateError.message}` };
       }
 
       // If activity was marked as completed, update lead's last_contact_date
       if (updateData.is_completed && !existingActivity.is_completed &&
-          existingActivity.activity_type !== 'note') {
+          existingActivity.activity_type !== 'note' && existingActivity.lead_id) {
         const { error: leadUpdateError } = await supabase
           .from('leads')
           .update({
@@ -244,10 +261,18 @@ class ActivityService {
         }
       }
 
-      // Fetch the updated activity
-      const updatedActivity = await this.getActivityById(activityId);
+      // Format the data to match expected structure
+      const formattedActivity = {
+        ...updatedActivity,
+        company: updatedActivity.leads?.company,
+        contact_name: updatedActivity.leads?.name,
+        first_name: updatedActivity.user_profiles?.first_name,
+        last_name: updatedActivity.user_profiles?.last_name,
+        leads: undefined,
+        user_profiles: undefined
+      };
 
-      return { success: true, data: updatedActivity.data };
+      return { success: true, data: formattedActivity };
     } catch (error) {
       console.error('Error updating activity:', error);
       return { success: false, error: error.message };
@@ -274,19 +299,20 @@ class ActivityService {
   }
 
   // Mark activity as completed
-  async completeActivity(activityId, completionData = {}) {
+  async completeActivity(activityId, completionData = {}, currentUser) {
     try {
       const supabase = supabaseAdmin;
 
-      // Check if activity exists
+      // Check if activity exists and belongs to user's company
       const { data: existingActivity, error: fetchError } = await supabase
         .from('activities')
         .select('*')
         .eq('id', activityId)
+        .eq('company_id', currentUser.company_id)
         .single();
 
       if (fetchError || !existingActivity) {
-        throw new Error('Activity not found');
+        return { success: false, error: 'Activity not found' };
       }
 
       const updateData = {
@@ -298,17 +324,24 @@ class ActivityService {
       };
 
       // Update the activity
-      const { error: updateError } = await supabase
+      const { data: updatedActivity, error: updateError } = await supabase
         .from('activities')
         .update(updateData)
-        .eq('id', activityId);
+        .eq('id', activityId)
+        .select(`
+          *,
+          leads!activities_lead_id_fkey(company, name),
+          user_profiles!activities_user_id_fkey(first_name, last_name)
+        `)
+        .single();
 
       if (updateError) {
-        throw new Error(`Failed to complete activity: ${updateError.message}`);
+        console.error('Error completing activity:', updateError);
+        return { success: false, error: `Failed to complete activity: ${updateError.message}` };
       }
 
-      // Update lead's last_contact_date if it's not a note
-      if (existingActivity.activity_type !== 'note') {
+      // Update lead's last_contact_date if it's not a note and has a lead
+      if (existingActivity.activity_type !== 'note' && existingActivity.lead_id) {
         const { error: leadUpdateError } = await supabase
           .from('leads')
           .update({
@@ -323,9 +356,18 @@ class ActivityService {
         }
       }
 
-      const updatedActivity = await this.getActivityById(activityId);
+      // Format the data to match expected structure
+      const formattedActivity = {
+        ...updatedActivity,
+        company: updatedActivity.leads?.company,
+        contact_name: updatedActivity.leads?.name,
+        first_name: updatedActivity.user_profiles?.first_name,
+        last_name: updatedActivity.user_profiles?.last_name,
+        leads: undefined,
+        user_profiles: undefined
+      };
 
-      return { success: true, data: updatedActivity.data };
+      return { success: true, data: formattedActivity };
     } catch (error) {
       console.error('Error completing activity:', error);
       return { success: false, error: error.message };
@@ -397,6 +439,8 @@ class ActivityService {
         activities.push({
           lead_id: activityData.lead_id,
           user_id: activityData.user_id,
+          company_id: activityData.company_id,
+          type: activityData.activity_type,
           activity_type: activityData.activity_type,
           subject: activityData.subject || null,
           description: activityData.description || null,
@@ -405,7 +449,7 @@ class ActivityService {
           is_completed: activityData.is_completed || false,
           duration_minutes: activityData.duration_minutes || null,
           outcome: activityData.outcome || null,
-          metadata: activityData.metadata || null,
+          metadata: activityData.metadata || {},
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         });

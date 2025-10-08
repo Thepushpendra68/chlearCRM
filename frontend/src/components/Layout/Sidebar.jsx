@@ -1,8 +1,8 @@
 import { Fragment, useState, useRef, useEffect } from 'react'
 import { Dialog, Transition, Menu } from '@headlessui/react'
-import { 
-  XMarkIcon, 
-  ChevronLeftIcon, 
+import {
+  XMarkIcon,
+  ChevronLeftIcon,
   ChevronRightIcon,
   Cog6ToothIcon,
   UserCircleIcon,
@@ -22,28 +22,53 @@ import {
   DocumentChartBarIcon,
   ClipboardDocumentListIcon,
 } from '@heroicons/react/24/outline'
-
-// Main navigation items (top section)
-const mainNavigation = [
-  { name: 'Dashboard', href: '/app/dashboard', icon: HomeIcon, badge: null },
-  { name: 'Leads', href: '/app/leads', icon: UsersIcon, badge: 3 },
-  { name: 'Pipeline', href: '/app/pipeline', icon: Squares2X2Icon, badge: null },
-  { name: 'Activities', href: '/app/activities', icon: ClockIcon, badge: 2 },
-]
-
-// Utility/admin navigation items (bottom section)
-const utilityNavigation = [
-  { name: 'Assignments', href: '/app/assignments', icon: UserPlusIcon, badge: null },
-  { name: 'Tasks', href: '/app/tasks', icon: ClipboardDocumentListIcon, badge: 5 },
-  { name: 'Users', href: '/app/users', icon: UserGroupIcon, badge: null },
-  { name: 'Reports', href: '/app/reports', icon: DocumentChartBarIcon, badge: null },
-]
-
+import api from '../../services/api'
 
 const Sidebar = ({ sidebarOpen, setSidebarOpen, isCollapsed, setIsCollapsed }) => {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [isDarkMode, setIsDarkMode] = useState(false)
+  const [isHovered, setIsHovered] = useState(false)
+  const [badgeCounts, setBadgeCounts] = useState({
+    leads: 0,
+    activities: 0,
+    tasks: 0
+  })
+
+  // Fetch badge counts
+  useEffect(() => {
+    const fetchBadgeCounts = async () => {
+      try {
+        const response = await api.get('/dashboard/badge-counts')
+        if (response.data.success) {
+          setBadgeCounts(response.data.data)
+        }
+      } catch (error) {
+        console.error('Failed to fetch badge counts:', error)
+      }
+    }
+
+    fetchBadgeCounts()
+    // Refresh counts every 5 minutes
+    const interval = setInterval(fetchBadgeCounts, 5 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [])
+
+  // Main navigation items (top section)
+  const mainNavigation = [
+    { name: 'Dashboard', href: '/app/dashboard', icon: HomeIcon, badge: null },
+    { name: 'Leads', href: '/app/leads', icon: UsersIcon, badge: badgeCounts.leads || null },
+    { name: 'Pipeline', href: '/app/pipeline', icon: Squares2X2Icon, badge: null },
+    { name: 'Activities', href: '/app/activities', icon: ClockIcon, badge: badgeCounts.activities || null },
+  ]
+
+  // Utility/admin navigation items (bottom section)
+  const utilityNavigation = [
+    { name: 'Assignments', href: '/app/assignments', icon: UserPlusIcon, badge: null },
+    { name: 'Tasks', href: '/app/tasks', icon: ClipboardDocumentListIcon, badge: badgeCounts.tasks || null },
+    { name: 'Users', href: '/app/users', icon: UserGroupIcon, badge: null },
+    { name: 'Reports', href: '/app/reports', icon: DocumentChartBarIcon, badge: null },
+  ]
 
   // Handle keyboard navigation
   useEffect(() => {
@@ -251,14 +276,18 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, isCollapsed, setIsCollapsed }) =
       </Transition.Root>
 
       {/* Desktop sidebar */}
-      <div className={`hidden md:flex md:flex-shrink-0 transition-all duration-300 ${
-        isCollapsed ? 'md:w-16' : 'md:w-60'
-      }`}>
+      <div
+        className={`hidden md:flex md:flex-shrink-0 transition-all duration-300 ${
+          (isCollapsed && !isHovered) ? 'md:w-16' : 'md:w-60'
+        }`}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
         <div className="flex flex-col w-full bg-gray-50 border-r border-gray-200">
           <div className="flex flex-col h-0 flex-1">
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200">
-              {!isCollapsed && (
+              {(!isCollapsed || isHovered) && (
                 <div className="flex items-center">
                   <div className="flex-shrink-0 w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
                     <span className="text-white font-bold text-sm">S</span>
@@ -266,7 +295,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, isCollapsed, setIsCollapsed }) =
                   <span className="ml-3 text-xl font-bold text-gray-900">Sakha</span>
                 </div>
               )}
-              {isCollapsed && (
+              {(isCollapsed && !isHovered) && (
                 <div className="flex-shrink-0 w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center mx-auto">
                   <span className="text-white font-bold text-sm">S</span>
                 </div>
@@ -293,7 +322,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, isCollapsed, setIsCollapsed }) =
                   <NavItem
                     key={item.name}
                     item={item}
-                    isCollapsed={isCollapsed}
+                    isCollapsed={isCollapsed && !isHovered}
                   />
                 ))}
               </nav>
@@ -309,7 +338,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, isCollapsed, setIsCollapsed }) =
                   <NavItem
                     key={item.name}
                     item={item}
-                    isCollapsed={isCollapsed}
+                    isCollapsed={isCollapsed && !isHovered}
                   />
                 ))}
               </nav>
@@ -322,7 +351,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, isCollapsed, setIsCollapsed }) =
                   <div className="flex-shrink-0">
                     <UserCircleIcon className="h-8 w-8 text-gray-400" />
                   </div>
-                  {!isCollapsed && (
+                  {(!isCollapsed || isHovered) && (
                     <div className="ml-3 flex-1 min-w-0">
                       <div className="text-sm font-medium text-gray-800 truncate">
                         {user?.first_name} {user?.last_name}

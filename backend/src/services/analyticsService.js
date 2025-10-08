@@ -941,6 +941,82 @@ const getTeamWorkloadDistribution = async (currentUser) => {
   }
 };
 
+/**
+ * Get badge counts for sidebar
+ */
+const getBadgeCounts = async (currentUser) => {
+  try {
+    const supabase = supabaseAdmin;
+
+    // Get new leads count (last 7 days)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    let leadsQuery = supabase
+      .from('leads')
+      .select('id', { count: 'exact' })
+      .eq('company_id', currentUser.company_id)
+      .gte('created_at', sevenDaysAgo.toISOString());
+
+    // Non-admin users only see their assigned leads
+    if (currentUser.role !== 'company_admin' && currentUser.role !== 'super_admin') {
+      leadsQuery = leadsQuery.eq('assigned_to', currentUser.id);
+    }
+
+    const { count: newLeadsCount, error: leadsError } = await leadsQuery;
+
+    if (leadsError) {
+      console.error('Badge counts - leads error:', leadsError);
+    }
+
+    // Get pending activities count (scheduled but not completed)
+    let activitiesQuery = supabase
+      .from('activities')
+      .select('id', { count: 'exact' })
+      .eq('company_id', currentUser.company_id)
+      .eq('is_completed', false)
+      .not('scheduled_at', 'is', null);
+
+    // Non-admin users only see their activities
+    if (currentUser.role !== 'company_admin' && currentUser.role !== 'super_admin') {
+      activitiesQuery = activitiesQuery.eq('user_id', currentUser.id);
+    }
+
+    const { count: pendingActivitiesCount, error: activitiesError } = await activitiesQuery;
+
+    if (activitiesError) {
+      console.error('Badge counts - activities error:', activitiesError);
+    }
+
+    // Get pending tasks count
+    let tasksQuery = supabase
+      .from('tasks')
+      .select('id', { count: 'exact' })
+      .eq('company_id', currentUser.company_id)
+      .eq('status', 'pending');
+
+    // Non-admin users only see their assigned tasks
+    if (currentUser.role !== 'company_admin' && currentUser.role !== 'super_admin') {
+      tasksQuery = tasksQuery.eq('assigned_to', currentUser.id);
+    }
+
+    const { count: pendingTasksCount, error: tasksError } = await tasksQuery;
+
+    if (tasksError) {
+      console.error('Badge counts - tasks error:', tasksError);
+    }
+
+    return {
+      leads: newLeadsCount || 0,
+      activities: pendingActivitiesCount || 0,
+      tasks: pendingTasksCount || 0
+    };
+  } catch (error) {
+    console.error('Badge counts error:', error);
+    throw new ApiError('Failed to fetch badge counts', 500);
+  }
+};
+
 module.exports = {
   getDashboardStats,
   getRecentLeads,
@@ -953,5 +1029,6 @@ module.exports = {
   getActivityTrends,
   getConversionFunnelData,
   getResponseTimeAnalytics,
-  getTeamWorkloadDistribution
+  getTeamWorkloadDistribution,
+  getBadgeCounts
 };

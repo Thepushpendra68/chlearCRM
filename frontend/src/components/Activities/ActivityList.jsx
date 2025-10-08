@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { format, formatDistanceToNow } from 'date-fns';
 
-const ActivityList = ({ 
+const ActivityList = ({
   activities = [],
   loading = false,
   error = null,
-  leadId, 
-  userId, 
-  filters = {}, 
-  onActivityClick, 
+  leadId,
+  userId,
+  filters = {},
+  onActivityClick,
   onEditActivity,
+  onDeleteActivity,
   onRefresh,
   showFilters = true
 }) => {
@@ -347,6 +348,19 @@ const ActivityList = ({
                             className="text-xs text-blue-600 hover:text-blue-800 font-medium"
                           >
                             Edit
+                          </button>
+                        )}
+                        {onDeleteActivity && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (window.confirm('Are you sure you want to delete this activity?')) {
+                                onDeleteActivity(activity.id);
+                              }
+                            }}
+                            className="text-xs text-red-600 hover:text-red-800 font-medium"
+                          >
+                            Delete
                           </button>
                         )}
                       </div>

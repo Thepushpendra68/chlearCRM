@@ -6,7 +6,8 @@ const {
   getLeadTrends,
   getLeadSources,
   getLeadStatus,
-  getUserPerformance
+  getUserPerformance,
+  getBadgeCounts
 } = require('../controllers/dashboardController');
 
 const router = express.Router();
@@ -55,5 +56,12 @@ router.get('/lead-status', getLeadStatus);
  * @access  Private (Admin)
  */
 router.get('/user-performance', authorize(['company_admin', 'super_admin']), getUserPerformance);
+
+/**
+ * @route   GET /api/dashboard/badge-counts
+ * @desc    Get sidebar badge counts
+ * @access  Private
+ */
+router.get('/badge-counts', getBadgeCounts);
 
 module.exports = router;

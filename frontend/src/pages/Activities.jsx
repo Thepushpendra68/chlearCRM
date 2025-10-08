@@ -121,6 +121,25 @@ const Activities = () => {
     setSelectedLeadId(null);
   };
 
+  const handleDeleteActivity = async (activityId) => {
+    try {
+      console.log('Deleting activity:', activityId);
+      const response = await activityService.deleteActivity(activityId);
+
+      if (response.success) {
+        // Remove the activity from the list
+        setActivities(prev => prev.filter(activity => activity.id !== activityId));
+        console.log('Activity deleted successfully');
+      } else {
+        console.error('Failed to delete activity:', response.error);
+        alert('Failed to delete activity: ' + (response.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Error deleting activity:', error);
+      alert('Failed to delete activity');
+    }
+  };
+
 
   return (
     <div className="activities-page">
@@ -188,6 +207,7 @@ const Activities = () => {
               error={activitiesError}
               onActivityClick={handleActivityClick}
               onEditActivity={handleEditActivity}
+              onDeleteActivity={handleDeleteActivity}
               onRefresh={fetchActivities}
               showFilters={true}
             />
@@ -213,6 +233,7 @@ const Activities = () => {
             onClose={handleCloseActivityDetail}
             activity={selectedActivity}
             onEdit={handleEditFromDetail}
+            onDelete={handleDeleteActivity}
           />
         )}
       </div>

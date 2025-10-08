@@ -151,11 +151,20 @@ const ActivityForm = ({
       };
 
       let response;
-      if (activity) {
+      console.log('=== Activity Form Submit Debug ===');
+      console.log('activity prop:', activity);
+      console.log('activity.id:', activity?.id);
+      console.log('Is edit mode:', !!activity);
+
+      if (activity && activity.id) {
+        console.log('Calling updateActivity with ID:', activity.id);
         response = await activityService.updateActivity(activity.id, activityData);
       } else {
+        console.log('Calling createActivity (new activity)');
         response = await activityService.createActivity(activityData);
       }
+
+      console.log('API Response:', response);
 
       if (response.success) {
         console.log('Activity saved successfully:', response.data);
