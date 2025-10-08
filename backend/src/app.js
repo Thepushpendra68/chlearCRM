@@ -78,16 +78,36 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 // CORS configuration
-app.use(cors({
-  origin: [
-    process.env.FRONTEND_URL || 'http://localhost:3000',
-    'http://localhost:3000',  // Production frontend
-    'http://localhost:3001',  // Development frontend
-    'http://localhost:3002',  // Development frontend
-    'http://localhost:3003'   // Development frontend
-  ],
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'http://localhost:3002',
+  'http://localhost:3003'
+].filter(Boolean); // Remove undefined values
+
+// Allow all Vercel preview deployments
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, etc.)
+    if (!origin) return callback(null, true);
+
+    // Allow Vercel deployments (*.vercel.app)
+    if (origin.endsWith('.vercel.app')) {
+      return callback(null, true);
+    }
+
+    // Allow configured origins
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    callback(new Error('Not allowed by CORS'));
+  },
   credentials: true
-}));
+};
+
+app.use(cors(corsOptions));
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
@@ -186,33 +206,37 @@ app.use('*', (req, res) => {
 // Global error handler
 app.use(errorHandler);
 
-// Start server with graceful shutdown
-const server = app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🌐 Health check: http://localhost:${PORT}/health`);
-});
-
-// Graceful shutdown handling
-const gracefulShutdown = (signal) => {
-  console.log(`\n⚠️ Received ${signal}. Shutting down gracefully...`);
-  server.close((err) => {
-    if (err) {
-      console.error('Error during shutdown:', err);
-      process.exit(1);
-    }
-    console.log('✅ Server closed successfully');
-    process.exit(0);
+// Start server only if not running in serverless mode (e.g., Vercel)
+if (process.env.VERCEL !== '1' && !process.env.AWS_LAMBDA_FUNCTION_NAME) {
+  const server = app.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`🌐 Health check: http://localhost:${PORT}/health`);
   });
-  
-  // Force shutdown after 10 seconds
-  setTimeout(() => {
-    console.log('⚠️ Forcing shutdown...');
-    process.exit(1);
-  }, 10000);
-};
 
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+  // Graceful shutdown handling
+  const gracefulShutdown = (signal) => {
+    console.log(`\n⚠️ Received ${signal}. Shutting down gracefully...`);
+    server.close((err) => {
+      if (err) {
+        console.error('Error during shutdown:', err);
+        process.exit(1);
+      }
+      console.log('✅ Server closed successfully');
+      process.exit(0);
+    });
+
+    // Force shutdown after 10 seconds
+    setTimeout(() => {
+      console.log('⚠️ Forcing shutdown...');
+      process.exit(1);
+    }, 10000);
+  };
+
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+} else {
+  console.log('🚀 Running in serverless mode (Vercel/AWS Lambda)');
+}
 
 module.exports = app;
