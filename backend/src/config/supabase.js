@@ -5,6 +5,12 @@
  */
 
 console.log('🔄 [SUPABASE] Loading supabase.js configuration file...');
+console.log('🔍 [SUPABASE] Environment variables present:', {
+  SUPABASE_URL: !!process.env.SUPABASE_URL,
+  SUPABASE_ANON_KEY: !!process.env.SUPABASE_ANON_KEY,
+  SUPABASE_SERVICE_ROLE_KEY: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+  SUPABASE_JWT_SECRET: !!process.env.SUPABASE_JWT_SECRET
+});
 
 const { createClient } = require('@supabase/supabase-js');
 
@@ -13,7 +19,9 @@ const requiredEnvVars = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_
 const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
 
 if (missingEnvVars.length > 0) {
-  throw new Error(`Missing required Supabase environment variables: ${missingEnvVars.join(', ')}`);
+  const errorMessage = `Missing required Supabase environment variables: ${missingEnvVars.join(', ')}`;
+  console.error('❌ [SUPABASE]', errorMessage);
+  throw new Error(errorMessage);
 }
 
 // Supabase client with anon key (respects RLS)

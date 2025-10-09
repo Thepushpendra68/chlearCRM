@@ -1,5 +1,16 @@
 // Vercel Serverless Function - Express API
-require('dotenv').config();
+// Note: Vercel automatically injects environment variables, no need for dotenv
+
+// Debug: Log environment variable availability
+console.log('🔍 [API] Environment variables check:', {
+  hasSupabaseUrl: !!process.env.SUPABASE_URL,
+  hasSupabaseAnonKey: !!process.env.SUPABASE_ANON_KEY,
+  hasSupabaseServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+  hasSupabaseJwtSecret: !!process.env.SUPABASE_JWT_SECRET,
+  hasGeminiKey: !!process.env.GEMINI_API_KEY,
+  nodeEnv: process.env.NODE_ENV
+});
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
