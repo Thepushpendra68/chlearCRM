@@ -16,5 +16,6 @@ router.put('/stages/reorder', pipelineController.reorderStages);
 // Pipeline operations routes
 router.get('/overview', pipelineController.getPipelineOverview);
 router.get('/conversion-rates', pipelineController.getConversionRates);
+router.post('/create-default-stages', pipelineController.createDefaultStages);
 
 module.exports = router;

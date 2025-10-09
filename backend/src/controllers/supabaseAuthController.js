@@ -27,7 +27,7 @@ class SupabaseAuthController {
       const {
         // Company data
         companyName,
-        subdomain,
+        companySlug,
         industry,
         size,
         country,
@@ -38,22 +38,22 @@ class SupabaseAuthController {
         lastName,
       } = req.body;
 
-      // Check if subdomain is already taken
+      // Check if company slug is already taken
       const { data: existingCompany } = await supabaseAdmin
         .from('companies')
         .select('id')
-        .eq('subdomain', subdomain.toLowerCase())
+        .eq('company_slug', companySlug.toLowerCase())
         .single();
 
       if (existingCompany) {
-        return next(ApiError.badRequest('Subdomain is already taken'));
+        return next(ApiError.badRequest('Company slug is already taken'));
       }
 
       // Create company and admin user
       const result = await createCompanyWithAdmin(
         {
           name: companyName,
-          subdomain: subdomain.toLowerCase(),
+          company_slug: companySlug.toLowerCase(),
           industry,
           size,
           country,

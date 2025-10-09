@@ -441,6 +441,61 @@ class PipelineService {
       return { success: false, error: error.message };
     }
   }
+
+  // Create default pipeline stages for a company
+  async createDefaultStages(currentUser) {
+    try {
+      // Check if company already has stages
+      const { data: existingStages, error: checkError } = await supabaseAdmin
+        .from('pipeline_stages')
+        .select('id')
+        .eq('company_id', currentUser.company_id)
+        .limit(1);
+
+      if (checkError) {
+        console.error('Error checking existing stages:', checkError);
+        return { success: false, error: checkError.message };
+      }
+
+      if (existingStages && existingStages.length > 0) {
+        return { success: false, error: 'Company already has pipeline stages. Delete existing stages first if you want to recreate them.' };
+      }
+
+      // Create default stages
+      const defaultStages = [
+        { name: 'New Lead', color: '#3B82F6', order_position: 1, is_closed_won: false, is_closed_lost: false },
+        { name: 'Contacted', color: '#06B6D4', order_position: 2, is_closed_won: false, is_closed_lost: false },
+        { name: 'Qualified', color: '#10B981', order_position: 3, is_closed_won: false, is_closed_lost: false },
+        { name: 'Proposal Sent', color: '#F59E0B', order_position: 4, is_closed_won: false, is_closed_lost: false },
+        { name: 'Negotiation', color: '#F97316', order_position: 5, is_closed_won: false, is_closed_lost: false },
+        { name: 'Closed Won', color: '#22C55E', order_position: 6, is_closed_won: true, is_closed_lost: false },
+        { name: 'Closed Lost', color: '#EF4444', order_position: 7, is_closed_won: false, is_closed_lost: true },
+      ];
+
+      const stagesToInsert = defaultStages.map(stage => ({
+        ...stage,
+        company_id: currentUser.company_id,
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }));
+
+      const { data: createdStages, error: insertError } = await supabaseAdmin
+        .from('pipeline_stages')
+        .insert(stagesToInsert)
+        .select();
+
+      if (insertError) {
+        console.error('Error creating default stages:', insertError);
+        return { success: false, error: insertError.message };
+      }
+
+      return { success: true, data: createdStages };
+    } catch (error) {
+      console.error('Error creating default stages:', error);
+      return { success: false, error: error.message };
+    }
+  }
 }
 
 module.exports = new PipelineService();

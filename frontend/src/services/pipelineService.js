@@ -88,6 +88,17 @@ class PipelineService {
       throw error;
     }
   }
+
+  // Create default pipeline stages
+  async createDefaultStages() {
+    try {
+      const response = await api.post('/pipeline/create-default-stages');
+      return response.data;
+    } catch (error) {
+      console.error('Error creating default stages:', error);
+      throw error;
+    }
+  }
 }
 
 export default new PipelineService();

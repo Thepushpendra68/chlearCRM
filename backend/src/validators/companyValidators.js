@@ -13,11 +13,11 @@ const validateCompanyRegistration = [
     .isLength({ min: 2, max: 100 })
     .withMessage('Company name must be between 2 and 100 characters'),
 
-  body('subdomain')
+  body('companySlug')
     .trim()
     .isLength({ min: 3, max: 50 })
     .matches(/^[a-z0-9-]+$/)
-    .withMessage('Subdomain must contain only lowercase letters, numbers, and hyphens'),
+    .withMessage('Company slug must contain only lowercase letters, numbers, and hyphens'),
 
   body('industry')
     .optional()

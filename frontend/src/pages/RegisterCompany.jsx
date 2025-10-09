@@ -29,7 +29,7 @@ const RegisterCompany = () => {
   }, [isAuthenticated, navigate])
 
   const validateStep1 = async () => {
-    const isValid = await trigger(['companyName', 'subdomain', 'industry', 'size'])
+    const isValid = await trigger(['companyName', 'companySlug', 'industry', 'size'])
     return isValid
   }
 
@@ -51,7 +51,7 @@ const RegisterCompany = () => {
   const onSubmit = async (data) => {
     const companyData = {
       name: data.companyName,
-      subdomain: data.subdomain,
+      companySlug: data.companySlug,
       industry: data.industry,
       size: data.size,
       country: data.country
@@ -142,32 +142,32 @@ const RegisterCompany = () => {
                 )}
               </div>
 
-              {/* Subdomain */}
+              {/* Company Slug */}
               <div>
-                <label htmlFor="subdomain" className="block text-sm font-medium text-gray-700">
-                  Subdomain
+                <label htmlFor="companySlug" className="block text-sm font-medium text-gray-700">
+                  Company Identifier
                 </label>
-                <div className="mt-1 flex rounded-md shadow-sm">
+                <div className="mt-1">
                   <input
-                    {...register('subdomain', {
-                      required: 'Subdomain is required',
-                      minLength: { value: 3, message: 'Subdomain must be at least 3 characters' },
+                    {...register('companySlug', {
+                      required: 'Company identifier is required',
+                      minLength: { value: 3, message: 'Company identifier must be at least 3 characters' },
                       pattern: {
                         value: /^[a-z0-9-]+$/,
-                        message: 'Subdomain can only contain lowercase letters, numbers, and hyphens'
+                        message: 'Company identifier can only contain lowercase letters, numbers, and hyphens'
                       }
                     })}
                     type="text"
-                    className="flex-1 block w-full px-3 py-2 border border-gray-300 rounded-l-md placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                    className="appearance-none relative block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                     placeholder="your-company"
                   />
-                  <span className="inline-flex items-center px-3 rounded-r-md border border-l-0 border-gray-300 bg-gray-50 text-gray-500 sm:text-sm">
-                    .crm.com
-                  </span>
                 </div>
-                {errors.subdomain && (
-                  <p className="mt-2 text-sm text-red-600">{errors.subdomain.message}</p>
+                {errors.companySlug && (
+                  <p className="mt-2 text-sm text-red-600">{errors.companySlug.message}</p>
                 )}
+                <p className="mt-1 text-xs text-gray-500">
+                  URL-friendly unique identifier for your company
+                </p>
               </div>
 
               {/* Industry */}

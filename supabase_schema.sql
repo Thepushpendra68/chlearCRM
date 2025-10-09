@@ -40,7 +40,7 @@ CREATE TYPE user_role AS ENUM (
 CREATE TABLE companies (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name TEXT NOT NULL,
-  subdomain TEXT UNIQUE,
+  company_slug TEXT UNIQUE,
   plan TEXT DEFAULT 'starter',
   status TEXT DEFAULT 'active',
   settings JSONB DEFAULT '{}',
@@ -172,7 +172,7 @@ CREATE TABLE role_permissions (
 -- =====================================================
 
 -- Companies
-CREATE INDEX idx_companies_subdomain ON companies(subdomain);
+CREATE INDEX idx_companies_company_slug ON companies(company_slug);
 CREATE INDEX idx_companies_status ON companies(status);
 
 -- User profiles
@@ -458,7 +458,7 @@ BEGIN
     -- Check if this is the first user (super admin scenario)
     IF NOT EXISTS (SELECT 1 FROM user_profiles LIMIT 1) THEN
       -- Create a default company for the first user
-      INSERT INTO companies (name, subdomain, status)
+      INSERT INTO companies (name, company_slug, status)
       VALUES (
         COALESCE(NEW.raw_user_meta_data->>'company_name', 'My Company'),
         LOWER(REPLACE(COALESCE(NEW.raw_user_meta_data->>'company_name', 'my-company'), ' ', '-')),

@@ -234,7 +234,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const payload = {
         companyName: companyData.name,
-        subdomain: companyData.subdomain,
+        companySlug: companyData.companySlug,
         industry: companyData.industry,
         size: companyData.size,
         country: companyData.country,

@@ -116,7 +116,7 @@ class AuthService {
       .from('user_profiles')
       .select(`
         *,
-        companies(name, subdomain)
+        companies(name, company_slug)
       `)
       .eq('id', authData.user.id)
       .single();
@@ -165,7 +165,7 @@ class AuthService {
       .from('user_profiles')
       .select(`
         *,
-        companies(name, subdomain)
+        companies(name, company_slug)
       `)
       .eq('id', userId)
       .single();
@@ -226,7 +226,7 @@ class AuthService {
       .eq('id', userId)
       .select(`
         *,
-        companies(name, subdomain)
+        companies(name, company_slug)
       `)
       .single();
 

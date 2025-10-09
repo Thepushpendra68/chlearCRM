@@ -166,6 +166,25 @@ class PipelineController {
       next(error);
     }
   }
+
+  // Create default pipeline stages
+  async createDefaultStages(req, res, next) {
+    try {
+      const result = await pipelineService.createDefaultStages(req.user);
+
+      if (!result.success) {
+        throw new ApiError(400, result.error);
+      }
+
+      res.status(201).json({
+        success: true,
+        message: 'Default pipeline stages created successfully',
+        data: result.data
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = new PipelineController();

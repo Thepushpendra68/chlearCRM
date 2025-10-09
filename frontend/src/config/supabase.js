@@ -224,7 +224,7 @@ export async function getCurrentUserProfile() {
       .from('user_profiles')
       .select(`
         *,
-        companies(name, subdomain)
+        companies(name, company_slug)
       `)
       .eq('id', userId)
       .single();
@@ -247,7 +247,7 @@ export async function getCurrentUserProfile() {
         .eq('id', userId)
         .select(`
           *,
-          companies(name, subdomain)
+          companies(name, company_slug)
         `)
         .single();
       if (!emailSyncError && updatedProfile) {
@@ -267,7 +267,7 @@ export async function getCurrentUserProfile() {
       role: profileRecord.role,
       company_id: profileRecord.company_id,
       company_name: profileRecord.companies?.name || '',
-      company_subdomain: profileRecord.companies?.subdomain || '',
+      company_slug: profileRecord.companies?.company_slug || '',
       avatar_url: profileRecord.avatar_url,
       phone: profileRecord.phone,
       is_active: profileRecord.is_active,

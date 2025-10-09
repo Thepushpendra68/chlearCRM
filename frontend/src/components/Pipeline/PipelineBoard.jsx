@@ -215,6 +215,91 @@ const PipelineBoard = forwardRef(({ onLeadClick, onAddLead }, ref) => {
     );
   }
 
+  // Empty state when no pipeline stages exist
+  if (!loading && (!stages || stages.length === 0)) {
+    return (
+      <div className="pipeline-board">
+        {/* Pipeline Header */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Sales Pipeline</h2>
+              <p className="text-gray-600 mt-1">Manage your leads through the sales process</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Empty State */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12">
+          <div className="text-center max-w-2xl mx-auto">
+            {/* Icon */}
+            <div className="mb-6">
+              <svg className="w-24 h-24 mx-auto text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            </div>
+
+            {/* Title and Description */}
+            <h3 className="text-2xl font-bold text-gray-900 mb-3">
+              Welcome to Your Sales Pipeline!
+            </h3>
+            <p className="text-gray-600 mb-8 text-lg">
+              Your pipeline is currently empty. Get started by creating your pipeline stages to organize and track your leads through the sales process.
+            </p>
+
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+              <button
+                onClick={async () => {
+                  try {
+                    const response = await pipelineService.createDefaultStages();
+                    if (response.success) {
+                      fetchPipelineData();
+                    } else {
+                      setError(response.error || 'Failed to create default stages');
+                    }
+                  } catch (err) {
+                    console.error('Error creating default stages:', err);
+                    setError('Failed to create default stages');
+                  }
+                }}
+                className="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors shadow-sm"
+              >
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Create Default Pipeline
+              </button>
+
+              <button
+                onClick={() => setShowStageManager(true)}
+                className="inline-flex items-center px-6 py-3 bg-white text-gray-700 font-medium rounded-lg border border-gray-300 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+              >
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                Create Custom Stages
+              </button>
+            </div>
+
+            {/* Info Box */}
+            <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4 text-left">
+              <div className="flex items-start">
+                <svg className="w-5 h-5 text-blue-600 mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div className="text-sm text-blue-800">
+                  <p className="font-semibold mb-1">What's a Sales Pipeline?</p>
+                  <p>A sales pipeline helps you visualize and manage your sales process. Create stages that represent your workflow (e.g., New Lead → Contacted → Qualified → Won) and move leads through each stage as they progress.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="pipeline-board">
       {/* Pipeline Header */}

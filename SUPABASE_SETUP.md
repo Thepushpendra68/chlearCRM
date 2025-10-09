@@ -22,7 +22,7 @@ CREATE TYPE user_role AS ENUM (
 CREATE TABLE companies (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
-  subdomain TEXT UNIQUE,
+  company_slug TEXT UNIQUE,
   plan TEXT DEFAULT 'starter',
   status TEXT DEFAULT 'active',
   settings JSONB DEFAULT '{}',
@@ -65,7 +65,7 @@ BEGIN
   -- Check if this is a new company registration
   IF NEW.raw_user_meta_data->>'company_name' IS NOT NULL THEN
     -- Create a new company
-    INSERT INTO companies (name, subdomain, status)
+    INSERT INTO companies (name, company_slug, status)
     VALUES (
       NEW.raw_user_meta_data->>'company_name',
       LOWER(REPLACE(NEW.raw_user_meta_data->>'company_name', ' ', '-')),
@@ -130,7 +130,7 @@ SELECT
   au.email_confirmed_at,
   au.last_sign_in_at,
   c.name as company_name,
-  c.subdomain as company_subdomain
+  c.company_slug
 FROM user_profiles up
 LEFT JOIN auth.users au ON up.id = au.id
 LEFT JOIN companies c ON up.company_id = c.id;

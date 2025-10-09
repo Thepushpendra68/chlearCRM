@@ -45,8 +45,8 @@ async function ensureUserProfile(userId) {
 async function ensureDemoCompany() {
   const { data: existingCompanies, error: companyLookupError } = await supabaseAdmin
     .from('companies')
-    .select('id, name, subdomain')
-    .eq('subdomain', 'sakha-demo')
+    .select('id, name, company_slug')
+    .eq('company_slug', 'sakha-demo')
     .limit(1);
 
   if (companyLookupError) {
@@ -82,7 +82,7 @@ async function ensureDemoCompany() {
   const { company, user } = await createCompanyWithAdmin(
     {
       name: 'Sakha Demo Company',
-      subdomain: 'sakha-demo',
+      company_slug: 'sakha-demo',
       plan: 'starter',
       status: 'active',
       settings: {

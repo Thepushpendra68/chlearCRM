@@ -173,7 +173,7 @@ async function getUserProfile(userId) {
     // Get company information
     const { data: company, error: companyError } = await supabaseAdmin
       .from('companies')
-      .select('name, subdomain')
+      .select('name, company_slug')
       .eq('id', profile.company_id)
       .single();
 
@@ -195,7 +195,7 @@ async function getUserProfile(userId) {
     return {
       ...profile,
       company_name: company?.name,
-      company_subdomain: company?.subdomain,
+      company_slug: company?.company_slug,
       email: authUser?.user?.email,
     };
   } catch (error) {
@@ -214,7 +214,7 @@ async function createCompanyWithAdmin(companyData, userData) {
   const normalizedCompanyData = {
     ...companyData,
     name: companyData.name?.trim() || companyData.name,
-    subdomain: companyData.subdomain?.trim().toLowerCase() || null,
+    company_slug: companyData.company_slug?.trim().toLowerCase() || null,
     status: companyData.status || 'active',
   };
 
@@ -309,6 +309,36 @@ async function createCompanyWithAdmin(companyData, userData) {
 
     if (profileError) {
       throw profileError;
+    }
+
+    // 5. Create default pipeline stages for the new company
+    const defaultStages = [
+      { name: 'New Lead', color: '#3B82F6', order_position: 1, is_closed_won: false, is_closed_lost: false },
+      { name: 'Contacted', color: '#06B6D4', order_position: 2, is_closed_won: false, is_closed_lost: false },
+      { name: 'Qualified', color: '#10B981', order_position: 3, is_closed_won: false, is_closed_lost: false },
+      { name: 'Proposal Sent', color: '#F59E0B', order_position: 4, is_closed_won: false, is_closed_lost: false },
+      { name: 'Negotiation', color: '#F97316', order_position: 5, is_closed_won: false, is_closed_lost: false },
+      { name: 'Closed Won', color: '#22C55E', order_position: 6, is_closed_won: true, is_closed_lost: false },
+      { name: 'Closed Lost', color: '#EF4444', order_position: 7, is_closed_won: false, is_closed_lost: true },
+    ];
+
+    const stagesToInsert = defaultStages.map(stage => ({
+      ...stage,
+      company_id: company.id,
+      is_active: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }));
+
+    const { error: stagesError } = await supabaseAdmin
+      .from('pipeline_stages')
+      .insert(stagesToInsert);
+
+    if (stagesError) {
+      console.error('⚠️ [SUPABASE] Error creating default pipeline stages:', stagesError);
+      // Don't throw - stages can be created later manually
+    } else {
+      console.log('✅ [SUPABASE] Created 7 default pipeline stages for company:', company.id);
     }
 
     return {
