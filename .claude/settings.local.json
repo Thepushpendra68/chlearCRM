@@ -101,7 +101,17 @@
       "Read(//c/Users/Vishaka/**)",
       "Read(//c/c/Users/Vishaka/**)",
       "WebFetch(domain:ai.google.dev)",
-      "Bash(powershell:*)"
+      "Bash(powershell:*)",
+      "mcp__vercel__list_deployments",
+      "mcp__vercel__get_deployment",
+      "Bash(git log:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git fetch:*)",
+      "mcp__vercel__get_deployment_build_logs",
+      "mcp__vercel__web_fetch_vercel_url",
+      "mcp__vercel__list_projects",
+      "mcp__github__list_commits",
+      "Bash(npm run build:*)"
     ],
     "deny": [],
     "ask": []
