@@ -8,8 +8,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## 🚀 Deployment Status
 **Production:** ✅ Live at https://chlear-crm.vercel.app
 **Platform:** Vercel + Supabase
-**Build Configuration:** Auto-detection (no custom build commands)
-**Note:** Let Vercel auto-detect the build process. Custom install/build commands cause `vite: command not found` errors.
+**Frontend:** ✅ Working (React/Vite)
+**Backend API:** ✅ Working (Express serverless function)
+
+### Key Configuration
+- **Frontend Build:** Vite build tools moved to `dependencies` (not devDependencies)
+- **Backend API:** Standalone Express app in `api/index.js`
+- **Routing:** `/api/*` requests rewritten to `/api/index` serverless function
+- **Dependencies:** All backend dependencies in root `package.json`
+- **Build Process:** Vercel auto-detects frontend build, no custom commands needed
+
+### Critical Notes
+- Build tools (vite, postcss, tailwindcss) MUST be in dependencies, not devDependencies
+- Vercel production builds skip devDependencies (NODE_ENV=production)
+- API routes are handled by a single Express serverless function at `api/index.js`
 
 ## ⚠️ CRITICAL DATABASE REQUIREMENTS ⚠️
 **THIS PROJECT SUPPORTS TWO DATABASE CONFIGURATIONS:**
