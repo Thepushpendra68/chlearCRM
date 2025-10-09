@@ -5,6 +5,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Name
 **Sakha** - Your Friend in CRM (formerly CHLEAR CRM)
 
+## 🚀 Deployment Status
+**Production:** ✅ Live at https://chlear-crm.vercel.app
+**Platform:** Vercel + Supabase
+**Build Configuration:** Auto-detection (no custom build commands)
+**Note:** Let Vercel auto-detect the build process. Custom install/build commands cause `vite: command not found` errors.
+
 ## ⚠️ CRITICAL DATABASE REQUIREMENTS ⚠️
 **THIS PROJECT SUPPORTS TWO DATABASE CONFIGURATIONS:**
 1. **TRADITIONAL**: Standalone database setup (legacy)
