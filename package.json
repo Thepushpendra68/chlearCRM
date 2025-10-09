@@ -1,4 +1,11 @@
 {
+  "name": "sakha-crm-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "cd frontend && npm install && npm run build",
+    "postinstall": "cd backend && npm install && cd ../frontend && npm install"
+  },
   "dependencies": {
     "@supabase/supabase-js": "^2.58.0",
     "axios": "^1.12.2"
