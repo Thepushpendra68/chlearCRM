@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useReducer, useCallback, useMemo, useRef } from 'react';
 import leadService from '../services/leadService';
 import toast from 'react-hot-toast';
 
@@ -7,7 +7,15 @@ const initialState = {
   leads: [],
   loading: false,
   error: null,
-  lastUpdated: null
+  lastUpdated: null,
+  pagination: {
+    current_page: 1,
+    total_pages: 1,
+    total_items: 0,
+    items_per_page: 20,
+    has_next: false,
+    has_prev: false
+  }
 };
 
 // Action types
@@ -34,7 +42,8 @@ const leadReducer = (state, action) => {
     case LEAD_ACTIONS.FETCH_LEADS_SUCCESS:
       return {
         ...state,
-        leads: action.payload,
+        leads: action.payload.leads || action.payload,
+        pagination: action.payload.pagination || state.pagination,
         loading: false,
         error: null,
         lastUpdated: new Date()
@@ -100,22 +109,60 @@ const LeadContext = createContext();
 // Provider component
 export const LeadProvider = ({ children }) => {
   const [state, dispatch] = useReducer(leadReducer, initialState);
+  const lastFetchParamsRef = useRef({
+    page: 1,
+    limit: initialState.pagination.items_per_page
+  });
 
   // Fetch leads function
   const fetchLeads = useCallback(async (params = {}) => {
     try {
       dispatch({ type: LEAD_ACTIONS.FETCH_LEADS_START });
-      const response = await leadService.getLeads(params);
-      dispatch({ 
-        type: LEAD_ACTIONS.FETCH_LEADS_SUCCESS, 
-        payload: response.data || [] 
+      const mergedParams = {
+        ...lastFetchParamsRef.current,
+        ...params
+      };
+
+      if (!mergedParams.page || mergedParams.page < 1) {
+        mergedParams.page = 1;
+      }
+
+      if (!mergedParams.limit || mergedParams.limit < 1) {
+        mergedParams.limit = initialState.pagination.items_per_page;
+      }
+
+      const response = await leadService.getLeads(mergedParams);
+
+      // Handle response with pagination metadata
+      const payload = {
+        leads: response.data || [],
+        pagination: response.pagination || {
+          current_page: mergedParams.page,
+          total_pages: 1,
+          total_items: (response.data || []).length,
+          items_per_page: mergedParams.limit,
+          has_next: false,
+          has_prev: mergedParams.page > 1
+        }
+      };
+
+      dispatch({
+        type: LEAD_ACTIONS.FETCH_LEADS_SUCCESS,
+        payload
       });
+
+      lastFetchParamsRef.current = {
+        ...mergedParams,
+        page: payload.pagination.current_page,
+        limit: payload.pagination.items_per_page
+      };
+
       return response.data || [];
     } catch (error) {
       console.error('Failed to fetch leads:', error);
-      dispatch({ 
-        type: LEAD_ACTIONS.FETCH_LEADS_ERROR, 
-        payload: error.message || 'Failed to fetch leads' 
+      dispatch({
+        type: LEAD_ACTIONS.FETCH_LEADS_ERROR,
+        payload: error.message || 'Failed to fetch leads'
       });
       toast.error('Failed to load leads');
       throw error;
@@ -149,7 +196,7 @@ export const LeadProvider = ({ children }) => {
   // Refresh leads function
   const refreshLeads = useCallback(() => {
     dispatch({ type: LEAD_ACTIONS.REFRESH_LEADS });
-    return fetchLeads();
+    return fetchLeads(lastFetchParamsRef.current);
   }, [fetchLeads]);
 
   // Move lead to stage function (for pipeline)

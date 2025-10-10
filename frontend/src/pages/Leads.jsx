@@ -19,10 +19,20 @@ const Leads = () => {
   const [selectedLeads, setSelectedLeads] = useState([])
   const [showBulkActions, setShowBulkActions] = useState(false)
   const [pipelineStages, setPipelineStages] = useState([])
-  
+  const [isPageChanging, setIsPageChanging] = useState(false)
+ 
   // Use the global leads context
-  const { leads, loading, fetchLeads, addLead, updateLead, deleteLead, lastUpdated, refreshLeads } = useLeads()
+  const { leads, loading, pagination, fetchLeads, deleteLead, lastUpdated, refreshLeads } = useLeads()
 
+  const totalItems = pagination?.total_items ?? leads.length
+  const currentPage = pagination?.current_page ?? 1
+  const itemsPerPage = pagination?.items_per_page ?? 20
+  const totalPages = pagination?.total_pages ?? Math.max(1, Math.ceil(totalItems / (itemsPerPage || 1)))
+  const hasNextPage = pagination?.has_next ?? currentPage < totalPages
+  const hasPrevPage = pagination?.has_prev ?? currentPage > 1
+  const startItemIndex = totalItems === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1
+  const endItemIndex = totalItems === 0 ? 0 : Math.min(currentPage * itemsPerPage, totalItems)
+ 
   // Load leads and pipeline stages on component mount
   useEffect(() => {
     const loadData = async () => {
@@ -207,6 +217,43 @@ const Leads = () => {
     console.log('Leads page - Pipeline stages:', pipelineStages)
   }, [leads, pipelineStages])
 
+  const handlePageChange = async (newPage) => {
+    if (
+      loading ||
+      isPageChanging ||
+      newPage === currentPage ||
+      newPage < 1 ||
+      newPage > totalPages
+    ) {
+      return
+    }
+
+    setIsPageChanging(true)
+    try {
+      await fetchLeads({ page: newPage })
+    } catch (error) {
+      console.error('Failed to change page:', error)
+    } finally {
+      setIsPageChanging(false)
+    }
+  }
+
+  const handlePageSizeChange = async (event) => {
+    const newLimit = parseInt(event.target.value, 10)
+    if (Number.isNaN(newLimit) || newLimit <= 0 || newLimit === itemsPerPage) {
+      return
+    }
+
+    setIsPageChanging(true)
+    try {
+      await fetchLeads({ page: 1, limit: newLimit })
+    } catch (error) {
+      console.error('Failed to change page size:', error)
+    } finally {
+      setIsPageChanging(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       {/* Enhanced Header Section */}
@@ -228,11 +275,11 @@ const Leads = () => {
                     </p>
                   </div>
                 </div>
-                {leads.length > 0 && (
+                {(pagination?.total_items > 0 || leads.length > 0) && (
                   <div className="mt-4 flex items-center space-x-6 text-sm text-gray-500">
                     <span className="flex items-center">
                       <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
-                      {leads.length} total leads
+                      {pagination?.total_items || leads.length} total leads
                     </span>
                     <span className="flex items-center">
                       <div className="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
@@ -522,6 +569,60 @@ const Leads = () => {
               </table>
             </div>
           )}
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="flex items-center space-x-2">
+            <span className="text-sm text-gray-600">Rows per page:</span>
+            <select
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200"
+              value={String(itemsPerPage)}
+              onChange={handlePageSizeChange}
+              disabled={loading}
+            >
+              <option value="10">10</option>
+              <option value="20">20</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+          </div>
+
+          <div className="flex items-center space-x-4 text-sm text-gray-600">
+            <span>
+              Page {currentPage} of {totalPages}
+            </span>
+            <span>
+              <span className="font-medium text-gray-900">{startItemIndex}</span> -{' '}
+              <span className="font-medium text-gray-900">{endItemIndex}</span> of{' '}
+              <span className="font-medium text-gray-900">{totalItems}</span>
+            </span>
+            <div className="flex items-center space-x-2">
+              <button
+                className={`px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white hover:bg-gray-50 transition-all duration-200 ${
+                  loading || isPageChanging || !hasPrevPage
+                    ? 'opacity-50 cursor-not-allowed'
+                    : ''
+                }`}
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={loading || isPageChanging || !hasPrevPage}
+              >
+                Previous
+              </button>
+              <button
+                className={`px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white hover:bg-gray-50 transition-all duration-200 ${
+                  loading || isPageChanging || !hasNextPage
+                    ? 'opacity-50 cursor-not-allowed'
+                    : ''
+                }`}
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={loading || isPageChanging || !hasNextPage}
+              >
+                Next
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
