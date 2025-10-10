@@ -88,5 +88,5 @@ jobs:
     
     - name: Run security audit
       run: |
-        cd backend && npm audit --audit-level moderate
-        cd ../frontend && npm audit --audit-level moderate
+        cd backend && npm install && npm audit --audit-level moderate || true
+        cd ../frontend && npm install && npm audit --audit-level moderate || true

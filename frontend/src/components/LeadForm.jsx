@@ -341,7 +341,7 @@ const LeadForm = ({ lead = null, onClose, onSuccess, initialStageId = null, onSu
                 type="tel"
                 {...register('phone', {
                   pattern: {
-                    value: /^[\+]?[0-9\s\-\(\)]{0,20}$/,
+                    value: /^[+]?[\d\s()-]{0,20}$/,
                     message: 'Please provide a valid phone number'
                   },
                   maxLength: {
