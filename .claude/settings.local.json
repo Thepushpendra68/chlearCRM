@@ -112,7 +112,9 @@
       "mcp__vercel__list_projects",
       "mcp__github__list_commits",
       "Bash(npm run build:*)",
-      "mcp__vercel__search_vercel_documentation"
+      "mcp__vercel__search_vercel_documentation",
+      "mcp__github__get_file_contents",
+      "mcp__github__search_repositories"
     ],
     "deny": [],
     "ask": []

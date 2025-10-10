@@ -66,7 +66,7 @@ A modern, full-stack Customer Relationship Management (CRM) system built with cu
 ### Frontend
 1. Build the application: npm run build
 2. Serve the dist folder or deploy to a static host
-3. Configure reverse proxy (nginx) when self-hosting
+3. Configure reverse proxy when self-hosting
 4. Set up SSL certificates
 
 ### Vercel Preview Deployments
@@ -309,7 +309,7 @@ npm run lint        # Run ESLint
 ### Frontend
 1. Build the application: `npm run build`
 2. Serve the `dist` folder
-3. Configure reverse proxy (nginx)
+3. Configure reverse proxy
 4. Set up SSL certificates
 
 ## 🤝 Contributing
