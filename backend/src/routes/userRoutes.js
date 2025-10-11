@@ -7,6 +7,7 @@ const {
   createUser,
   updateUser,
   deactivateUser,
+  resendInvite,
   getCurrentUser,
   updateCurrentUser
 } = require('../controllers/userController');
@@ -64,5 +65,12 @@ router.put('/:id', validateUserUpdate, updateUser);
  * @access  Private (Admin)
  */
 router.delete('/:id', authorize(['company_admin', 'super_admin']), deactivateUser);
+
+/**
+ * @route   POST /api/users/:id/resend-invite
+ * @desc    Resend invitation email (admin only)
+ * @access  Private (Admin)
+ */
+router.post('/:id/resend-invite', authorize(['company_admin', 'super_admin']), resendInvite);
 
 module.exports = router;

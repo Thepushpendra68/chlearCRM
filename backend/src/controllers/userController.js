@@ -187,6 +187,27 @@ const deactivateUser = async (req, res, next) => {
 };
 
 /**
+ * @desc    Resend user invite (admin only)
+ * @route   POST /api/users/:id/resend-invite
+ * @access  Private (Admin)
+ */
+const resendInvite = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const result = await userService.resendUserInvite(id, req.user);
+
+    res.json({
+      success: true,
+      message: 'Invitation email sent successfully',
+      data: result
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * @desc    Get current user profile
  * @route   GET /api/users/profile/me
  * @access  Private
@@ -251,6 +272,7 @@ module.exports = {
   createUser,
   updateUser,
   deactivateUser,
+  resendInvite,
   getCurrentUser,
   updateCurrentUser
 };

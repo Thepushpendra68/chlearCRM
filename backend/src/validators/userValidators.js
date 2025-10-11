@@ -1,5 +1,7 @@
 const { body } = require('express-validator');
 
+const allowedRoles = ['sales_rep', 'manager', 'company_admin', 'super_admin'];
+
 /**
  * Validation rules for user creation (admin only)
  */
@@ -36,8 +38,8 @@ const validateUser = [
     .withMessage('Last name can only contain letters and spaces'),
 
   body('role')
-    .isIn(['admin', 'manager', 'sales_rep'])
-    .withMessage('Role must be admin, manager, or sales_rep'),
+    .isIn(allowedRoles)
+    .withMessage(`Role must be one of: ${allowedRoles.join(', ')}`),
 
   body('is_active')
     .optional()
@@ -86,8 +88,8 @@ const validateUserUpdate = [
 
   body('role')
     .optional()
-    .isIn(['admin', 'manager', 'sales_rep'])
-    .withMessage('Role must be admin, manager, or sales_rep'),
+    .isIn(allowedRoles)
+    .withMessage(`Role must be one of: ${allowedRoles.join(', ')}`),
 
   body('is_active')
     .optional()
@@ -107,8 +109,8 @@ const validateUserSearch = [
 
   body('role')
     .optional()
-    .isIn(['admin', 'manager', 'sales_rep'])
-    .withMessage('Invalid role filter'),
+    .isIn(allowedRoles)
+    .withMessage(`Invalid role filter. Allowed roles: ${allowedRoles.join(', ')}`),
 
   body('is_active')
     .optional()

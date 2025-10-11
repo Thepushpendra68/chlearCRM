@@ -9,14 +9,28 @@ const getUsers = async (currentUser, page = 1, limit = 20, filters = {}) => {
   try {
     const supabase = supabaseAdmin;
 
-    // Build base query
-    let query = supabase
-      .from('user_profiles_with_auth')
-      .select('*', { count: 'exact' })
-      .eq('company_id', currentUser.company_id);
+    console.log('🔍 [USER_SERVICE] getUsers called with:', {
+      currentUser: {
+        id: currentUser.id,
+        email: currentUser.email,
+        role: currentUser.role,
+        company_id: currentUser.company_id
+      },
+      page,
+      limit,
+      filters
+    });
+
+    // DEBUG: Log the exact Supabase URL and client config
+    console.log('🔍 [USER_SERVICE] Supabase URL:', process.env.SUPABASE_URL);
+    console.log('🔍 [USER_SERVICE] Using service role key:', !!process.env.SUPABASE_SERVICE_ROLE_KEY);
+    console.log('🔍 [USER_SERVICE] Query company_id:', currentUser.company_id);
+    console.log('🔍 [USER_SERVICE] Company ID type:', typeof currentUser.company_id);
+    console.log('🔍 [USER_SERVICE] Company ID length:', currentUser.company_id?.length);
 
     // Non-admin users can only see users in their company
     if (currentUser.role !== 'company_admin' && currentUser.role !== 'super_admin') {
+      console.log('❌ [USER_SERVICE] User is not admin, returning empty list');
       return {
         users: [],
         totalItems: 0,
@@ -27,17 +41,28 @@ const getUsers = async (currentUser, page = 1, limit = 20, filters = {}) => {
       };
     }
 
+    // Build query
+    let query = supabase
+      .from('user_profiles')
+      .select('*', { count: 'exact' })
+      .eq('company_id', currentUser.company_id);
+
     // Apply filters
     if (filters.search) {
-      query = query.or(`first_name.ilike.%${filters.search}%,last_name.ilike.%${filters.search}%,email.ilike.%${filters.search}%`);
+      query = query.or(`first_name.ilike.%${filters.search}%,last_name.ilike.%${filters.search}%`);
     }
 
     if (filters.role) {
       query = query.eq('role', filters.role);
     }
 
-    if (filters.is_active !== undefined) {
-      query = query.eq('is_active', filters.is_active === 'true');
+    if (filters.is_active !== undefined && filters.is_active !== '') {
+      const isActiveFilter =
+        typeof filters.is_active === 'string'
+          ? filters.is_active === 'true'
+          : Boolean(filters.is_active);
+
+      query = query.eq('is_active', isActiveFilter);
     }
 
     // Apply sorting
@@ -49,18 +74,79 @@ const getUsers = async (currentUser, page = 1, limit = 20, filters = {}) => {
     const offset = (page - 1) * limit;
     query = query.range(offset, offset + limit - 1);
 
+    console.log('🔍 [USER_SERVICE] About to execute query...');
+
+    // DEBUG: Test query without filter to see if we get ANY data
+    const { data: testAll, error: testError } = await supabase
+      .from('user_profiles')
+      .select('*');
+    console.log('🧪 [DEBUG] Query ALL user_profiles (no filter):', {
+      count: testAll?.length || 0,
+      error: testError,
+      data: testAll
+    });
+
+    // DEBUG: Test query with EXACT company_id to isolate the issue
+    const { data: testFiltered, error: testError2 } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('company_id', 'be21c126-d3f8-4366-9239-9e650850c073');
+    console.log('🧪 [DEBUG] Query with HARDCODED company_id:', {
+      count: testFiltered?.length || 0,
+      error: testError2,
+      data: testFiltered
+    });
+
     const { data: users, error, count } = await query;
 
+    console.log('🔍 [USER_SERVICE] Raw query response:', {
+      data: users,
+      error: error,
+      count: count,
+      dataType: typeof users,
+      isArray: Array.isArray(users)
+    });
+
+    console.log('📊 [USER_SERVICE] Query result:', {
+      userCount: users?.length || 0,
+      totalCount: count,
+      error: error ? error.message : 'none',
+      users: users
+    });
+
     if (error) {
-      console.error('Error fetching users:', error);
+      console.error('❌ [USER_SERVICE] Error fetching users:', error);
       throw new ApiError('Failed to fetch users', 500);
     }
+
+    // Manually add email from auth.users for each user
+    const usersWithEmail = await Promise.all((users || []).map(async (user) => {
+      try {
+        const { data: authUser } = await supabase.auth.admin.getUserById(user.id);
+        return {
+          ...user,
+          email: authUser?.user?.email || null,
+          email_confirmed_at: authUser?.user?.email_confirmed_at || null,
+          last_sign_in_at: authUser?.user?.last_sign_in_at || null
+        };
+      } catch (err) {
+        console.error(`Error fetching auth data for user ${user.id}:`, err);
+        return { ...user, email: null };
+      }
+    }));
 
     const totalItems = count || 0;
     const totalPages = Math.ceil(totalItems / limit);
 
+    console.log('✅ [USER_SERVICE] Returning users:', {
+      totalItems,
+      totalPages,
+      currentPage: page,
+      userCount: usersWithEmail?.length || 0
+    });
+
     return {
-      users: users || [],
+      users: usersWithEmail,
       totalItems,
       totalPages,
       currentPage: page,
@@ -68,7 +154,7 @@ const getUsers = async (currentUser, page = 1, limit = 20, filters = {}) => {
       hasPrev: page > 1
     };
   } catch (error) {
-    console.error('Error fetching users:', error);
+    console.error('❌ [USER_SERVICE] Error in getUsers:', error);
     throw new ApiError('Failed to fetch users', 500);
   }
 };
@@ -81,7 +167,7 @@ const getUserById = async (id, currentUser) => {
     const supabase = supabaseAdmin;
 
     const { data: user, error } = await supabase
-      .from('user_profiles_with_auth')
+      .from('user_profiles')
       .select('*')
       .eq('id', id)
       .eq('company_id', currentUser.company_id)
@@ -91,7 +177,14 @@ const getUserById = async (id, currentUser) => {
       throw new ApiError('User not found', 404);
     }
 
-    return user;
+    // Add email from auth
+    const { data: authUser } = await supabase.auth.admin.getUserById(user.id);
+    return {
+      ...user,
+      email: authUser?.user?.email || null,
+      email_confirmed_at: authUser?.user?.email_confirmed_at || null,
+      last_sign_in_at: authUser?.user?.last_sign_in_at || null
+    };
   } catch (error) {
     console.error('Error fetching user:', error);
     throw new ApiError('Failed to fetch user', 500);
@@ -121,7 +214,7 @@ const getUserByEmail = async (email, currentUser) => {
 
     // Then get the user profile
     const { data: user, error } = await supabase
-      .from('user_profiles_with_auth')
+      .from('user_profiles')
       .select('*')
       .eq('id', authUser.id)
       .eq('company_id', currentUser.company_id)
@@ -333,8 +426,8 @@ const getUsersForAssignment = async (currentUser) => {
     const supabase = supabaseAdmin;
 
     const { data: users, error } = await supabase
-      .from('user_profiles_with_auth')
-      .select('id, first_name, last_name, email, role')
+      .from('user_profiles')
+      .select('id, first_name, last_name, role')
       .eq('company_id', currentUser.company_id)
       .eq('is_active', true)
       .order('first_name', { ascending: true });
@@ -344,7 +437,13 @@ const getUsersForAssignment = async (currentUser) => {
       throw new ApiError('Failed to fetch users for assignment', 500);
     }
 
-    return users || [];
+    // Add email from auth
+    const usersWithEmail = await Promise.all((users || []).map(async (user) => {
+      const { data: authUser } = await supabase.auth.admin.getUserById(user.id);
+      return { ...user, email: authUser?.user?.email || null };
+    }));
+
+    return usersWithEmail;
   } catch (error) {
     console.error('Error fetching users for assignment:', error);
     throw new ApiError('Failed to fetch users for assignment', 500);
@@ -360,20 +459,20 @@ const getUserStats = async (currentUser) => {
 
     // Total users
     const { count: totalUsers } = await supabase
-      .from('user_profiles_with_auth')
+      .from('user_profiles')
       .select('*', { count: 'exact' })
       .eq('company_id', currentUser.company_id);
 
     // Active users
     const { count: activeUsers } = await supabase
-      .from('user_profiles_with_auth')
+      .from('user_profiles')
       .select('*', { count: 'exact' })
       .eq('company_id', currentUser.company_id)
       .eq('is_active', true);
 
     // Users by role
     const { data: roleStats } = await supabase
-      .from('user_profiles_with_auth')
+      .from('user_profiles')
       .select('role')
       .eq('company_id', currentUser.company_id);
 
@@ -382,7 +481,7 @@ const getUserStats = async (currentUser) => {
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     const { count: recentUsers } = await supabase
-      .from('user_profiles_with_auth')
+      .from('user_profiles')
       .select('*', { count: 'exact' })
       .eq('company_id', currentUser.company_id)
       .gte('created_at', thirtyDaysAgo.toISOString());
@@ -407,6 +506,55 @@ const getUserStats = async (currentUser) => {
   }
 };
 
+/**
+ * Resend an invitation email to a user
+ */
+const resendUserInvite = async (id, currentUser) => {
+  try {
+    const supabase = supabaseAdmin;
+
+    if (currentUser.role !== 'company_admin' && currentUser.role !== 'super_admin') {
+      throw new ApiError('Insufficient permissions to resend invites', 403);
+    }
+
+    const targetUser = await getUserById(id, currentUser);
+
+    if (!targetUser) {
+      throw new ApiError('User not found', 404);
+    }
+
+    const redirectUrl = process.env.APP_URL
+      ? `${process.env.APP_URL.replace(/\/$/, '')}/login`
+      : undefined;
+
+    const { error } = await supabase.auth.admin.inviteUserByEmail(targetUser.email, {
+      data: {
+        first_name: targetUser.first_name,
+        last_name: targetUser.last_name,
+        role: targetUser.role,
+        company_id: targetUser.company_id
+      },
+      redirectTo: redirectUrl
+    });
+
+    if (error) {
+      console.error('Error resending invite:', error);
+      throw new ApiError('Failed to resend invite', 500);
+    }
+
+    return {
+      email: targetUser.email
+    };
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+
+    console.error('Error resending invite:', error);
+    throw new ApiError('Failed to resend invite', 500);
+  }
+};
+
 module.exports = {
   getUsers,
   getUserById,
@@ -416,5 +564,6 @@ module.exports = {
   deactivateUser,
   verifyPassword,
   getUsersForAssignment,
-  getUserStats
+  getUserStats,
+  resendUserInvite
 };

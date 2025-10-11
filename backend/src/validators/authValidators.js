@@ -1,5 +1,7 @@
 const { body } = require('express-validator');
 
+const allowedRoles = ['sales_rep', 'manager', 'company_admin', 'super_admin'];
+
 /**
  * Validation rules for user registration
  */
@@ -27,8 +29,8 @@ const registerValidation = [
   
   body('role')
     .optional()
-    .isIn(['admin', 'manager', 'sales_rep'])
-    .withMessage('Role must be admin, manager, or sales_rep')
+    .isIn(allowedRoles)
+    .withMessage(`Role must be one of: ${allowedRoles.join(', ')}`)
 ];
 
 /**

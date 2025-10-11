@@ -86,6 +86,18 @@ const userService = {
   },
 
   /**
+   * Resend user invite (admin only)
+   */
+  resendInvite: async (id) => {
+    try {
+      const response = await api.post(`/users/${id}/resend-invite`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  /**
    * Search users
    */
   searchUsers: async (searchTerm, filters = {}) => {

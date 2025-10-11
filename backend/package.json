@@ -4,7 +4,7 @@
   "description": "Sakha - Your Friend in CRM - Backend API with Node.js and Express - USES SUPABASE ONLY (NO SQLITE3, NO KNEX)",
   "main": "src/app.js",
   "scripts": {
-    "start": "node --no-deprecation src/app.js",
+    "start": "node src/app.js",
     "dev": "nodemon src/app.js",
     "dev:clean": "npx kill-port 5000 && npm run dev",
     "_migrate": "echo 'DEPRECATED: Use Supabase migrations instead'",
@@ -36,6 +36,7 @@
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^1.4.5-lts.1",
+    "punycode": "^2.3.1",
     "uuid": "^9.0.1",
     "xlsx": "^0.18.5"
   },
@@ -46,5 +47,9 @@
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "overrides": {
+    "punycode": "^2.3.1",
+    "whatwg-url": "^13.0.0"
   }
 }

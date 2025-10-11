@@ -114,7 +114,10 @@
       "Bash(npm run build:*)",
       "mcp__vercel__search_vercel_documentation",
       "mcp__github__get_file_contents",
-      "mcp__github__search_repositories"
+      "mcp__github__search_repositories",
+      "Bash(npm why:*)",
+      "Bash(npm ls:*)",
+      "Bash(npm run test:*)"
     ],
     "deny": [],
     "ask": []
