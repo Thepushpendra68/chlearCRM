@@ -39,7 +39,10 @@ const authReducer = (state, action) => {
         user: null,
         session: null,
         error: null,
-        loading: false
+        loading: false,
+        impersonatedUser: null,
+        originalUser: null,
+        isImpersonating: false
       }
     case 'UPDATE_SESSION':
       return {
@@ -51,6 +54,20 @@ const authReducer = (state, action) => {
       return {
         ...state,
         user: { ...state.user, ...action.payload }
+      }
+    case 'START_IMPERSONATION':
+      return {
+        ...state,
+        originalUser: state.user,
+        impersonatedUser: action.payload,
+        isImpersonating: true
+      }
+    case 'END_IMPERSONATION':
+      return {
+        ...state,
+        impersonatedUser: null,
+        originalUser: null,
+        isImpersonating: false
       }
     case 'CLEAR_ERROR':
       return {
@@ -73,7 +90,10 @@ const initialState = {
   user: null,
   session: null,
   loading: true, // Start with loading true
-  error: null
+  error: null,
+  impersonatedUser: null,
+  originalUser: null,
+  isImpersonating: false
 }
 
 export const AuthProvider = ({ children }) => {
@@ -303,6 +323,107 @@ export const AuthProvider = ({ children }) => {
     dispatch({ type: 'CLEAR_ERROR' })
   }
 
+  // Start impersonation
+  const startImpersonation = async (userId, targetUser) => {
+    try {
+      // Store impersonation in state
+      dispatch({
+        type: 'START_IMPERSONATION',
+        payload: targetUser
+      })
+
+      // Store in localStorage for persistence
+      localStorage.setItem('impersonating', JSON.stringify({
+        userId: userId,
+        user: targetUser
+      }))
+
+      // Import api here to avoid circular dependency
+      const api = (await import('../services/api')).default
+
+      // Set impersonation header
+      api.defaults.headers.common['x-impersonate-user-id'] = userId
+
+      toast.success(`Now impersonating ${targetUser.first_name} ${targetUser.last_name}`)
+
+      // Redirect to dashboard to see impersonated user's view
+      window.location.href = '/app/dashboard'
+
+      return { success: true }
+    } catch (error) {
+      console.error('Failed to start impersonation:', error)
+      toast.error('Failed to start impersonation')
+      dispatch({ type: 'END_IMPERSONATION' })
+      localStorage.removeItem('impersonating')
+      return { success: false, error: error.message }
+    }
+  }
+
+  // End impersonation
+  const endImpersonation = async () => {
+    try {
+      // Import api here to avoid circular dependency
+      const api = (await import('../services/api')).default
+
+      // Remove impersonation header
+      delete api.defaults.headers.common['x-impersonate-user-id']
+
+      // Clear state
+      dispatch({ type: 'END_IMPERSONATION' })
+
+      // Clear localStorage
+      localStorage.removeItem('impersonating')
+
+      // Call backend to log end of impersonation
+      try {
+        await api.post('/platform/impersonate/end')
+      } catch (error) {
+        console.error('Failed to log end of impersonation:', error)
+        // Don't fail the whole operation if logging fails
+      }
+
+      toast.success('Impersonation ended')
+
+      // Reload to restore original user view
+      window.location.href = '/platform'
+
+      return { success: true }
+    } catch (error) {
+      console.error('Failed to end impersonation:', error)
+      toast.error('Failed to end impersonation')
+      return { success: false, error: error.message }
+    }
+  }
+
+  // Restore impersonation on page load
+  useEffect(() => {
+    const restoreImpersonation = async () => {
+      const impersonating = localStorage.getItem('impersonating')
+      if (impersonating && state.isAuthenticated && state.user?.role === 'super_admin') {
+        try {
+          const { userId, user } = JSON.parse(impersonating)
+
+          // Restore state
+          dispatch({
+            type: 'START_IMPERSONATION',
+            payload: user
+          })
+
+          // Import api here to avoid circular dependency
+          const api = (await import('../services/api')).default
+
+          // Restore header
+          api.defaults.headers.common['x-impersonate-user-id'] = userId
+        } catch (error) {
+          console.error('Failed to restore impersonation:', error)
+          localStorage.removeItem('impersonating')
+        }
+      }
+    }
+
+    restoreImpersonation()
+  }, [state.isAuthenticated, state.user])
+
   const value = {
     ...state,
     login,
@@ -310,7 +431,9 @@ export const AuthProvider = ({ children }) => {
     registerCompany,
     logout,
     updateProfile,
-    clearError
+    clearError,
+    startImpersonation,
+    endImpersonation
   }
 
   return (

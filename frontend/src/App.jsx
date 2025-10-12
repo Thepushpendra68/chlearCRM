@@ -20,6 +20,14 @@ const Reports = lazy(() => import('./pages/Reports'))
 const Tasks = lazy(() => import('./pages/Tasks'))
 const SearchResults = lazy(() => import('./pages/SearchResults'))
 const Layout = lazy(() => import('./components/Layout/Layout'))
+const PlatformLayout = lazy(() => import('./components/Platform/PlatformLayout'))
+const PlatformDashboard = lazy(() => import('./pages/Platform/PlatformDashboard'))
+const Companies = lazy(() => import('./pages/Platform/Companies'))
+const CompanyDetails = lazy(() => import('./pages/Platform/CompanyDetails'))
+const AuditLogs = lazy(() => import('./pages/Platform/AuditLogs'))
+const PlatformUsers = lazy(() => import('./pages/Platform/PlatformUsers'))
+const PlatformAnalytics = lazy(() => import('./pages/Platform/PlatformAnalytics'))
+const PlatformActivity = lazy(() => import('./pages/Platform/PlatformActivity'))
 
 const RouteLoadingFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -71,7 +79,22 @@ function App() {
               <Route path="tasks" element={<Tasks />} />
               <Route path="search" element={<SearchResults />} />
             </Route>
-            
+
+            {/* Platform routes - Super Admin only */}
+            <Route path="/platform" element={
+              <ProtectedRoute>
+                <PlatformLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<PlatformDashboard />} />
+              <Route path="companies" element={<Companies />} />
+              <Route path="companies/:companyId" element={<CompanyDetails />} />
+              <Route path="users" element={<PlatformUsers />} />
+              <Route path="analytics" element={<PlatformAnalytics />} />
+              <Route path="audit-logs" element={<AuditLogs />} />
+              <Route path="activity" element={<PlatformActivity />} />
+            </Route>
+
             {/* Catch all route */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes></Suspense>

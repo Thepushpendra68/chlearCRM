@@ -21,6 +21,7 @@ import {
   UserPlusIcon,
   DocumentChartBarIcon,
   ClipboardDocumentListIcon,
+  CommandLineIcon,
 } from '@heroicons/react/24/outline'
 import api from '../../services/api'
 
@@ -68,6 +69,14 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, isCollapsed, setIsCollapsed }) =
     { name: 'Tasks', href: '/app/tasks', icon: ClipboardDocumentListIcon, badge: badgeCounts.tasks || null },
     { name: 'Users', href: '/app/users', icon: UserGroupIcon, badge: null },
     { name: 'Reports', href: '/app/reports', icon: DocumentChartBarIcon, badge: null },
+    // Platform Admin link - only for super_admin
+    ...(user?.role === 'super_admin' ? [{
+      name: 'Platform Admin',
+      href: '/platform',
+      icon: CommandLineIcon,
+      badge: null,
+      className: 'border-t border-gray-200 pt-2 mt-2'
+    }] : [])
   ]
 
   // Handle keyboard navigation

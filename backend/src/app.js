@@ -46,6 +46,7 @@ const taskRoutes = require('./routes/taskRoutes');
 const importRoutes = require('./routes/importRoutes');
 const searchRoutes = require('./routes/searchRoutes');
 const chatbotRoutes = require('./routes/chatbotRoutes');
+const platformRoutes = require('./routes/platformRoutes');
 
 // Import middleware
 const errorHandler = require('./middleware/errorMiddleware');
@@ -178,6 +179,7 @@ app.get('/debug-headers', (req, res) => {
 });
 
 // API routes
+// Note: Impersonation is now handled automatically in the authenticate middleware
 app.use('/api/auth', authRoutes); // Legacy auth routes (keep for backward compatibility during migration)
 app.use('/api/supabase-auth', supabaseAuthRoutes); // New Supabase auth routes
 app.use('/api/users', userRoutes);
@@ -191,6 +193,7 @@ app.use('/api/tasks', taskRoutes);
 app.use('/api/import', importRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/chatbot', chatbotRoutes);
+app.use('/api/platform', platformRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {
