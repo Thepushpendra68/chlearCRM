@@ -119,17 +119,7 @@ const ConfirmActionModal = ({
 
 const Users = () => {
   const { user } = useAuth();
-
-  if (!['company_admin', 'super_admin'].includes(user?.role)) {
-    return (
-      <div className="text-center py-12">
-        <h3 className="text-lg font-medium text-gray-900">Access Denied</h3>
-        <p className="mt-2 text-sm text-gray-500">
-          You don&apos;t have permission to view this page.
-        </p>
-      </div>
-    );
-  }
+  const hasAccess = ['company_admin', 'super_admin'].includes(user?.role);
 
   const [tableState, setTableState] = useState(INITIAL_TABLE_STATE);
   const [users, setUsers] = useState([]);
@@ -145,6 +135,10 @@ const Users = () => {
   const normalizedSearch = debouncedSearch.trim();
 
   const queryParams = useMemo(() => {
+    if (!hasAccess) {
+      return null;
+    }
+
     const params = {
       page: tableState.page,
       limit: tableState.pageSize,
@@ -166,6 +160,7 @@ const Users = () => {
 
     return params;
   }, [
+    hasAccess,
     tableState.page,
     tableState.pageSize,
     tableState.role,
@@ -177,6 +172,11 @@ const Users = () => {
 
   useEffect(() => {
     let cancelled = false;
+
+    if (!hasAccess || !queryParams) {
+      setLoading(false);
+      return () => {};
+    }
 
     const fetchUsers = async () => {
       setLoading(true);
@@ -210,7 +210,18 @@ const Users = () => {
     return () => {
       cancelled = true;
     };
-  }, [queryParams, refreshKey, user]);
+  }, [hasAccess, queryParams, refreshKey, user]);
+
+  if (!hasAccess) {
+    return (
+      <div className="text-center py-12">
+        <h3 className="text-lg font-medium text-gray-900">Access Denied</h3>
+        <p className="mt-2 text-sm text-gray-500">
+          You don&apos;t have permission to view this page.
+        </p>
+      </div>
+    );
+  }
 
   const currentPage = pagination?.current_page ?? tableState.page;
   const totalPages = Math.max(pagination?.total_pages ?? 1, 1);
