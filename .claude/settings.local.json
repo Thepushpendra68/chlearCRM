@@ -117,7 +117,8 @@
       "mcp__github__search_repositories",
       "Bash(npm why:*)",
       "Bash(npm ls:*)",
-      "Bash(npm run test:*)"
+      "Bash(npm run test:*)",
+      "Bash(test:*)"
     ],
     "deny": [],
     "ask": []
