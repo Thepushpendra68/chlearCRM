@@ -1,10 +1,12 @@
 import { Outlet, useLocation } from 'react-router-dom'
 import Header from './Header'
 import Sidebar from './Sidebar'
-import ChatbotWidget from '../Chatbot/ChatbotWidget'
+import { Suspense, lazy } from 'react'
 import ImpersonationBanner from '../Platform/ImpersonationBanner'
 import { useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
+
+const ChatbotWidget = lazy(() => import('../Chatbot/ChatbotWidget'))
 
 const Layout = () => {
   const { isImpersonating, impersonatedUser, endImpersonation } = useAuth()
@@ -50,7 +52,9 @@ const Layout = () => {
       </div>
 
       {/* Chatbot Widget */}
-      <ChatbotWidget />
+      <Suspense fallback={null}>
+        <ChatbotWidget />
+      </Suspense>
     </div>
   )
 }
