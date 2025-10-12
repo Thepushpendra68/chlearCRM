@@ -1,6 +1,8 @@
 const express = require('express');
 const { authenticate, authorize } = require('../middleware/authMiddleware');
 const platformController = require('../controllers/platformController');
+const { endImpersonation } = require('../middleware/impersonationMiddleware');
+const { platformRateLimiter, strictPlatformRateLimiter } = require('../middleware/rateLimitMiddleware');
 
 const router = express.Router();
 
@@ -14,6 +16,9 @@ router.use(authenticate);
 
 // Authorize only super admins
 router.use(authorize(['super_admin']));
+
+// Apply rate limiting to all platform routes
+router.use(platformRateLimiter);
 
 /**
  * @route   GET /api/platform/stats
@@ -41,7 +46,7 @@ router.get('/companies/:companyId', platformController.getCompanyDetails);
  * @desc    Update company status (suspend/activate)
  * @access  Super Admin
  */
-router.put('/companies/:companyId/status', platformController.updateCompanyStatus);
+router.put('/companies/:companyId/status', strictPlatformRateLimiter, platformController.updateCompanyStatus);
 
 /**
  * @route   GET /api/platform/users/search
@@ -63,5 +68,12 @@ router.get('/audit-logs', platformController.getAuditLogs);
  * @access  Super Admin
  */
 router.get('/activity', platformController.getRecentActivity);
+
+/**
+ * @route   POST /api/platform/impersonate/end
+ * @desc    End impersonation session
+ * @access  Super Admin
+ */
+router.post('/impersonate/end', endImpersonation);
 
 module.exports = router;
