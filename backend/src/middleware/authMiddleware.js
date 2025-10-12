@@ -1,8 +1,11 @@
 const { extractTokenFromHeader, verifyAndGetUser, requireRole, requirePermission } = require('../utils/supabaseAuthUtils');
 const ApiError = require('../utils/ApiError');
+const { getUserProfile } = require('../config/supabase');
+const auditService = require('../services/auditService');
 
 /**
  * Authentication middleware to verify Supabase JWT tokens
+ * Also handles user impersonation if x-impersonate-user-id header is present
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  * @param {Function} next - Express next function
@@ -38,6 +41,56 @@ const authenticate = async (req, res, next) => {
     // Add user to request object with enhanced data
     req.user = user;
     req.token = token; // Keep token for Supabase client operations
+
+    // Handle impersonation if header is present
+    const impersonateUserId = req.headers['x-impersonate-user-id'];
+    if (impersonateUserId && req.user.role === 'super_admin') {
+      console.log(`[IMPERSONATION] Super admin ${req.user.email} attempting to impersonate user ${impersonateUserId}`);
+
+      // Get target user profile
+      const targetUserProfile = await getUserProfile(impersonateUserId);
+
+      if (!targetUserProfile) {
+        throw ApiError.notFound('Target user not found');
+      }
+
+      // Prevent super_admin from impersonating another super_admin
+      if (targetUserProfile.role === 'super_admin') {
+        throw ApiError.forbidden('Cannot impersonate another super admin');
+      }
+
+      // Store original user
+      req.originalUser = { ...req.user };
+
+      // Replace req.user with target user
+      req.user = {
+        ...targetUserProfile,
+        isImpersonated: true,
+        impersonatedBy: req.originalUser.id
+      };
+
+      // Log impersonation
+      await auditService.logEvent({
+        actorId: req.originalUser.id,
+        actorEmail: req.originalUser.email,
+        actorRole: req.originalUser.role,
+        action: 'impersonate_user',
+        resourceType: 'user',
+        resourceId: impersonateUserId,
+        details: {
+          target_user_email: targetUserProfile.email,
+          target_user_name: `${targetUserProfile.first_name} ${targetUserProfile.last_name}`
+        },
+        isImpersonation: true,
+        impersonatedUserId: impersonateUserId,
+        severity: 'warning',
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent']
+      });
+
+      console.log(`[IMPERSONATION] Successfully impersonating ${targetUserProfile.email}`);
+    }
+
     next();
   } catch (error) {
     console.error('Authentication error:', error);
