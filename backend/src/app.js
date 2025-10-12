@@ -179,6 +179,7 @@ app.get('/debug-headers', (req, res) => {
 });
 
 // API routes
+// Note: Impersonation is now handled automatically in the authenticate middleware
 app.use('/api/auth', authRoutes); // Legacy auth routes (keep for backward compatibility during migration)
 app.use('/api/supabase-auth', supabaseAuthRoutes); // New Supabase auth routes
 app.use('/api/users', userRoutes);

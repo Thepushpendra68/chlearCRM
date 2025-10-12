@@ -218,6 +218,63 @@ class PlatformController {
       next(error);
     }
   };
+
+  /**
+   * Start impersonating a user
+   */
+  startImpersonation = async (req, res, next) => {
+    try {
+      const { userId } = req.body;
+
+      if (!userId) {
+        throw new ApiError('User ID is required', 400);
+      }
+
+      // Get target user profile
+      const { getUserProfile } = require('../config/supabase');
+      const targetUser = await getUserProfile(userId);
+
+      if (!targetUser) {
+        throw new ApiError('Target user not found', 404);
+      }
+
+      // Prevent super_admin from impersonating another super_admin
+      if (targetUser.role === 'super_admin') {
+        throw new ApiError('Cannot impersonate another super admin', 403);
+      }
+
+      // Log impersonation start
+      await auditService.logEvent({
+        actorId: req.user.id,
+        actorEmail: req.user.email,
+        actorRole: req.user.role,
+        action: 'start_impersonation',
+        resourceType: 'user',
+        resourceId: userId,
+        details: {
+          target_user_email: targetUser.email,
+          target_user_name: `${targetUser.first_name} ${targetUser.last_name}`,
+          target_user_role: targetUser.role,
+          target_user_company: targetUser.company_name
+        },
+        isImpersonation: true,
+        impersonatedUserId: userId,
+        severity: 'warning',
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent']
+      });
+
+      res.json({
+        success: true,
+        data: {
+          user: targetUser,
+          message: 'Impersonation started successfully'
+        }
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 }
 
 module.exports = new PlatformController();

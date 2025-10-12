@@ -3,9 +3,10 @@ import { useAuth } from '../../context/AuthContext';
 import { Navigate } from 'react-router-dom';
 import PlatformSidebar from './PlatformSidebar';
 import PlatformHeader from './PlatformHeader';
+import ImpersonationBanner from './ImpersonationBanner';
 
 const PlatformLayout = () => {
-  const { user, loading } = useAuth();
+  const { user, loading, isImpersonating, impersonatedUser, endImpersonation } = useAuth();
 
   // Loading state
   if (loading) {
@@ -25,6 +26,14 @@ const PlatformLayout = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Platform Header */}
       <PlatformHeader />
+
+      {/* Impersonation Banner */}
+      {isImpersonating && impersonatedUser && (
+        <ImpersonationBanner
+          impersonatedUser={impersonatedUser}
+          onEnd={endImpersonation}
+        />
+      )}
 
       <div className="flex">
         {/* Platform Sidebar */}

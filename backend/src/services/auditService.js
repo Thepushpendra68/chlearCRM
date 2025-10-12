@@ -100,13 +100,15 @@ class AuditService {
    * Get recent platform activity
    */
   async getRecentActivity(limit = 20) {
+    // Query audit_logs directly for more reliable results
     const { data, error } = await supabaseAdmin
-      .from('platform_recent_activity')
+      .from('audit_logs')
       .select('*')
+      .order('created_at', { ascending: false })
       .limit(limit);
 
     if (error) throw error;
-    return data;
+    return data || [];
   }
 }
 

@@ -25,6 +25,9 @@ const PlatformDashboard = lazy(() => import('./pages/Platform/PlatformDashboard'
 const Companies = lazy(() => import('./pages/Platform/Companies'))
 const CompanyDetails = lazy(() => import('./pages/Platform/CompanyDetails'))
 const AuditLogs = lazy(() => import('./pages/Platform/AuditLogs'))
+const PlatformUsers = lazy(() => import('./pages/Platform/PlatformUsers'))
+const PlatformAnalytics = lazy(() => import('./pages/Platform/PlatformAnalytics'))
+const PlatformActivity = lazy(() => import('./pages/Platform/PlatformActivity'))
 
 const RouteLoadingFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -86,7 +89,10 @@ function App() {
               <Route index element={<PlatformDashboard />} />
               <Route path="companies" element={<Companies />} />
               <Route path="companies/:companyId" element={<CompanyDetails />} />
+              <Route path="users" element={<PlatformUsers />} />
+              <Route path="analytics" element={<PlatformAnalytics />} />
               <Route path="audit-logs" element={<AuditLogs />} />
+              <Route path="activity" element={<PlatformActivity />} />
             </Route>
 
             {/* Catch all route */}

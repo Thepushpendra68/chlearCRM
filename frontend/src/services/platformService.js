@@ -63,6 +63,24 @@ const platformService = {
       params: { limit }
     });
     return response.data;
+  },
+
+  /**
+   * Start impersonating a user
+   */
+  async startImpersonation(userId) {
+    const response = await api.post('/platform/impersonate/start', {
+      userId
+    });
+    return response.data;
+  },
+
+  /**
+   * End impersonation session
+   */
+  async endImpersonation() {
+    const response = await api.post('/platform/impersonate/end');
+    return response.data;
   }
 };
 

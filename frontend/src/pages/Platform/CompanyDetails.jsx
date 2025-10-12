@@ -1,18 +1,21 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import platformService from '../../services/platformService';
-import api from '../../services/api';
 import toast from 'react-hot-toast';
+import { useAuth } from '../../context/AuthContext';
 import {
   ArrowLeftIcon,
-  UserIcon
+  UserIcon,
+  ArrowRightOnRectangleIcon
 } from '@heroicons/react/24/outline';
 
 const CompanyDetails = () => {
   const { companyId } = useParams();
+  const { startImpersonation } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [impersonating, setImpersonating] = useState(null);
 
   useEffect(() => {
     fetchCompanyDetails();
@@ -44,14 +47,28 @@ const CompanyDetails = () => {
     }
   };
 
-  const handleImpersonateUser = (userId) => {
-    // Set impersonation header
-    api.defaults.headers.common['x-impersonate-user-id'] = userId;
+  const handleImpersonateUser = async (user) => {
+    if (user.role === 'super_admin') {
+      toast.error('Cannot impersonate another super admin');
+      return;
+    }
 
-    toast.success('Impersonation started');
+    setImpersonating(user.id);
+    try {
+      // Call backend to start impersonation
+      const response = await platformService.startImpersonation(user.id);
 
-    // Redirect to main app
-    window.location.href = '/app/dashboard';
+      if (response.success) {
+        // Call auth context to set header and state
+        await startImpersonation(user.id, response.data.user);
+      } else {
+        toast.error('Failed to start impersonation');
+      }
+    } catch (error) {
+      console.error('Impersonation error:', error);
+      toast.error('Failed to start impersonation');
+      setImpersonating(null);
+    }
   };
 
   if (loading) {
@@ -137,12 +154,28 @@ const CompanyDetails = () => {
                   <p className="text-xs text-gray-500 capitalize">{user.role.replace('_', ' ')}</p>
                 </div>
               </div>
-              <button
-                onClick={() => handleImpersonateUser(user.id)}
-                className="btn-secondary text-sm"
-              >
-                Impersonate
-              </button>
+              {user.role !== 'super_admin' && (
+                <button
+                  onClick={() => handleImpersonateUser(user)}
+                  disabled={impersonating === user.id}
+                  className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                >
+                  {impersonating === user.id ? (
+                    <>
+                      <div className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-solid border-current border-r-transparent mr-2"></div>
+                      Impersonating...
+                    </>
+                  ) : (
+                    <>
+                      <ArrowRightOnRectangleIcon className="h-4 w-4 mr-1" />
+                      Impersonate
+                    </>
+                  )}
+                </button>
+              )}
+              {user.role === 'super_admin' && (
+                <span className="text-xs text-gray-400 italic">Not available</span>
+              )}
             </div>
           ))}
         </div>

@@ -139,11 +139,11 @@ const PlatformDashboard = () => {
                       {item.resource_name}
                     </p>
                     <p className="text-xs text-gray-500">
-                      {item.activity_type.replace('_', ' ')}
+                      {(item.activity_type || 'unknown_activity').replace(/_/g, ' ')}
                     </p>
                   </div>
                   <p className="text-xs text-gray-400">
-                    {new Date(item.timestamp).toLocaleString()}
+                    {item.timestamp ? new Date(item.timestamp).toLocaleString() : ''}
                   </p>
                 </div>
               </div>

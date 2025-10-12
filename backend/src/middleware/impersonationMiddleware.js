@@ -10,13 +10,19 @@ const impersonate = async (req, res, next) => {
   try {
     const impersonateUserId = req.headers['x-impersonate-user-id'];
 
+    // Skip if no impersonation header
+    if (!impersonateUserId) {
+      return next();
+    }
+
+    // Skip if no user (not authenticated)
+    if (!req.user) {
+      return next();
+    }
+
     // Only super admins can impersonate
     if (req.user.role !== 'super_admin') {
       return next(new ApiError('Only super admins can impersonate users', 403));
-    }
-
-    if (!impersonateUserId) {
-      return next();
     }
 
     // Store original user
@@ -27,6 +33,11 @@ const impersonate = async (req, res, next) => {
 
     if (!targetUserProfile) {
       return next(new ApiError('Target user not found', 404));
+    }
+
+    // Prevent super_admin from impersonating another super_admin
+    if (targetUserProfile.role === 'super_admin') {
+      return next(new ApiError('Cannot impersonate another super admin', 403));
     }
 
     // Replace req.user with target user

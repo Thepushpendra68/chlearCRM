@@ -70,6 +70,13 @@ router.get('/audit-logs', platformController.getAuditLogs);
 router.get('/activity', platformController.getRecentActivity);
 
 /**
+ * @route   POST /api/platform/impersonate/start
+ * @desc    Start impersonating a user
+ * @access  Super Admin
+ */
+router.post('/impersonate/start', strictPlatformRateLimiter, platformController.startImpersonation);
+
+/**
  * @route   POST /api/platform/impersonate/end
  * @desc    End impersonation session
  * @access  Super Admin
