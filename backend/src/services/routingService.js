@@ -27,8 +27,8 @@ class RoutingService {
         return { success: true, message: 'Lead is already assigned', assignedTo: lead.assigned_to };
       }
 
-      // Get active assignment rules
-      const rulesResult = await assignmentService.getActiveRules();
+      // Get active assignment rules for the company
+      const rulesResult = await assignmentService.getActiveRules({ company_id: lead.company_id });
       if (!rulesResult.success) {
         throw new Error(rulesResult.error);
       }
@@ -36,7 +36,7 @@ class RoutingService {
       const rules = rulesResult.data;
       if (rules.length === 0) {
         // No rules available, use round-robin as fallback
-        return await this.roundRobinAssignment(leadId, assignedBy);
+        return await this.roundRobinAssignment(leadId, assignedBy, lead.company_id);
       }
 
       // Evaluate rules against lead data
@@ -44,7 +44,7 @@ class RoutingService {
 
       if (!matchingRule) {
         // No rule matches, use round-robin as fallback
-        return await this.roundRobinAssignment(leadId, assignedBy);
+        return await this.roundRobinAssignment(leadId, assignedBy, lead.company_id);
       }
 
       // Execute assignment based on rule type
@@ -127,12 +127,13 @@ class RoutingService {
    * Round-robin assignment among all active users
    * @param {string} leadId - Lead ID
    * @param {string} assignedBy - User ID who triggered the assignment
+   * @param {string} companyId - Company ID for the lead
    * @returns {Object} - Assignment result
    */
-  async roundRobinAssignment(leadId, assignedBy = null) {
+  async roundRobinAssignment(leadId, assignedBy = null, companyId = null) {
     try {
       // Get next user in round-robin sequence
-      const userResult = await this.getRoundRobinUser();
+      const userResult = await this.getRoundRobinUser(companyId);
       if (!userResult.success) {
         throw new Error(userResult.error);
       }
@@ -184,18 +185,26 @@ class RoutingService {
 
   /**
    * Get next user in round-robin sequence
+   * @param {string} companyId - Company ID to filter users
    * @returns {Object} - User result
    */
-  async getRoundRobinUser() {
+  async getRoundRobinUser(companyId = null) {
     try {
       // Get all active users from user_profiles (excluding admins)
-      const { data: users, error: usersError } = await supabaseAdmin
+      let query = supabaseAdmin
         .from('user_profiles')
         .select('id')
         .eq('is_active', true)
         .neq('role', 'super_admin')
         .neq('role', 'company_admin')
         .order('id', { ascending: true });
+
+      // Filter by company if provided
+      if (companyId) {
+        query = query.eq('company_id', companyId);
+      }
+
+      const { data: users, error: usersError } = await query;
 
       if (usersError || !users || users.length === 0) {
         return { success: false, error: 'No active users available for assignment' };

@@ -225,6 +225,9 @@ class AssignmentService {
         return { success: false, error: 'Lead not found' };
       }
 
+      // Store current assignment for history
+      const currentAssignedTo = lead.assigned_to;
+
       // Check if assigned user exists and belongs to company
       const { data: assignedUser, error: userError } = await supabase
         .from('user_profiles_with_auth')
@@ -253,6 +256,23 @@ class AssignmentService {
       if (error) {
         console.error('Error assigning lead:', error);
         return { success: false, error: error.message };
+      }
+
+      // Record assignment history
+      const { error: historyError } = await supabase
+        .from('lead_assignment_history')
+        .insert({
+          lead_id: leadId,
+          previous_assigned_to: currentAssignedTo,
+          new_assigned_to: assignedTo,
+          assigned_by: assignedBy,
+          assignment_reason: reason,
+          assignment_source: 'manual'
+        });
+
+      if (historyError) {
+        console.error('Failed to record assignment history:', historyError);
+        // Don't fail the assignment if history recording fails
       }
 
       return { success: true, message: 'Lead assigned successfully' };
@@ -289,12 +309,45 @@ class AssignmentService {
   // Get assignment history for a lead
   async getLeadAssignmentHistory(leadId, currentUser) {
     try {
-      // Since we don't have assignment history table, return basic info
-      return {
-        success: true,
-        data: [],
-        message: 'Assignment history not available in current schema'
-      };
+      const supabase = supabaseAdmin;
+
+      const { data: history, error } = await supabase
+        .from('lead_assignment_history')
+        .select(`
+          *,
+          previous_assigned:user_profiles!lead_assignment_history_previous_assigned_to_fkey(first_name, last_name, email),
+          new_assigned:user_profiles!lead_assignment_history_new_assigned_to_fkey(first_name, last_name, email),
+          assigned_by_user:user_profiles!lead_assignment_history_assigned_by_fkey(first_name, last_name, email)
+        `)
+        .eq('lead_id', leadId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching assignment history:', error);
+        return { success: false, error: error.message };
+      }
+
+      // Format the response
+      const formattedHistory = history.map(item => ({
+        id: item.id,
+        lead_id: item.lead_id,
+        previous_assigned_to: item.previous_assigned_to,
+        new_assigned_to: item.new_assigned_to,
+        assigned_by: item.assigned_by,
+        assignment_reason: item.assignment_reason,
+        assignment_source: item.assignment_source,
+        assignment_rule_id: item.assignment_rule_id,
+        created_at: item.created_at,
+        previous_assigned_name: item.previous_assigned ? 
+          `${item.previous_assigned.first_name} ${item.previous_assigned.last_name}` : null,
+        new_assigned_name: item.new_assigned ? 
+          `${item.new_assigned.first_name} ${item.new_assigned.last_name}` : null,
+        assigned_by_name: item.assigned_by_user ? 
+          `${item.assigned_by_user.first_name} ${item.assigned_by_user.last_name}` : 'System',
+        assigned_by_email: item.assigned_by_user?.email || 'system@company.com'
+      }));
+
+      return { success: true, data: formattedHistory };
     } catch (error) {
       console.error('Error fetching assignment history:', error);
       return { success: false, error: error.message };

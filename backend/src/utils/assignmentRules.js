@@ -141,7 +141,7 @@ class AssignmentRules {
    */
   static getLeadFields() {
     return [
-      { value: 'source', label: 'Lead Source', type: 'string' },
+      { value: 'lead_source', label: 'Lead Source', type: 'string' },
       { value: 'status', label: 'Lead Status', type: 'string' },
       { value: 'company', label: 'Company', type: 'string' },
       { value: 'industry', label: 'Industry', type: 'string' },
@@ -149,6 +149,7 @@ class AssignmentRules {
       { value: 'lead_score', label: 'Lead Score', type: 'number' },
       { value: 'deal_value', label: 'Deal Value', type: 'number' },
       { value: 'pipeline_stage_id', label: 'Pipeline Stage', type: 'string' },
+      { value: 'priority', label: 'Priority', type: 'string' },
       { value: 'created_at', label: 'Created Date', type: 'date' },
       { value: 'last_contact_date', label: 'Last Contact Date', type: 'date' }
     ];

@@ -118,7 +118,10 @@
       "Bash(npm why:*)",
       "Bash(npm ls:*)",
       "Bash(npm run test:*)",
-      "Bash(test:*)"
+      "Bash(test:*)",
+      "mcp__vercel__list_teams",
+      "mcp__vercel__get_access_to_vercel_url",
+      "WebFetch(domain:chlear-15rcctzei-pushpendrachl-gmailcoms-projects.vercel.app)"
     ],
     "deny": [],
     "ask": []

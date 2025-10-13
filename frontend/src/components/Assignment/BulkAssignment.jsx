@@ -200,13 +200,14 @@ const BulkAssignment = ({
     
     return leads.filter(lead => {
       if (filters.status && lead.status !== filters.status) return false;
-      if (filters.source && lead.lead_source !== filters.source) return false;
+      if (filters.source && (lead.lead_source || lead.source) !== filters.source) return false;
       if (filters.assigned_to && lead.assigned_to !== filters.assigned_to) return false;
       if (filters.search) {
         const searchTerm = filters.search.toLowerCase();
         return (
           lead.first_name?.toLowerCase().includes(searchTerm) ||
           lead.last_name?.toLowerCase().includes(searchTerm) ||
+          lead.name?.toLowerCase().includes(searchTerm) ||
           lead.email?.toLowerCase().includes(searchTerm) ||
           lead.company?.toLowerCase().includes(searchTerm)
         );
@@ -219,7 +220,12 @@ const BulkAssignment = ({
     if (!leads || !Array.isArray(leads)) {
       return [];
     }
-    return [...new Set(leads.map(lead => lead[field]).filter(Boolean))];
+    return [...new Set(leads.map(lead => {
+      if (field === 'source') {
+        return lead.lead_source || lead.source;
+      }
+      return lead[field];
+    }).filter(Boolean))];
   };
 
   const getUserName = (userId) => {
@@ -227,7 +233,14 @@ const BulkAssignment = ({
       return 'Unknown';
     }
     const user = users.find(u => u.id === userId);
-    return user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email : 'Unknown';
+    if (!user) return 'Unknown';
+    
+    // Handle both old and new user data structures
+    const firstName = user.first_name || user.name?.split(' ')[0] || '';
+    const lastName = user.last_name || user.name?.split(' ').slice(1).join(' ') || '';
+    const fullName = `${firstName} ${lastName}`.trim();
+    
+    return fullName || user.email || 'Unknown';
   };
 
   if (loading && !isDataLoaded) {
@@ -450,7 +463,7 @@ const BulkAssignment = ({
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div>
                       <div className="text-sm font-medium text-gray-900">
-                        {`${lead.first_name || ''} ${lead.last_name || ''}`.trim() || 'Unnamed Lead'}
+                        {`${lead.first_name || ''} ${lead.last_name || ''}`.trim() || lead.name || 'Unnamed Lead'}
                       </div>
                       <div className="text-sm text-gray-500">{lead.email}</div>
                     </div>
@@ -469,7 +482,7 @@ const BulkAssignment = ({
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {lead.lead_source}
+                    {lead.lead_source || lead.source}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {lead.assigned_to ? getUserName(lead.assigned_to) : (
