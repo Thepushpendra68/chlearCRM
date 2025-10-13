@@ -1,5 +1,6 @@
 const { supabaseAdmin } = require('../config/supabase');
 const ApiError = require('../utils/ApiError');
+const userService = require('./userService');
 
 /**
  * Platform Service for Super Admin Operations
@@ -176,6 +177,57 @@ class PlatformService {
     );
 
     return usersWithEmail;
+  }
+
+  async createUserForCompany(currentUser, userData) {
+    if (currentUser.role !== 'super_admin') {
+      throw new ApiError('Only super admins can create users across companies', 403);
+    }
+
+    const companyId = userData.company_id;
+
+    if (!companyId) {
+      throw new ApiError('Target company is required', 400);
+    }
+
+    const { data: company, error: companyError } = await supabaseAdmin
+      .from('companies')
+      .select('id, name')
+      .eq('id', companyId)
+      .single();
+
+    if (companyError || !company) {
+      throw new ApiError('Target company not found', 404);
+    }
+
+    const payload = {
+      first_name: userData.first_name,
+      last_name: userData.last_name,
+      email: userData.email,
+      password: userData.password,
+      role: userData.role || 'sales_rep',
+      company_id: companyId
+    };
+
+    const createdUser = await userService.createUser(payload, {
+      ...currentUser,
+      company_id: companyId
+    });
+
+    if (userData.is_active === false) {
+      await supabaseAdmin
+        .from('user_profiles')
+        .update({ is_active: false, updated_at: new Date().toISOString() })
+        .eq('id', createdUser.id)
+        .eq('company_id', companyId);
+
+      createdUser.is_active = false;
+    }
+
+    return {
+      ...createdUser,
+      company_name: createdUser.company_name || company.name
+    };
   }
 }
 

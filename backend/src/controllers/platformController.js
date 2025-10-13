@@ -1,11 +1,59 @@
 const platformService = require('../services/platformService');
 const auditService = require('../services/auditService');
 const ApiError = require('../utils/ApiError');
+const { validationResult } = require('express-validator');
 
 /**
  * Platform Controller - Super Admin Operations
  */
 class PlatformController {
+  createCompanyUser = async (req, res, next) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        throw ApiError.badRequest('Validation failed', errors.array());
+      }
+
+      const payload = {
+        company_id: req.body.company_id,
+        first_name: req.body.first_name.trim(),
+        last_name: req.body.last_name.trim(),
+        email: req.body.email.trim(),
+        password: req.body.password,
+        role: req.body.role || 'sales_rep',
+        is_active: req.body.is_active !== undefined ? req.body.is_active : true
+      };
+
+      const result = await platformService.createUserForCompany(req.user, payload);
+
+      await auditService.logEvent({
+        actorId: req.user.id,
+        actorEmail: req.user.email,
+        actorRole: req.user.role,
+        action: 'platform_create_user',
+        resourceType: 'user',
+        resourceId: result?.id,
+        details: {
+          company_id: payload.company_id,
+          email: payload.email,
+          role: payload.role,
+          is_active: payload.is_active
+        },
+        severity: 'warning',
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent']
+      });
+
+      res.status(201).json({
+        success: true,
+        data: result,
+        message: 'User created successfully'
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   /**
    * Get all companies
    */

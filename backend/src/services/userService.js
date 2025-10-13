@@ -239,8 +239,35 @@ const createUser = async (userData, currentUser) => {
   try {
     const supabase = supabaseAdmin;
 
-    // Check if email already exists
-    const existingUser = await getUserByEmail(userData.email, currentUser);
+    // Determine target company context
+    let targetCompanyId = currentUser.company_id;
+
+    if (currentUser.role === 'super_admin') {
+      targetCompanyId = userData.company_id || targetCompanyId;
+    }
+
+    if (!targetCompanyId) {
+      throw new ApiError('Target company is required to create a user', 400);
+    }
+
+    // Ensure super admin is creating user within an existing company
+    if (currentUser.role === 'super_admin') {
+      const { data: company, error: companyError } = await supabase
+        .from('companies')
+        .select('id')
+        .eq('id', targetCompanyId)
+        .single();
+
+      if (companyError || !company) {
+        throw new ApiError('Target company not found', 404);
+      }
+    }
+
+    // Check if email already exists within target company context
+    const existingUser = await getUserByEmail(userData.email, {
+      ...currentUser,
+      company_id: targetCompanyId
+    });
     if (existingUser) {
       throw new ApiError('Email already exists', 400);
     }
@@ -251,6 +278,8 @@ const createUser = async (userData, currentUser) => {
     }
 
     // Create user in Supabase Auth
+    const role = userData.role || 'sales_rep';
+
     const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
       email: userData.email,
       password: userData.password,
@@ -258,9 +287,13 @@ const createUser = async (userData, currentUser) => {
       user_metadata: {
         first_name: userData.first_name,
         last_name: userData.last_name,
-        company_id: currentUser.company_id,
-        role: userData.role || 'sales_rep',
+        company_id: targetCompanyId,
+        role
       },
+      app_metadata: {
+        company_id: targetCompanyId,
+        role
+      }
     });
 
     if (authError) {
@@ -273,7 +306,10 @@ const createUser = async (userData, currentUser) => {
     await new Promise(resolve => setTimeout(resolve, 500));
 
     // Get the created user profile
-    const createdUser = await getUserById(authUser.user.id, currentUser);
+    const createdUser = await getUserById(authUser.user.id, {
+      ...currentUser,
+      company_id: targetCompanyId
+    });
 
     return createdUser;
   } catch (error) {

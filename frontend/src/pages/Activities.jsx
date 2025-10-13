@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import ActivityList from '../components/Activities/ActivityList';
 import ActivityForm from '../components/Activities/ActivityForm';
 import ActivityDetail from '../components/Activities/ActivityDetail';
 import activityService from '../services/activityService';
 
 const Activities = () => {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [showActivityForm, setShowActivityForm] = useState(false);
   const [showActivityDetail, setShowActivityDetail] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState(null);
@@ -15,6 +18,18 @@ const Activities = () => {
   const [activities, setActivities] = useState([]);
   const [activitiesLoading, setActivitiesLoading] = useState(true);
   const [activitiesError, setActivitiesError] = useState(null);
+
+  useEffect(() => {
+    const action = searchParams.get('action');
+    if (action === 'create-activity') {
+      const type = searchParams.get('type') || 'note';
+      setActivityType(type);
+      setSelectedActivity(null);
+      setSelectedLeadId(null);
+      setShowActivityForm(true);
+      navigate('/app/activities', { replace: true });
+    }
+  }, [searchParams, navigate]);
 
   // Fetch activities on component mount
   useEffect(() => {

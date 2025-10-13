@@ -44,7 +44,67 @@ const validateUser = [
   body('is_active')
     .optional()
     .isBoolean()
+    .withMessage('is_active must be a boolean value'),
+
+  body('company_id')
+    .optional()
+    .isUUID()
+    .withMessage('company_id must be a valid UUID')
+];
+
+/**
+ * Validation rules for platform-level user creation (super admin)
+ */
+const validatePlatformUser = [
+  body('company_id')
+    .notEmpty()
+    .withMessage('Target company is required')
+    .bail()
+    .isUUID()
+    .withMessage('company_id must be a valid UUID'),
+
+  body('email')
+    .isEmail()
+    .withMessage('Please provide a valid email address')
+    .normalizeEmail()
+    .isLength({ max: 100 })
+    .withMessage('Email must not exceed 100 characters'),
+
+  body('password')
+    .isLength({ min: 8 })
+    .withMessage('Password must be at least 8 characters long')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
+    .withMessage('Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character'),
+
+  body('first_name')
+    .trim()
+    .notEmpty()
+    .withMessage('First name is required')
+    .isLength({ min: 2, max: 50 })
+    .withMessage('First name must be between 2 and 50 characters')
+    .matches(/^[a-zA-Z\s]+$/)
+    .withMessage('First name can only contain letters and spaces'),
+
+  body('last_name')
+    .trim()
+    .notEmpty()
+    .withMessage('Last name is required')
+    .isLength({ min: 2, max: 50 })
+    .withMessage('Last name must be between 2 and 50 characters')
+    .matches(/^[a-zA-Z\s]+$/)
+    .withMessage('Last name can only contain letters and spaces'),
+
+  body('role')
+    .optional()
+    .isIn(allowedRoles)
+    .withMessage(`Role must be one of: ${allowedRoles.join(', ')}`)
+    .default('sales_rep'),
+
+  body('is_active')
+    .optional()
+    .isBoolean()
     .withMessage('is_active must be a boolean value')
+    .toBoolean()
 ];
 
 /**
@@ -165,5 +225,6 @@ module.exports = {
   validateUser,
   validateUserUpdate,
   validateUserSearch,
-  validatePasswordChange
+  validatePasswordChange,
+  validatePlatformUser
 };

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import TaskList from '../components/Tasks/TaskList';
 import TaskForm from '../components/Tasks/TaskForm';
@@ -6,6 +7,8 @@ import taskService from '../services/taskService';
 import userService from '../services/userService';
 
 const Tasks = () => {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -24,6 +27,15 @@ const Tasks = () => {
     overdue: 0
   });
   const [users, setUsers] = useState([]);
+
+  useEffect(() => {
+    const action = searchParams.get('action');
+    if (action === 'create-task') {
+      setEditingTask(null);
+      setShowForm(true);
+      navigate('/app/tasks', { replace: true });
+    }
+  }, [searchParams, navigate]);
 
   useEffect(() => {
     loadTasks();

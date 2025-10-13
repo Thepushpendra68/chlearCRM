@@ -48,6 +48,14 @@ const platformService = {
   },
 
   /**
+   * Create user within a specific company (super admin only)
+   */
+  async createUser(payload) {
+    const response = await api.post('/platform/users', payload);
+    return response.data;
+  },
+
+  /**
    * Get audit logs
    */
   async getAuditLogs(params = {}) {

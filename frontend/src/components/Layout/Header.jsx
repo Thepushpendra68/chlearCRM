@@ -25,13 +25,13 @@ const Header = ({ setSidebarOpen, isCollapsed, currentPath }) => {
   }
 
   const quickActions = [
-    { name: 'New Lead', href: '/leads/new', icon: '👤' },
-    { name: 'New Task', href: '/tasks/new', icon: '📋' },
-    { name: 'New Activity', href: '/activities/new', icon: '⏰' },
+    { name: 'New Lead', to: '/app/leads?action=create-lead', icon: '👤' },
+    { name: 'New Task', to: '/app/tasks?action=create-task', icon: '📋' },
+    { name: 'New Activity', to: '/app/activities?action=create-activity', icon: '⏰' },
   ]
 
   const handleQuickAction = (action) => {
-    navigate(action.href)
+    navigate(action.to)
     setShowQuickActions(false)
   }
 

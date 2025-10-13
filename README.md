@@ -375,7 +375,7 @@ This is a foundational CRM system. Future enhancements could include:
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details, and consult the repository-specific [Agent Guidelines](AGENTS.md) when setting up your workflow.
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)

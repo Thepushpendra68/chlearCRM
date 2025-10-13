@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { PlusIcon, MagnifyingGlassIcon, ArrowDownTrayIcon, ArrowUpTrayIcon, TrashIcon } from '@heroicons/react/24/outline'
 import ImportWizard from '../components/Import/ImportWizard'
 import ExportModal from '../components/Export/ExportModal'
@@ -11,6 +11,7 @@ import toast from 'react-hot-toast'
 
 const Leads = () => {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [showImportWizard, setShowImportWizard] = useState(false)
   const [showExportModal, setShowExportModal] = useState(false)
   const [showAddLeadForm, setShowAddLeadForm] = useState(false)
@@ -33,6 +34,14 @@ const Leads = () => {
   const startItemIndex = totalItems === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1
   const endItemIndex = totalItems === 0 ? 0 : Math.min(currentPage * itemsPerPage, totalItems)
  
+  useEffect(() => {
+    const action = searchParams.get('action')
+    if (action === 'create-lead') {
+      setShowAddLeadForm(true)
+      navigate('/app/leads', { replace: true })
+    }
+  }, [searchParams, navigate])
+
   // Load leads and pipeline stages on component mount
   useEffect(() => {
     const loadData = async () => {

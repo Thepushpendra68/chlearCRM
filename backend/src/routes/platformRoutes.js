@@ -3,6 +3,7 @@ const { authenticate, authorize } = require('../middleware/authMiddleware');
 const platformController = require('../controllers/platformController');
 const { endImpersonation } = require('../middleware/impersonationMiddleware');
 const { platformRateLimiter, strictPlatformRateLimiter } = require('../middleware/rateLimitMiddleware');
+const { validatePlatformUser } = require('../validators/userValidators');
 
 const router = express.Router();
 
@@ -68,6 +69,13 @@ router.get('/audit-logs', platformController.getAuditLogs);
  * @access  Super Admin
  */
 router.get('/activity', platformController.getRecentActivity);
+
+/**
+ * @route   POST /api/platform/users
+ * @desc    Create user in a specific company
+ * @access  Super Admin
+ */
+router.post('/users', strictPlatformRateLimiter, validatePlatformUser, platformController.createCompanyUser);
 
 /**
  * @route   POST /api/platform/impersonate/start

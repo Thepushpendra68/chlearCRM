@@ -1,6 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { MagnifyingGlassIcon, UserCircleIcon, BuildingOfficeIcon, ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline';
+import {
+  MagnifyingGlassIcon,
+  UserCircleIcon,
+  BuildingOfficeIcon,
+  ArrowRightOnRectangleIcon,
+  PlusIcon
+} from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import platformService from '../../services/platformService';
 import { useAuth } from '../../context/AuthContext';
@@ -14,6 +19,16 @@ const PlatformUsers = () => {
   const [companyFilter, setCompanyFilter] = useState('');
   const [companies, setCompanies] = useState([]);
   const [impersonating, setImpersonating] = useState(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [creatingUser, setCreatingUser] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    company_id: '',
+    first_name: '',
+    last_name: '',
+    email: '',
+    password: '',
+    role: 'sales_rep'
+  });
 
   // Fetch companies for filter
   useEffect(() => {
@@ -62,6 +77,57 @@ const PlatformUsers = () => {
   const handleSearch = (e) => {
     e.preventDefault();
     fetchUsers();
+  };
+
+  const resetCreateForm = () => {
+    setCreateForm({
+      company_id: '',
+      first_name: '',
+      last_name: '',
+      email: '',
+      password: '',
+      role: 'sales_rep'
+    });
+  };
+
+  const handleCreateUser = async (event) => {
+    event.preventDefault();
+
+    if (!createForm.company_id) {
+      toast.error('Please select a company');
+      return;
+    }
+
+    if (!createForm.first_name || !createForm.last_name || !createForm.email || !createForm.password) {
+      toast.error('Fill in all required fields');
+      return;
+    }
+
+    try {
+      setCreatingUser(true);
+      const payload = {
+        company_id: createForm.company_id,
+        first_name: createForm.first_name.trim(),
+        last_name: createForm.last_name.trim(),
+        email: createForm.email.trim(),
+        password: createForm.password,
+        role: createForm.role
+      };
+
+      const response = await platformService.createUser(payload);
+
+      if (response?.success) {
+        toast.success('User created successfully');
+        setShowCreateModal(false);
+        resetCreateForm();
+        fetchUsers();
+      }
+    } catch (error) {
+      const message = error?.response?.data?.message || error?.message || 'Failed to create user';
+      toast.error(message);
+    } finally {
+      setCreatingUser(false);
+    }
   };
 
   const handleImpersonate = async (user) => {
@@ -114,6 +180,16 @@ const PlatformUsers = () => {
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">Platform Users</h1>
         <p className="mt-2 text-gray-600">Manage users across all companies</p>
+        <div className="mt-4">
+          <button
+            type="button"
+            onClick={() => setShowCreateModal(true)}
+            className="inline-flex items-center px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-md shadow-sm hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+          >
+            <PlusIcon className="h-4 w-4 mr-2" />
+            Add User
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -294,6 +370,125 @@ const PlatformUsers = () => {
           </div>
         )}
       </div>
+
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-auto">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Add User to Company</h2>
+              <p className="mt-1 text-sm text-gray-600">
+                Create a user for any tenant. The new user will receive immediate access.
+              </p>
+            </div>
+            <form onSubmit={handleCreateUser} className="px-6 py-5 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Company *</label>
+                  <select
+                    value={createForm.company_id}
+                    onChange={(e) => setCreateForm((prev) => ({ ...prev, company_id: e.target.value }))}
+                    className="mt-1 input"
+                    required
+                  >
+                    <option value="">Select company</option>
+                    {companies.map((company) => (
+                      <option key={company.id} value={company.id}>
+                        {company.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Role *</label>
+                  <select
+                    value={createForm.role}
+                    onChange={(e) => setCreateForm((prev) => ({ ...prev, role: e.target.value }))}
+                    className="mt-1 input"
+                  >
+                    <option value="sales_rep">Sales Rep</option>
+                    <option value="manager">Manager</option>
+                    <option value="company_admin">Company Admin</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">First Name *</label>
+                  <input
+                    type="text"
+                    value={createForm.first_name}
+                    onChange={(e) => setCreateForm((prev) => ({ ...prev, first_name: e.target.value }))}
+                    className="mt-1 input"
+                    placeholder="First name"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Last Name *</label>
+                  <input
+                    type="text"
+                    value={createForm.last_name}
+                    onChange={(e) => setCreateForm((prev) => ({ ...prev, last_name: e.target.value }))}
+                    className="mt-1 input"
+                    placeholder="Last name"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Email *</label>
+                  <input
+                    type="email"
+                    value={createForm.email}
+                    onChange={(e) => setCreateForm((prev) => ({ ...prev, email: e.target.value }))}
+                    className="mt-1 input"
+                    placeholder="Email address"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Temporary Password *</label>
+                  <input
+                    type="password"
+                    value={createForm.password}
+                    onChange={(e) => setCreateForm((prev) => ({ ...prev, password: e.target.value }))}
+                    className="mt-1 input"
+                    placeholder="Provide a secure password"
+                    required
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Share this password securely with the user—they should change it after first login.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-3 border-t border-gray-100 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCreateModal(false);
+                    resetCreateForm();
+                  }}
+                  className="btn-secondary"
+                  disabled={creatingUser}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  disabled={creatingUser}
+                >
+                  {creatingUser ? 'Creating...' : 'Create User'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

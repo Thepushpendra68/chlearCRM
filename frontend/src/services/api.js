@@ -167,9 +167,11 @@ api.interceptors.response.use(
           break;
         }
 
-        case 403:
-          toast.error("Access denied. You don't have permission to perform this action.");
+        case 403: {
+          const message = data?.message || "Access denied. You don't have permission to perform this action.";
+          toast.error(message);
           break;
+        }
 
         case 404:
           toast.error('Resource not found.');
