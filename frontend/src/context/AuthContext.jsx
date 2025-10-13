@@ -2,6 +2,7 @@ import { createContext, useContext, useReducer, useEffect, useRef } from 'react'
 import supabase, { signIn, signOut, updateUserProfile, getCurrentUserProfile } from '../config/supabase'
 import authService from '../services/authService'
 import toast from 'react-hot-toast'
+import { subscribeForcedLogout } from '../utils/authEvents'
 
 const AuthContext = createContext()
 
@@ -202,6 +203,16 @@ export const AuthProvider = ({ children }) => {
     });
 
     return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribeForcedLogout = subscribeForcedLogout(() => {
+      console.log('[AUTH] Forced logout signal received');
+      dispatch({ type: 'AUTH_LOGOUT' });
+      localStorage.removeItem('impersonating');
+    });
+
+    return unsubscribeForcedLogout;
   }, []);
 
   // Logout function

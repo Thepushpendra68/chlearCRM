@@ -1,6 +1,7 @@
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import supabase, { ensureSessionInitialized, getCachedSession } from '../config/supabase';
+import { emitForcedLogout } from '../utils/authEvents';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
@@ -114,6 +115,7 @@ const triggerSignOut = async () => {
   } catch (signOutError) {
     console.error('Failed to sign out after 401:', signOutError);
   } finally {
+    emitForcedLogout();
     isSigningOut = false;
   }
 };
