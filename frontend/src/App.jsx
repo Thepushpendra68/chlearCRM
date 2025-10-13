@@ -19,6 +19,8 @@ const Users = lazy(() => import('./pages/Users'))
 const Reports = lazy(() => import('./pages/Reports'))
 const Tasks = lazy(() => import('./pages/Tasks'))
 const SearchResults = lazy(() => import('./pages/SearchResults'))
+const Profile = lazy(() => import('./pages/Profile'))
+const Settings = lazy(() => import('./pages/Settings'))
 const Layout = lazy(() => import('./components/Layout/Layout'))
 const PlatformLayout = lazy(() => import('./components/Platform/PlatformLayout'))
 const PlatformDashboard = lazy(() => import('./pages/Platform/PlatformDashboard'))
@@ -78,6 +80,8 @@ function App() {
               } />
               <Route path="tasks" element={<Tasks />} />
               <Route path="search" element={<SearchResults />} />
+              <Route path="profile" element={<Profile />} />
+              <Route path="settings" element={<Settings />} />
             </Route>
 
             {/* Platform routes - Super Admin only */}

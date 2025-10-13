@@ -251,6 +251,20 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, isCollapsed, setIsCollapsed }) =
                           <Menu.Item>
                             {({ active }) => (
                               <button
+                                onClick={() => navigate('/app/profile')}
+                                className={`${
+                                  active ? 'bg-gray-100' : ''
+                                } flex items-center w-full px-4 py-2 text-sm text-gray-700`}
+                              >
+                                <UserCircleIcon className="h-4 w-4 mr-3" />
+                                My Profile
+                              </button>
+                            )}
+                          </Menu.Item>
+                          <Menu.Item>
+                            {({ active }) => (
+                              <button
+                                onClick={() => navigate('/app/settings')}
                                 className={`${
                                   active ? 'bg-gray-100' : ''
                                 } flex items-center w-full px-4 py-2 text-sm text-gray-700`}
@@ -385,6 +399,20 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, isCollapsed, setIsCollapsed }) =
                       <Menu.Item>
                         {({ active }) => (
                           <button
+                            onClick={() => navigate('/app/profile')}
+                            className={`${
+                              active ? 'bg-gray-100' : ''
+                            } flex items-center w-full px-4 py-2 text-sm text-gray-700`}
+                          >
+                            <UserCircleIcon className="h-4 w-4 mr-3" />
+                            My Profile
+                          </button>
+                        )}
+                      </Menu.Item>
+                      <Menu.Item>
+                        {({ active }) => (
+                          <button
+                            onClick={() => navigate('/app/settings')}
                             className={`${
                               active ? 'bg-gray-100' : ''
                             } flex items-center w-full px-4 py-2 text-sm text-gray-700`}

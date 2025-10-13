@@ -310,20 +310,51 @@ export const AuthProvider = ({ children }) => {
         throw new Error('User not authenticated')
       }
 
-      const { data, error } = await updateUserProfile(state.user.id, profileData)
+      // Use the API service for profile updates
+      const { default: api } = await import('../services/api')
+      const response = await api.put('/users/profile/me', profileData)
 
-      if (error) {
-        throw error
+      if (response.data.success) {
+        dispatch({
+          type: 'UPDATE_USER',
+          payload: response.data.data
+        })
+        toast.success('Profile updated successfully!')
+        return { success: true, data: response.data.data }
+      } else {
+        throw new Error('Profile update failed')
+      }
+    } catch (error) {
+      const errorMessage = error.response?.data?.message || error.message || 'Profile update failed'
+      toast.error(errorMessage)
+      return { success: false, error: errorMessage }
+    }
+  }
+
+  const applyUserPatch = (updates) => {
+    if (!updates || typeof updates !== 'object') {
+      return
+    }
+    dispatch({
+      type: 'UPDATE_USER',
+      payload: updates
+    })
+  }
+
+  // Upload avatar (placeholder for future Supabase Storage implementation)
+  const uploadAvatar = async (file) => {
+    try {
+      if (!state.user?.id) {
+        throw new Error('User not authenticated')
       }
 
-      dispatch({
-        type: 'UPDATE_USER',
-        payload: data
-      })
-      toast.success('Profile updated successfully!')
-      return { success: true }
+      // TODO: Implement Supabase Storage upload
+      // For now, return a placeholder message
+      console.log('Avatar upload not yet implemented:', file.name)
+      toast.info('Avatar upload feature coming soon')
+      return { success: false, message: 'Avatar upload coming soon' }
     } catch (error) {
-      const errorMessage = error.message || 'Profile update failed'
+      const errorMessage = error.message || 'Avatar upload failed'
       toast.error(errorMessage)
       return { success: false, error: errorMessage }
     }
@@ -442,6 +473,8 @@ export const AuthProvider = ({ children }) => {
     registerCompany,
     logout,
     updateProfile,
+    applyUserPatch,
+    uploadAvatar,
     clearError,
     startImpersonation,
     endImpersonation

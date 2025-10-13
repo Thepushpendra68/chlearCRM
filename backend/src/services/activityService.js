@@ -21,6 +21,11 @@ class ActivityService {
         query = query.eq('user_id', currentUser.id);
       }
 
+      // Allow admins to request their own feed explicitly
+      if (filters.user_specific) {
+        query = query.eq('user_id', currentUser.id);
+      }
+
       // Apply filters
       if (filters.lead_id) {
         query = query.eq('lead_id', filters.lead_id);
@@ -45,16 +50,15 @@ class ActivityService {
       // Order by created_at desc by default
       query = query.order('created_at', { ascending: false });
 
-      // Apply pagination
-      if (filters.limit) {
-        query = query.limit(filters.limit);
-      }
+      const requestedLimit = Number.isInteger(filters.limit) ? filters.limit : 20;
+      const sanitizedLimit = Math.min(Math.max(requestedLimit, 1), 100);
+      const page = Number.isInteger(filters.page) && filters.page > 0 ? filters.page : 1;
+      const offset = Number.isInteger(filters.offset)
+        ? Math.max(filters.offset, 0)
+        : (page - 1) * sanitizedLimit;
+      const fetchEnd = offset + sanitizedLimit;
 
-      if (filters.offset) {
-        query = query.range(filters.offset, filters.offset + (filters.limit || 20) - 1);
-      }
-
-      const { data: activities, error } = await query;
+      const { data: activities, error } = await query.range(offset, fetchEnd);
 
       if (error) {
         console.error('Error fetching activities:', error);
@@ -62,7 +66,7 @@ class ActivityService {
       }
 
       // Format the data to match expected structure
-      const formattedActivities = activities.map(activity => ({
+      const formattedActivities = (activities || []).map(activity => ({
         ...activity,
         company: activity.leads?.company,
         contact_name: activity.leads?.name,
@@ -74,7 +78,21 @@ class ActivityService {
         user_profiles: undefined
       }));
 
-      return { success: true, data: formattedActivities || [] };
+      const hasMore = formattedActivities.length > sanitizedLimit;
+      const paginatedActivities = hasMore
+        ? formattedActivities.slice(0, sanitizedLimit)
+        : formattedActivities;
+
+      return {
+        success: true,
+        data: paginatedActivities || [],
+        pagination: {
+          page,
+          limit: sanitizedLimit,
+          hasMore,
+          nextPage: hasMore ? page + 1 : null
+        }
+      };
     } catch (error) {
       console.error('Error fetching activities:', error);
       return { success: false, error: error.message };

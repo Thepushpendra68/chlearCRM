@@ -35,6 +35,10 @@ const Header = ({ setSidebarOpen, isCollapsed, currentPath }) => {
     setShowQuickActions(false)
   }
 
+  const handleMenuNavigate = (path) => {
+    navigate(path)
+  }
+
   return (
     <div className="relative flex-shrink-0 flex h-16 bg-white shadow border-b border-gray-200">
       {/* Mobile hamburger button - only visible on mobile */}
@@ -163,6 +167,7 @@ const Header = ({ setSidebarOpen, isCollapsed, currentPath }) => {
                 <Menu.Item>
                   {({ active }) => (
                     <button
+                      onClick={() => handleMenuNavigate('/app/profile')}
                       className={`${
                         active ? 'bg-gray-100' : ''
                       } flex items-center w-full px-4 py-2 text-sm text-gray-700`}
@@ -175,6 +180,7 @@ const Header = ({ setSidebarOpen, isCollapsed, currentPath }) => {
                 <Menu.Item>
                   {({ active }) => (
                     <button
+                      onClick={() => handleMenuNavigate('/app/settings')}
                       className={`${
                         active ? 'bg-gray-100' : ''
                       } flex items-center w-full px-4 py-2 text-sm text-gray-700`}

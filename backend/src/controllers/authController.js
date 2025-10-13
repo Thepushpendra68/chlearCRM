@@ -101,13 +101,27 @@ class AuthController {
         return next(ApiError.badRequest('Validation failed', 'VALIDATION_ERROR'));
       }
 
-      const { first_name, last_name, email } = req.body;
+      const {
+        first_name,
+        last_name,
+        email,
+        phone,
+        title,
+        department,
+        timezone,
+        language
+      } = req.body;
       const userId = req.user.id;
 
       const updatedUser = await authService.updateProfile(userId, {
         first_name,
         last_name,
-        email
+        email,
+        phone,
+        title,
+        department,
+        timezone,
+        language
       });
 
       res.json({

@@ -154,7 +154,36 @@ const validateUserUpdate = [
   body('is_active')
     .optional()
     .isBoolean()
-    .withMessage('is_active must be a boolean value')
+    .withMessage('is_active must be a boolean value'),
+
+  body('phone')
+    .optional()
+    .trim()
+    .isLength({ min: 5, max: 20 })
+    .withMessage('Phone number must be between 5 and 20 characters'),
+
+  body('title')
+    .optional()
+    .trim()
+    .isLength({ min: 2, max: 100 })
+    .withMessage('Title must be between 2 and 100 characters'),
+
+  body('department')
+    .optional()
+    .trim()
+    .isLength({ min: 2, max: 100 })
+    .withMessage('Department must be between 2 and 100 characters'),
+
+  body('timezone')
+    .optional()
+    .trim()
+    .isLength({ min: 2, max: 100 })
+    .withMessage('Timezone must be between 2 and 100 characters'),
+
+  body('language')
+    .optional()
+    .isIn(['en', 'es', 'fr', 'de'])
+    .withMessage('Language must be one of: en, es, fr, de')
 ];
 
 /**

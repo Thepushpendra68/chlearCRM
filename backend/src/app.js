@@ -47,6 +47,7 @@ const importRoutes = require('./routes/importRoutes');
 const searchRoutes = require('./routes/searchRoutes');
 const chatbotRoutes = require('./routes/chatbotRoutes');
 const platformRoutes = require('./routes/platformRoutes');
+const preferencesRoutes = require('./routes/preferencesRoutes');
 
 // Import middleware
 const errorHandler = require('./middleware/errorMiddleware');
@@ -194,6 +195,7 @@ app.use('/api/import', importRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/chatbot', chatbotRoutes);
 app.use('/api/platform', platformRoutes);
+app.use('/api/preferences', preferencesRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {

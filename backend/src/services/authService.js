@@ -198,7 +198,16 @@ class AuthService {
    * @returns {Object} Updated user data
    */
   async updateProfile(userId, updateData) {
-    const { first_name, last_name, email } = updateData;
+    const {
+      first_name,
+      last_name,
+      email,
+      phone,
+      title,
+      department,
+      timezone,
+      language
+    } = updateData;
 
     // Check if email is being changed and if it's already taken
     if (email) {
@@ -215,10 +224,16 @@ class AuthService {
 
     // Update user profile
     const updatePayload = {
-      ...(first_name && { first_name }),
-      ...(last_name && { last_name }),
       updated_at: new Date().toISOString()
     };
+
+    if (first_name !== undefined) updatePayload.first_name = first_name;
+    if (last_name !== undefined) updatePayload.last_name = last_name;
+    if (phone !== undefined) updatePayload.phone = phone;
+    if (title !== undefined) updatePayload.title = title;
+    if (department !== undefined) updatePayload.department = department;
+    if (timezone !== undefined) updatePayload.timezone = timezone;
+    if (language !== undefined) updatePayload.language = language;
 
     const { data: updatedProfile, error } = await supabaseAdmin
       .from('user_profiles')
@@ -255,6 +270,11 @@ class AuthService {
       email: authUser?.user?.email || '',
       first_name: updatedProfile.first_name,
       last_name: updatedProfile.last_name,
+      phone: updatedProfile.phone,
+      title: updatedProfile.title,
+      department: updatedProfile.department,
+      timezone: updatedProfile.timezone,
+      language: updatedProfile.language,
       role: updatedProfile.role,
       is_active: updatedProfile.is_active,
       company_id: updatedProfile.company_id,

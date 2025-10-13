@@ -348,6 +348,11 @@ const updateUser = async (id, userData, currentUser) => {
     if (userData.is_active !== undefined && (currentUser.role === 'company_admin' || currentUser.role === 'super_admin')) {
       updateData.is_active = userData.is_active;
     }
+    if (userData.phone !== undefined) updateData.phone = userData.phone;
+    if (userData.title !== undefined) updateData.title = userData.title;
+    if (userData.department !== undefined) updateData.department = userData.department;
+    if (userData.timezone !== undefined) updateData.timezone = userData.timezone;
+    if (userData.language !== undefined) updateData.language = userData.language;
 
     // Handle password update (through Supabase Auth admin API)
     if (userData.password) {

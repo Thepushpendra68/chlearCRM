@@ -6,6 +6,11 @@ class ActivityController {
   // Get activities with filters
   async getActivities(req, res, next) {
     try {
+      const limit = req.query.limit ? parseInt(req.query.limit, 10) : undefined;
+      const offset = req.query.offset ? parseInt(req.query.offset, 10) : undefined;
+      const page = req.query.page ? parseInt(req.query.page, 10) : undefined;
+      const userSpecific = req.query.user_specific === 'true';
+
       const filters = {
         lead_id: req.query.lead_id,
         user_id: req.query.user_id,
@@ -15,8 +20,10 @@ class ActivityController {
         date_to: req.query.date_to,
         scheduled_from: req.query.scheduled_from,
         scheduled_to: req.query.scheduled_to,
-        limit: req.query.limit ? parseInt(req.query.limit) : undefined,
-        offset: req.query.offset ? parseInt(req.query.offset) : undefined
+        limit,
+        offset,
+        page,
+        user_specific: userSpecific
       };
 
       // Remove undefined values
@@ -34,7 +41,8 @@ class ActivityController {
 
       res.json({
         success: true,
-        data: result.data
+        data: result.data,
+        pagination: result.pagination
       });
     } catch (error) {
       next(error);
@@ -54,7 +62,8 @@ class ActivityController {
 
       res.json({
         success: true,
-        data: result.data
+        data: result.data,
+        pagination: result.pagination
       });
     } catch (error) {
       next(error);
