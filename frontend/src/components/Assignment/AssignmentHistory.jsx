@@ -33,9 +33,7 @@ const AssignmentHistory = ({
       if (leadId) {
         response = await assignmentService.getLeadAssignmentHistory(leadId);
       } else {
-        // For now, we'll fetch all history by getting history for multiple leads
-        // In a real implementation, you might want a dedicated endpoint for all history
-        response = { success: true, data: [] }; // Placeholder
+        response = await assignmentService.getAssignmentHistory({ limit: 100 });
       }
 
       if (response.success) {

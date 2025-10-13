@@ -315,11 +315,13 @@ class AssignmentService {
         .from('lead_assignment_history')
         .select(`
           *,
-          previous_assigned:user_profiles!lead_assignment_history_previous_assigned_to_fkey(first_name, last_name, email),
-          new_assigned:user_profiles!lead_assignment_history_new_assigned_to_fkey(first_name, last_name, email),
-          assigned_by_user:user_profiles!lead_assignment_history_assigned_by_fkey(first_name, last_name, email)
+          leads!inner(id, company_id, name, first_name, last_name),
+          previous_assigned:user_profiles!lead_assignment_history_previous_assigned_to_fkey(first_name, last_name),
+          new_assigned:user_profiles!lead_assignment_history_new_assigned_to_fkey(first_name, last_name),
+          assigned_by_user:user_profiles!lead_assignment_history_assigned_by_fkey(first_name, last_name)
         `)
         .eq('lead_id', leadId)
+        .eq('leads.company_id', currentUser.company_id)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -338,13 +340,65 @@ class AssignmentService {
         assignment_source: item.assignment_source,
         assignment_rule_id: item.assignment_rule_id,
         created_at: item.created_at,
-        previous_assigned_name: item.previous_assigned ? 
-          `${item.previous_assigned.first_name} ${item.previous_assigned.last_name}` : null,
-        new_assigned_name: item.new_assigned ? 
-          `${item.new_assigned.first_name} ${item.new_assigned.last_name}` : null,
-        assigned_by_name: item.assigned_by_user ? 
-          `${item.assigned_by_user.first_name} ${item.assigned_by_user.last_name}` : 'System',
-        assigned_by_email: item.assigned_by_user?.email || 'system@company.com'
+        lead_name: item.leads ? ((item.leads.first_name || item.leads.last_name)
+          ? `${item.leads.first_name || ''} ${item.leads.last_name || ''}`.trim() || item.leads.name
+          : item.leads.name) : null,
+        previous_assigned_name: item.previous_assigned ? `${item.previous_assigned.first_name || ''} ${item.previous_assigned.last_name || ''}`.trim() || null : null,
+        new_assigned_name: item.new_assigned ? `${item.new_assigned.first_name || ''} ${item.new_assigned.last_name || ''}`.trim() || null : null,
+        assigned_by_name: item.assigned_by_user ? `${item.assigned_by_user.first_name || ''} ${item.assigned_by_user.last_name || ''}`.trim() || 'System' : 'System',
+        assigned_by_email: 'N/A'
+      }));
+
+      return { success: true, data: formattedHistory };
+    } catch (error) {
+      console.error('Error fetching assignment history:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Get assignment history for company
+  async getAssignmentHistory(currentUser, { limit = 100, offset = 0 } = {}) {
+    try {
+      const supabase = supabaseAdmin;
+
+      const parsedLimit = Math.min(Math.max(parseInt(limit, 10) || 100, 1), 500);
+      const parsedOffset = Math.max(parseInt(offset, 10) || 0, 0);
+
+      const { data: history, error } = await supabase
+        .from('lead_assignment_history')
+        .select(`
+          *,
+          leads!inner(id, company_id, name, first_name, last_name),
+          previous_assigned:user_profiles!lead_assignment_history_previous_assigned_to_fkey(first_name, last_name),
+          new_assigned:user_profiles!lead_assignment_history_new_assigned_to_fkey(first_name, last_name),
+          assigned_by_user:user_profiles!lead_assignment_history_assigned_by_fkey(first_name, last_name)
+        `)
+        .eq('leads.company_id', currentUser.company_id)
+        .order('created_at', { ascending: false })
+        .range(parsedOffset, parsedOffset + parsedLimit - 1);
+
+      if (error) {
+        console.error('Error fetching company assignment history:', error);
+        return { success: false, error: error.message };
+      }
+
+      const formattedHistory = history.map(item => ({
+        id: item.id,
+        lead_id: item.lead_id,
+        lead_name: item.leads ? ((item.leads.first_name || item.leads.last_name)
+          ? `${item.leads.first_name || ''} ${item.leads.last_name || ''}`.trim() || item.leads.name
+          : item.leads.name) : 'Unknown lead',
+        previous_assigned_to: item.previous_assigned_to,
+        new_assigned_to: item.new_assigned_to,
+        assigned_by: item.assigned_by,
+        assignment_reason: item.assignment_reason,
+        assignment_source: item.assignment_source,
+        assignment_rule_id: item.assignment_rule_id,
+        created_at: item.created_at,
+        previous_assigned_name: item.previous_assigned ? `${item.previous_assigned.first_name || ''} ${item.previous_assigned.last_name || ''}`.trim() || null : null,
+        new_assigned_name: item.new_assigned ? `${item.new_assigned.first_name || ''} ${item.new_assigned.last_name || ''}`.trim() || null : null,
+        assigned_by_name: item.assigned_by_user ? `${item.assigned_by_user.first_name || ''} ${item.assigned_by_user.last_name || ''}`.trim() || 'System' : 'System',
+        assigned_by_email: 'N/A'
       }));
 
       return { success: true, data: formattedHistory };
@@ -362,10 +416,9 @@ class AssignmentService {
       // Get users in the company using the view that includes email
       const { data: users, error: usersError } = await supabase
         .from('user_profiles_with_auth')
-        .select('id, first_name, last_name, email')
+        .select('id, first_name, last_name, email, role')
         .eq('company_id', currentUser.company_id)
-        .eq('is_active', true)
-        .neq('role', 'super_admin');
+        .eq('is_active', true);
 
       if (usersError) {
         console.error('Error fetching users:', usersError);
@@ -375,7 +428,7 @@ class AssignmentService {
       // Get lead counts by assigned user
       const { data: leadCounts, error: countsError } = await supabase
         .from('leads')
-        .select('assigned_to, status')
+        .select('assigned_to, status, deal_value')
         .eq('company_id', currentUser.company_id);
 
       if (countsError) {
@@ -386,20 +439,30 @@ class AssignmentService {
       // Calculate workload for each user
       const workload = users.map(user => {
         const userLeads = leadCounts.filter(lead => lead.assigned_to === user.id);
+        const totalValue = userLeads.reduce((sum, lead) => {
+          const value = Number(lead.deal_value);
+          return sum + (Number.isFinite(value) ? value : 0);
+        }, 0);
+        const avgValue = userLeads.length > 0 ? totalValue / userLeads.length : 0;
+
+        const firstName = user.first_name || '';
+        const lastName = user.last_name || '';
+        const displayName = `${firstName} ${lastName}`.trim() || user.email || 'Unnamed User';
         const activeLeads = userLeads.filter(lead => lead.status === 'active').length;
         const wonLeads = userLeads.filter(lead => lead.status === 'converted').length;
         const lostLeads = userLeads.filter(lead => lead.status === 'lost').length;
 
         return {
           user_id: user.id,
-          user_name: `${user.first_name} ${user.last_name}`,
+          user_name: displayName,
           user_email: user.email,
+          user_role: user.role,
           total_leads: userLeads.length,
           active_leads: activeLeads,
           won_leads: wonLeads,
           lost_leads: lostLeads,
-          total_deal_value: 0, // Not available in current schema
-          avg_deal_value: 0    // Not available in current schema
+          total_deal_value: totalValue,
+          avg_deal_value: avgValue
         };
       });
 

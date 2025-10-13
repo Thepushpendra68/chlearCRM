@@ -100,6 +100,16 @@ class AssignmentService {
     }
   }
 
+  async getAssignmentHistory(params = {}) {
+    try {
+      const response = await api.get('/assignments/history', { params });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching assignment history:', error);
+      throw error;
+    }
+  }
+
   async autoAssignLead(leadId) {
     try {
       const response = await api.post(`/assignments/leads/${leadId}/auto-assign`);

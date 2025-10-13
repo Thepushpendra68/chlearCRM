@@ -211,6 +211,24 @@ class AssignmentController {
     }
   }
 
+  // Get assignment history for the company
+  async getAssignmentHistory(req, res, next) {
+    try {
+      const result = await assignmentService.getAssignmentHistory(req.user, req.query);
+
+      if (!result.success) {
+        throw new ApiError(400, result.error);
+      }
+
+      res.json({
+        success: true,
+        data: result.data
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   // Redistribute leads based on workload
   async redistributeLeads(req, res, next) {
     try {

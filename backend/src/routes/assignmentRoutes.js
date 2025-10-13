@@ -27,6 +27,7 @@ router.post('/leads/bulk-auto-assign', assignmentController.processBulkAutoAssig
 
 // Team management
 router.get('/workload', assignmentController.getTeamWorkload);
+router.get('/history', assignmentController.getAssignmentHistory);
 router.post('/redistribute', assignmentController.redistributeLeads);
 
 // Statistics and analytics
