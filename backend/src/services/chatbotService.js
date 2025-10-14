@@ -526,8 +526,13 @@ Analyze the message and respond ONLY with valid JSON. Do not include any markdow
     if (parameters.priority) updateData.priority = parameters.priority;
     if (parameters.notes) updateData.notes = parameters.notes;
 
-    const lead = await leadService.updateLead(leadId, updateData, currentUser);
-    return { lead, action: 'updated' };
+    const leadResult = await leadService.updateLead(leadId, updateData, currentUser);
+
+    if (!leadResult) {
+      throw new ApiError('Lead not found', 404);
+    }
+
+    return { lead: leadResult.updatedLead, action: 'updated' };
   }
 
   /**

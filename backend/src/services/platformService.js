@@ -5,6 +5,45 @@ const userService = require('./userService');
 /**
  * Platform Service for Super Admin Operations
  */
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+const RANGE_CONFIG = {
+  '7d': { days: 7, label: 'Last 7 days' },
+  '30d': { days: 30, label: 'Last 30 days' },
+  '90d': { days: 90, label: 'Last 90 days' },
+  '1y': { days: 365, label: 'Last year' }
+};
+
+function resolveRange(rangeKey = '30d') {
+  const normalizedKey = typeof rangeKey === 'string' ? rangeKey.toLowerCase() : '30d';
+  return {
+    key: RANGE_CONFIG[normalizedKey] ? normalizedKey : '30d',
+    ...RANGE_CONFIG[RANGE_CONFIG[normalizedKey] ? normalizedKey : '30d']
+  };
+}
+
+async function countFrom(table, metricName, configureQuery = (query) => query) {
+  let query = supabaseAdmin
+    .from(table)
+    .select('*', { head: true, count: 'exact' });
+
+  if (typeof configureQuery === 'function') {
+    const configured = configureQuery(query);
+    if (configured) {
+      query = configured;
+    }
+  }
+
+  const { count, error } = await query;
+
+  if (error) {
+    console.error(`Error fetching count for ${metricName}:`, error);
+    throw new ApiError(`Failed to fetch ${metricName}`, 500);
+  }
+
+  return count || 0;
+}
+
 class PlatformService {
   /**
    * Get all companies with statistics
@@ -51,18 +90,70 @@ class PlatformService {
   /**
    * Get platform overview statistics
    */
-  async getPlatformStats() {
-    const { data, error } = await supabaseAdmin
-      .from('platform_overview_stats')
-      .select('*')
-      .single();
+  async getPlatformStats(rangeKey = '30d') {
+    const range = resolveRange(rangeKey);
+    const now = Date.now();
+    const periodStart = new Date(now - range.days * MS_PER_DAY).toISOString();
+    const activitiesWindowDays = Math.min(range.days, 7);
+    const activitiesStart = new Date(now - activitiesWindowDays * MS_PER_DAY).toISOString();
 
-    if (error) {
-      console.error('Error fetching platform stats:', error);
-      throw new ApiError('Failed to fetch platform statistics', 500);
+    const [
+      totalCompanies,
+      activeCompanies,
+      trialCompanies,
+      newCompaniesPeriod,
+      totalUsers,
+      activeUsers,
+      newUsersPeriod,
+      activeUsersPeriod,
+      totalLeads,
+      leadsCreatedPeriod,
+      totalActivities,
+      activitiesPeriod,
+      activities7d
+    ] = await Promise.all([
+      countFrom('companies', 'total companies'),
+      countFrom('companies', 'active companies', (query) => query.eq('status', 'active')),
+      countFrom('companies', 'trial companies', (query) => query.eq('status', 'trial')),
+      countFrom('companies', 'new companies for period', (query) => query.gte('created_at', periodStart)),
+      countFrom('user_profiles', 'total users'),
+      countFrom('user_profiles', 'active users', (query) => query.eq('is_active', true)),
+      countFrom('user_profiles', 'new users for period', (query) => query.gte('created_at', periodStart)),
+      countFrom('user_profiles', 'active users for period', (query) => query.gte('last_login_at', periodStart)),
+      countFrom('leads', 'total leads'),
+      countFrom('leads', 'leads created for period', (query) => query.gte('created_at', periodStart)),
+      countFrom('activities', 'total activities'),
+      countFrom('activities', 'activities for period', (query) => query.gte('created_at', periodStart)),
+      countFrom('activities', 'activities 7d window', (query) => query.gte('created_at', activitiesStart))
+    ]);
+
+    const stats = {
+      total_companies: totalCompanies,
+      active_companies: activeCompanies,
+      trial_companies: trialCompanies,
+      total_users: totalUsers,
+      active_users: activeUsers,
+      total_leads: totalLeads,
+      total_activities: totalActivities,
+      active_users_period: activeUsersPeriod,
+      leads_created_period: leadsCreatedPeriod,
+      new_companies_period: newCompaniesPeriod,
+      new_users_period: newUsersPeriod,
+      activities_period: activitiesPeriod,
+      activities_7d: activities7d,
+      period_key: range.key,
+      period_days: range.days,
+      period_label: range.label
+    };
+
+    if (range.key === '30d') {
+      stats.active_users_30d = activeUsersPeriod;
+      stats.leads_created_30d = leadsCreatedPeriod;
+      stats.new_companies_30d = newCompaniesPeriod;
+      stats.new_users_30d = newUsersPeriod;
     }
 
-    return data;
+    return stats;
   }
 
   /**

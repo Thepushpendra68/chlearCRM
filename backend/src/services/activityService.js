@@ -290,7 +290,11 @@ class ActivityService {
         user_profiles: undefined
       };
 
-      return { success: true, data: formattedActivity };
+      return {
+        success: true,
+        data: formattedActivity,
+        previousActivity: existingActivity
+      };
     } catch (error) {
       console.error('Error updating activity:', error);
       return { success: false, error: error.message };
@@ -298,9 +302,25 @@ class ActivityService {
   }
 
   // Delete activity
-  async deleteActivity(activityId) {
+  async deleteActivity(activityId, currentUser) {
     try {
-      const { error } = await supabaseAdmin
+      const supabase = supabaseAdmin;
+
+      const { data: existingActivity, error: fetchError } = await supabase
+        .from('activities')
+        .select('*')
+        .eq('id', activityId)
+        .single();
+
+      if (fetchError || !existingActivity) {
+        return { success: false, error: 'Activity not found or could not be deleted' };
+      }
+
+      if (existingActivity.company_id !== currentUser.company_id) {
+        return { success: false, error: 'Access denied' };
+      }
+
+      const { error } = await supabase
         .from('activities')
         .delete()
         .eq('id', activityId);
@@ -309,7 +329,11 @@ class ActivityService {
         return { success: false, error: 'Activity not found or could not be deleted' };
       }
 
-      return { success: true, message: 'Activity deleted successfully' };
+      return {
+        success: true,
+        message: 'Activity deleted successfully',
+        deletedActivity: existingActivity
+      };
     } catch (error) {
       console.error('Error deleting activity:', error);
       return { success: false, error: error.message };
@@ -385,7 +409,11 @@ class ActivityService {
         user_profiles: undefined
       };
 
-      return { success: true, data: formattedActivity };
+      return {
+        success: true,
+        data: formattedActivity,
+        previousActivity: existingActivity
+      };
     } catch (error) {
       console.error('Error completing activity:', error);
       return { success: false, error: error.message };

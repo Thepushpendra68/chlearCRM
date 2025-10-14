@@ -1,6 +1,6 @@
 const { getUserProfile } = require('../config/supabase');
-const auditService = require('../services/auditService');
 const ApiError = require('../utils/ApiError');
+const { AuditActions, AuditSeverity, logAuditEvent } = require('../utils/auditLogger');
 
 /**
  * Impersonation Middleware
@@ -46,24 +46,23 @@ const impersonate = async (req, res, next) => {
       isImpersonated: true,
       impersonatedBy: req.originalUser.id
     };
+    req.impersonationStartedAt = Date.now();
 
     // Log impersonation
-    await auditService.logEvent({
-      actorId: req.originalUser.id,
-      actorEmail: req.originalUser.email,
-      actorRole: req.originalUser.role,
-      action: 'impersonate_user',
+    await logAuditEvent(req, {
+      action: AuditActions.PLATFORM_IMPERSONATE_SWITCH,
       resourceType: 'user',
       resourceId: impersonateUserId,
+      resourceName: `${targetUserProfile.first_name} ${targetUserProfile.last_name}`.trim() || targetUserProfile.email,
+      companyId: targetUserProfile.company_id,
+      severity: AuditSeverity.WARNING,
       details: {
         target_user_email: targetUserProfile.email,
         target_user_name: `${targetUserProfile.first_name} ${targetUserProfile.last_name}`
       },
-      isImpersonation: true,
-      impersonatedUserId: impersonateUserId,
-      severity: 'warning',
-      ipAddress: req.ip,
-      userAgent: req.headers['user-agent']
+      metadata: {
+        target_user_company_id: targetUserProfile.company_id
+      }
     });
 
     next();
@@ -79,16 +78,18 @@ const impersonate = async (req, res, next) => {
 const endImpersonation = async (req, res, next) => {
   try {
     if (req.originalUser) {
-      await auditService.logEvent({
-        actorId: req.originalUser.id,
-        actorEmail: req.originalUser.email,
-        actorRole: req.originalUser.role,
-        action: 'end_impersonation',
+      await logAuditEvent(req, {
+        action: AuditActions.PLATFORM_IMPERSONATE_END,
         resourceType: 'user',
         resourceId: req.user.id,
-        severity: 'info',
-        ipAddress: req.ip,
-        userAgent: req.headers['user-agent']
+        resourceName: `${req.user.first_name || ''} ${req.user.last_name || ''}`.trim() || req.user.email,
+        companyId: req.user.company_id,
+        severity: AuditSeverity.INFO,
+        details: {
+          duration_ms: req.impersonationStartedAt
+            ? Date.now() - req.impersonationStartedAt
+            : undefined
+        }
       });
     }
 

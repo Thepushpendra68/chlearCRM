@@ -1,5 +1,28 @@
 const pipelineService = require('../services/pipelineService');
 const ApiError = require('../utils/ApiError');
+const { AuditActions, AuditSeverity, logAuditEvent } = require('../utils/auditLogger');
+
+const describeStage = (stage = {}) => stage?.name || `Stage ${stage?.id || ''}`.trim();
+
+const computeStageChanges = (before = {}, after = {}) => {
+  const fields = [
+    'name',
+    'color',
+    'order_position',
+    'is_active',
+    'is_closed_won',
+    'is_closed_lost'
+  ];
+
+  return fields.reduce((changes, field) => {
+    const beforeVal = before[field] ?? null;
+    const afterVal = after[field] ?? null;
+    if (beforeVal !== afterVal) {
+      changes.push({ field, before: beforeVal, after: afterVal });
+    }
+    return changes;
+  }, []);
+};
 
 class PipelineController {
   // Get all pipeline stages
@@ -35,6 +58,18 @@ class PipelineController {
         throw new ApiError(400, result.error);
       }
 
+      await logAuditEvent(req, {
+        action: AuditActions.PIPELINE_STAGE_CREATED,
+        resourceType: 'pipeline_stage',
+        resourceId: result.data?.id,
+        resourceName: describeStage(result.data),
+        companyId: req.user.company_id,
+        details: {
+          color: result.data?.color,
+          order_position: result.data?.order_position
+        }
+      });
+
       res.status(201).json({
         success: true,
         data: result.data,
@@ -55,6 +90,18 @@ class PipelineController {
 
       if (!result.success) {
         throw new ApiError(400, result.error);
+      }
+
+      const changes = computeStageChanges(result.previousStage, result.data);
+      if (changes.length > 0) {
+        await logAuditEvent(req, {
+          action: AuditActions.PIPELINE_STAGE_UPDATED,
+          resourceType: 'pipeline_stage',
+          resourceId: result.data?.id,
+          resourceName: describeStage(result.data),
+          companyId: req.user.company_id,
+          details: { changes }
+        });
       }
 
       res.json({
@@ -78,6 +125,15 @@ class PipelineController {
         throw new ApiError(400, result.error);
       }
 
+      await logAuditEvent(req, {
+        action: AuditActions.PIPELINE_STAGE_DELETED,
+        resourceType: 'pipeline_stage',
+        resourceId: id,
+        resourceName: describeStage(result.deletedStage || { id }),
+        companyId: req.user.company_id,
+        severity: AuditSeverity.WARNING
+      });
+
       res.json({
         success: true,
         message: result.message
@@ -97,6 +153,16 @@ class PipelineController {
       if (!result.success) {
         throw new ApiError(400, result.error);
       }
+
+      await logAuditEvent(req, {
+        action: AuditActions.PIPELINE_STAGE_REORDERED,
+        resourceType: 'pipeline_stage',
+        resourceName: 'Pipeline stages',
+        companyId: req.user.company_id,
+        details: {
+          stage_orders: stageOrders
+        }
+      });
 
       res.json({
         success: true,
@@ -139,6 +205,20 @@ class PipelineController {
         throw new ApiError(400, result.error);
       }
 
+      await logAuditEvent(req, {
+        action: AuditActions.PIPELINE_LEAD_MOVED,
+        resourceType: 'lead',
+        resourceId: id,
+        resourceName: `Lead ${id}`,
+        companyId: req.user.company_id,
+        details: {
+          from_stage_id: result.data.previous_stage_id,
+          to_stage_id: result.data.new_stage_id,
+          from_stage_name: describeStage(result.previousStage),
+          to_stage_name: describeStage(result.newStage)
+        }
+      });
+
       res.json({
         success: true,
         data: result.data,
@@ -175,6 +255,17 @@ class PipelineController {
       if (!result.success) {
         throw new ApiError(400, result.error);
       }
+
+      await logAuditEvent(req, {
+        action: AuditActions.PIPELINE_STAGE_CREATED,
+        resourceType: 'pipeline_stage',
+        resourceName: 'Default pipeline stages',
+        companyId: req.user.company_id,
+        details: {
+          created_stage_ids: result.data?.map(stage => stage.id),
+          count: result.data?.length || 0
+        }
+      });
 
       res.status(201).json({
         success: true,

@@ -173,7 +173,7 @@ class AssignmentService {
         return { success: false, error: error.message };
       }
 
-      return { success: true, data: updatedRule };
+      return { success: true, data: updatedRule, previousRule: existingRule };
     } catch (error) {
       console.error('Error updating assignment rule:', error);
       return { success: false, error: error.message };
@@ -190,6 +190,17 @@ class AssignmentService {
 
       const supabase = supabaseAdmin;
 
+      const { data: existingRule, error: findError } = await supabase
+        .from('lead_assignment_rules')
+        .select('*')
+        .eq('id', ruleId)
+        .eq('company_id', currentUser.company_id)
+        .single();
+
+      if (findError || !existingRule) {
+        return { success: false, error: 'Assignment rule not found' };
+      }
+
       const { error } = await supabase
         .from('lead_assignment_rules')
         .delete()
@@ -201,7 +212,7 @@ class AssignmentService {
         return { success: false, error: error.message };
       }
 
-      return { success: true, message: 'Assignment rule deleted successfully' };
+      return { success: true, message: 'Assignment rule deleted successfully', deletedRule: existingRule };
     } catch (error) {
       console.error('Error deleting assignment rule:', error);
       return { success: false, error: error.message };
@@ -275,7 +286,17 @@ class AssignmentService {
         // Don't fail the assignment if history recording fails
       }
 
-      return { success: true, message: 'Lead assigned successfully' };
+      return {
+        success: true,
+        message: 'Lead assigned successfully',
+        assignment: {
+          lead_id: leadId,
+          previous_assigned_to: currentAssignedTo,
+          new_assigned_to: assignedTo,
+          reason,
+          assigned_by: assignedBy
+        }
+      };
     } catch (error) {
       console.error('Error assigning lead:', error);
       return { success: false, error: error.message };

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   ChartBarIcon,
   BuildingOfficeIcon,
@@ -15,14 +15,10 @@ const PlatformAnalytics = () => {
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState('30d');
 
-  useEffect(() => {
-    fetchStats();
-  }, []);
-
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async (rangeKey) => {
     setLoading(true);
     try {
-      const response = await platformService.getPlatformStats();
+      const response = await platformService.getPlatformStats(rangeKey);
       if (response.success) {
         setStats(response.data);
       }
@@ -32,7 +28,11 @@ const PlatformAnalytics = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchStats(timeRange);
+  }, [timeRange, fetchStats]);
 
   const StatCard = ({ title, value, icon: Icon, color, trend, trendValue }) => (
     <div className="bg-white rounded-lg border border-gray-200 p-6">
@@ -103,6 +103,8 @@ const PlatformAnalytics = () => {
     );
   }
 
+  const periodLabel = stats?.periodLabel || 'Last 30 days';
+
   return (
     <div className="p-8">
       {/* Header */}
@@ -135,7 +137,7 @@ const PlatformAnalytics = () => {
           icon={BuildingOfficeIcon}
           color="bg-blue-500"
           trend="up"
-          trendValue={`+${stats.newCompanies30d || 0}`}
+          trendValue={`+${stats.newCompaniesPeriod || 0}`}
         />
         <StatCard
           title="Active Users"
@@ -143,7 +145,7 @@ const PlatformAnalytics = () => {
           icon={UsersIcon}
           color="bg-green-500"
           trend="up"
-          trendValue={`+${stats.newUsers30d || 0}`}
+          trendValue={`+${stats.newUsersPeriod || 0}`}
         />
         <StatCard
           title="Total Leads"
@@ -151,11 +153,11 @@ const PlatformAnalytics = () => {
           icon={DocumentTextIcon}
           color="bg-purple-500"
           trend="up"
-          trendValue={`+${stats.leadsCreated30d || 0}`}
+          trendValue={`+${stats.leadsCreatedPeriod || 0}`}
         />
         <StatCard
-          title="Platform Activity"
-          value={stats.activeUsers30d || 0}
+          title={`Platform Activity (${periodLabel})`}
+          value={stats.activeUsersPeriod || 0}
           icon={ChartBarIcon}
           color="bg-orange-500"
         />
@@ -169,15 +171,15 @@ const PlatformAnalytics = () => {
           <div className="space-y-1">
             <MetricRow
               label="Active Companies"
-              value={stats.totalCompanies || 0}
+              value={stats.activeCompanies || 0}
               total={stats.totalCompanies}
               percentage={100}
             />
             <MetricRow
-              label="New Companies (30d)"
-              value={stats.newCompanies30d || 0}
+              label={`New Companies (${periodLabel})`}
+              value={stats.newCompaniesPeriod || 0}
               total={stats.totalCompanies}
-              percentage={stats.totalCompanies > 0 ? Math.round((stats.newCompanies30d / stats.totalCompanies) * 100) : 0}
+              percentage={stats.totalCompanies > 0 ? Math.round((stats.newCompaniesPeriod / stats.totalCompanies) * 100) : 0}
             />
             <MetricRow
               label="Average Users per Company"
@@ -196,25 +198,25 @@ const PlatformAnalytics = () => {
           <div className="space-y-1">
             <MetricRow
               label="Total Users"
-              value={stats.activeUsers || 0}
-              total={stats.activeUsers}
+              value={stats.totalUsers || 0}
+              total={stats.totalUsers}
               percentage={100}
             />
             <MetricRow
-              label="New Users (30d)"
-              value={stats.newUsers30d || 0}
+              label={`New Users (${periodLabel})`}
+              value={stats.newUsersPeriod || 0}
               total={stats.activeUsers}
-              percentage={stats.activeUsers > 0 ? Math.round((stats.newUsers30d / stats.activeUsers) * 100) : 0}
+              percentage={stats.activeUsers > 0 ? Math.round((stats.newUsersPeriod / stats.activeUsers) * 100) : 0}
             />
             <MetricRow
-              label="Active Users (30d)"
-              value={stats.activeUsers30d || 0}
+              label={`Active Users (${periodLabel})`}
+              value={stats.activeUsersPeriod || 0}
               total={stats.activeUsers}
-              percentage={stats.activeUsers > 0 ? Math.round((stats.activeUsers30d / stats.activeUsers) * 100) : 0}
+              percentage={stats.activeUsers > 0 ? Math.round((stats.activeUsersPeriod / stats.activeUsers) * 100) : 0}
             />
             <MetricRow
               label="User Growth Rate"
-              value={`${stats.activeUsers > 0 ? Math.round((stats.newUsers30d / stats.activeUsers) * 100) : 0}%`}
+              value={`${stats.activeUsers > 0 ? Math.round((stats.newUsersPeriod / stats.activeUsers) * 100) : 0}%`}
             />
           </div>
         </div>
@@ -230,10 +232,10 @@ const PlatformAnalytics = () => {
               percentage={100}
             />
             <MetricRow
-              label="Leads Created (30d)"
-              value={stats.leadsCreated30d || 0}
+              label={`Leads Created (${periodLabel})`}
+              value={stats.leadsCreatedPeriod || 0}
               total={stats.totalLeads}
-              percentage={stats.totalLeads > 0 ? Math.round((stats.leadsCreated30d / stats.totalLeads) * 100) : 0}
+              percentage={stats.totalLeads > 0 ? Math.round((stats.leadsCreatedPeriod / stats.totalLeads) * 100) : 0}
             />
             <MetricRow
               label="Average Leads per User"
@@ -241,7 +243,7 @@ const PlatformAnalytics = () => {
             />
             <MetricRow
               label="Lead Creation Rate"
-              value={`${stats.totalLeads > 0 ? Math.round((stats.leadsCreated30d / stats.totalLeads) * 100) : 0}%`}
+              value={`${stats.totalLeads > 0 ? Math.round((stats.leadsCreatedPeriod / stats.totalLeads) * 100) : 0}%`}
             />
           </div>
         </div>
@@ -252,15 +254,15 @@ const PlatformAnalytics = () => {
           <div className="space-y-1">
             <MetricRow
               label="User Engagement Rate"
-              value={`${stats.activeUsers > 0 ? Math.round((stats.activeUsers30d / stats.activeUsers) * 100) : 0}%`}
+              value={`${stats.activeUsers > 0 ? Math.round((stats.activeUsersPeriod / stats.activeUsers) * 100) : 0}%`}
             />
             <MetricRow
               label="Company Growth Rate"
-              value={`${stats.totalCompanies > 0 ? Math.round((stats.newCompanies30d / stats.totalCompanies) * 100) : 0}%`}
+              value={`${stats.totalCompanies > 0 ? Math.round((stats.newCompaniesPeriod / stats.totalCompanies) * 100) : 0}%`}
             />
             <MetricRow
               label="Lead Activity Score"
-              value={`${stats.totalLeads > 0 && stats.activeUsers30d > 0 ? Math.round((stats.leadsCreated30d / stats.activeUsers30d) * 10) : 0}/10`}
+              value={`${stats.totalLeads > 0 && stats.activeUsersPeriod > 0 ? Math.round((stats.leadsCreatedPeriod / stats.activeUsersPeriod) * 10) : 0}/10`}
             />
             <MetricRow
               label="Platform Utilization"
@@ -272,18 +274,18 @@ const PlatformAnalytics = () => {
 
       {/* Growth Summary */}
       <div className="mt-6 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">30-Day Growth Summary</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">{periodLabel} Growth Summary</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="text-center">
-            <div className="text-3xl font-bold text-purple-600">+{stats.newCompanies30d || 0}</div>
+            <div className="text-3xl font-bold text-purple-600">+{stats.newCompaniesPeriod || 0}</div>
             <div className="text-sm text-gray-600 mt-1">New Companies</div>
           </div>
           <div className="text-center">
-            <div className="text-3xl font-bold text-blue-600">+{stats.newUsers30d || 0}</div>
+            <div className="text-3xl font-bold text-blue-600">+{stats.newUsersPeriod || 0}</div>
             <div className="text-sm text-gray-600 mt-1">New Users</div>
           </div>
           <div className="text-center">
-            <div className="text-3xl font-bold text-green-600">+{stats.leadsCreated30d || 0}</div>
+            <div className="text-3xl font-bold text-green-600">+{stats.leadsCreatedPeriod || 0}</div>
             <div className="text-sm text-gray-600 mt-1">Leads Created</div>
           </div>
         </div>

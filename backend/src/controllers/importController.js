@@ -2,6 +2,7 @@ const importService = require('../services/importService');
 const ApiError = require('../utils/ApiError');
 const multer = require('multer');
 const path = require('path');
+const { AuditActions, AuditSeverity, logAuditEvent } = require('../utils/auditLogger');
 
 // Configure multer for file uploads
 const storage = multer.memoryStorage();
@@ -36,6 +37,19 @@ class ImportController {
       const parsedFieldMapping = fieldMapping ? JSON.parse(fieldMapping) : {};
       const parsedOptions = options ? JSON.parse(options) : {};
 
+      await logAuditEvent(req, {
+        action: AuditActions.IMPORT_STARTED,
+        resourceType: 'lead_import',
+        resourceName: req.file.originalname,
+        companyId: req.user.company_id,
+        details: {
+          filename: req.file.originalname,
+          file_size: req.file.size,
+          field_mapping_provided: Boolean(fieldMapping),
+          options_provided: Boolean(options)
+        }
+      });
+
       const result = await importService.importLeads(
         req.file.buffer,
         req.file.originalname,
@@ -46,12 +60,39 @@ class ImportController {
         }
       );
 
+      await logAuditEvent(req, {
+        action: AuditActions.IMPORT_COMPLETED,
+        resourceType: 'lead_import',
+        resourceName: req.file.originalname,
+        companyId: req.user.company_id,
+        details: {
+          filename: req.file.originalname,
+          total_records: result.total_records,
+          successful: result.successful_imports,
+          failed: result.failed_imports
+        }
+      });
+
       res.json({
         success: true,
         data: result,
         message: `Import completed. ${result.successful_imports} leads imported successfully, ${result.failed_imports} failed.`
       });
     } catch (error) {
+      if (req.file) {
+        await logAuditEvent(req, {
+          action: AuditActions.IMPORT_FAILED,
+          resourceType: 'lead_import',
+          resourceName: req.file.originalname,
+          companyId: req.user.company_id,
+          severity: AuditSeverity.WARNING,
+          details: {
+            filename: req.file.originalname,
+            error: error?.message || 'Unknown error'
+          }
+        }).catch(() => {});
+      }
+
       next(error);
     }
   }
@@ -101,6 +142,16 @@ class ImportController {
           
           const csvContent = this.convertToCSV(emptyExport);
           console.log('Empty CSV content generated');
+          await logAuditEvent(req, {
+            action: AuditActions.EXPORT_GENERATED,
+            resourceType: 'lead_export',
+            resourceName: `leads_export_${new Date().toISOString().split('T')[0]}.csv`,
+            companyId: req.user.company_id,
+            details: {
+              format,
+              record_count: 0
+            }
+          });
           return res.send(csvContent);
         } else if (format === 'excel') {
           res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -108,6 +159,16 @@ class ImportController {
           
           const excelBuffer = await this.convertToExcel(emptyExport);
           console.log('Empty Excel buffer created');
+          await logAuditEvent(req, {
+            action: AuditActions.EXPORT_GENERATED,
+            resourceType: 'lead_export',
+            resourceName: `leads_export_${new Date().toISOString().split('T')[0]}.xlsx`,
+            companyId: req.user.company_id,
+            details: {
+              format,
+              record_count: 0
+            }
+          });
           return res.send(excelBuffer);
         }
       }
@@ -119,6 +180,16 @@ class ImportController {
         // Convert to CSV format
         const csvContent = this.convertToCSV(exportData);
         console.log('CSV content generated, length:', csvContent.length);
+        await logAuditEvent(req, {
+          action: AuditActions.EXPORT_GENERATED,
+          resourceType: 'lead_export',
+          resourceName: `leads_export_${new Date().toISOString().split('T')[0]}.csv`,
+          companyId: req.user.company_id,
+          details: {
+            format,
+            record_count: exportData.length
+          }
+        });
         res.send(csvContent);
       } else if (format === 'excel') {
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -128,8 +199,28 @@ class ImportController {
         console.log('Converting to Excel format...');
         const excelBuffer = await this.convertToExcel(exportData);
         console.log('Excel buffer created, sending response...');
+        await logAuditEvent(req, {
+          action: AuditActions.EXPORT_GENERATED,
+          resourceType: 'lead_export',
+          resourceName: `leads_export_${new Date().toISOString().split('T')[0]}.xlsx`,
+          companyId: req.user.company_id,
+          details: {
+            format,
+            record_count: exportData.length
+          }
+        });
         res.send(excelBuffer);
       } else {
+        await logAuditEvent(req, {
+          action: AuditActions.EXPORT_GENERATED,
+          resourceType: 'lead_export',
+          resourceName: `leads_export_${new Date().toISOString().split('T')[0]}.${format}`,
+          companyId: req.user.company_id,
+          details: {
+            format,
+            record_count: exportData.length
+          }
+        });
         res.json({
           success: true,
           data: exportData
@@ -154,6 +245,13 @@ class ImportController {
 
       const csvContent = this.convertToCSV(template);
       res.send(csvContent);
+
+      await logAuditEvent(req, {
+        action: AuditActions.IMPORT_TEMPLATE_DOWNLOADED,
+        resourceType: 'lead_import',
+        resourceName: 'leads_import_template.csv',
+        companyId: req.user.company_id
+      });
     } catch (error) {
       next(error);
     }
@@ -202,6 +300,18 @@ class ImportController {
         success: true,
         data: validation
       });
+
+      await logAuditEvent(req, {
+        action: AuditActions.IMPORT_FILE_VALIDATED,
+        resourceType: 'lead_import',
+        resourceName: req.file.originalname,
+        companyId: req.user.company_id,
+        details: {
+          filename: req.file.originalname,
+          validation_passed: validation?.isValid ?? false,
+          issues: validation?.issues || []
+        }
+      });
     } catch (error) {
       next(error);
     }
@@ -234,6 +344,17 @@ class ImportController {
         data: {
           headers: headers,
           suggestedMappings: this.getSuggestedMappings(headers)
+        }
+      });
+
+      await logAuditEvent(req, {
+        action: AuditActions.IMPORT_HEADERS_DETECTED,
+        resourceType: 'lead_import',
+        resourceName: req.file.originalname,
+        companyId: req.user.company_id,
+        details: {
+          filename: req.file.originalname,
+          header_count: headers?.length || 0
         }
       });
     } catch (error) {

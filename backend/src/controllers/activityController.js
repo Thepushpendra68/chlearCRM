@@ -1,6 +1,37 @@
 const activityService = require('../services/activityService');
 const timelineService = require('../services/timelineService');
 const ApiError = require('../utils/ApiError');
+const { AuditActions, AuditSeverity, logAuditEvent } = require('../utils/auditLogger');
+
+const buildActivitySummary = (activity = {}) => {
+  if (!activity) return 'Activity';
+  const base = activity.subject || activity.activity_type || activity.type || 'Activity';
+  return activity.lead_id ? `${base} for lead ${activity.lead_id}` : base;
+};
+
+const computeActivityChanges = (before = {}, after = {}) => {
+  const fields = [
+    'subject',
+    'description',
+    'activity_type',
+    'scheduled_at',
+    'completed_at',
+    'is_completed',
+    'duration_minutes',
+    'outcome',
+    'user_id',
+    'lead_id'
+  ];
+
+  return fields.reduce((changes, field) => {
+    const beforeValue = before[field] ?? null;
+    const afterValue = after[field] ?? null;
+    if (beforeValue !== afterValue) {
+      changes.push({ field, before: beforeValue, after: afterValue });
+    }
+    return changes;
+  }, []);
+};
 
 class ActivityController {
   // Get activities with filters
@@ -84,6 +115,21 @@ class ActivityController {
         throw new ApiError(result.error, 400);
       }
 
+      await logAuditEvent(req, {
+        action: AuditActions.ACTIVITY_LOGGED,
+        resourceType: 'activity',
+        resourceId: result.data?.id,
+        resourceName: buildActivitySummary(result.data),
+        companyId: result.data?.company_id,
+        details: {
+          activity_type: result.data?.activity_type,
+          lead_id: result.data?.lead_id,
+          user_id: result.data?.user_id,
+          scheduled_at: result.data?.scheduled_at,
+          is_completed: result.data?.is_completed
+        }
+      });
+
       res.status(201).json({
         success: true,
         data: result.data,
@@ -106,6 +152,18 @@ class ActivityController {
         throw new ApiError(result.error, 400);
       }
 
+      const changes = computeActivityChanges(result.previousActivity, result.data);
+      if (changes.length > 0) {
+        await logAuditEvent(req, {
+          action: AuditActions.ACTIVITY_UPDATED,
+          resourceType: 'activity',
+          resourceId: result.data?.id,
+          resourceName: buildActivitySummary(result.data),
+          companyId: result.data?.company_id,
+          details: { changes }
+        });
+      }
+
       res.json({
         success: true,
         data: result.data,
@@ -121,11 +179,25 @@ class ActivityController {
     try {
       const { id } = req.params;
 
-      const result = await activityService.deleteActivity(id);
+      const result = await activityService.deleteActivity(id, req.user);
 
       if (!result.success) {
         throw new ApiError(404, result.error);
       }
+
+      await logAuditEvent(req, {
+        action: AuditActions.ACTIVITY_DELETED,
+        resourceType: 'activity',
+        resourceId: id,
+        resourceName: buildActivitySummary(result.deletedActivity || { id }),
+        companyId: result.deletedActivity?.company_id ?? req.user.company_id,
+        severity: AuditSeverity.WARNING,
+        details: {
+          activity_type: result.deletedActivity?.activity_type,
+          lead_id: result.deletedActivity?.lead_id,
+          user_id: result.deletedActivity?.user_id
+        }
+      });
 
       res.json({
         success: true,
@@ -147,6 +219,20 @@ class ActivityController {
       if (!result.success) {
         throw new ApiError(result.error, 400);
       }
+
+      await logAuditEvent(req, {
+        action: AuditActions.ACTIVITY_UPDATED,
+        resourceType: 'activity',
+        resourceId: result.data?.id,
+        resourceName: buildActivitySummary(result.data),
+        companyId: result.data?.company_id,
+        severity: AuditSeverity.INFO,
+        details: {
+          completed_at: result.data?.completed_at,
+          outcome: result.data?.outcome,
+          duration_minutes: result.data?.duration_minutes
+        }
+      });
 
       res.json({
         success: true,

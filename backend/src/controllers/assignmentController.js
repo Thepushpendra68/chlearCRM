@@ -1,6 +1,38 @@
 const assignmentService = require('../services/assignmentService');
 const routingService = require('../services/routingService');
 const ApiError = require('../utils/ApiError');
+const { AuditActions, AuditSeverity, logAuditEvent } = require('../utils/auditLogger');
+
+const summarizeRule = (rule = {}) => rule?.name || `Rule ${rule?.id || ''}`.trim();
+
+const computeRuleChanges = (before = {}, after = {}) => {
+  const fields = [
+    'name',
+    'assignment_type',
+    'assigned_to',
+    'is_active',
+    'priority'
+  ];
+
+  const changes = fields.reduce((acc, field) => {
+    const beforeVal = before[field] ?? null;
+    const afterVal = after[field] ?? null;
+    if (beforeVal !== afterVal) {
+      acc.push({ field, before: beforeVal, after: afterVal });
+    }
+    return acc;
+  }, []);
+
+  if (JSON.stringify(before.conditions || null) !== JSON.stringify(after.conditions || null)) {
+    changes.push({
+      field: 'conditions',
+      before: before.conditions || null,
+      after: after.conditions || null
+    });
+  }
+
+  return changes;
+};
 
 class AssignmentController {
   // Get all assignment rules
@@ -68,6 +100,20 @@ class AssignmentController {
         throw new ApiError(400, result.error);
       }
 
+      await logAuditEvent(req, {
+        action: AuditActions.ASSIGNMENT_CREATED,
+        resourceType: 'assignment_rule',
+        resourceId: result.data?.id,
+        resourceName: summarizeRule(result.data),
+        companyId: req.user.company_id,
+        details: {
+          assignment_type: result.data?.assignment_type,
+          assigned_to: result.data?.assigned_to,
+          priority: result.data?.priority,
+          is_active: result.data?.is_active
+        }
+      });
+
       res.status(201).json({
         success: true,
         data: result.data,
@@ -89,6 +135,18 @@ class AssignmentController {
         throw new ApiError(400, result.error);
       }
 
+      const changes = computeRuleChanges(result.previousRule, result.data);
+      if (changes.length > 0) {
+        await logAuditEvent(req, {
+          action: AuditActions.ASSIGNMENT_UPDATED,
+          resourceType: 'assignment_rule',
+          resourceId: id,
+          resourceName: summarizeRule(result.data),
+          companyId: req.user.company_id,
+          details: { changes }
+        });
+      }
+
       res.json({
         success: true,
         data: result.data,
@@ -108,6 +166,15 @@ class AssignmentController {
       if (!result.success) {
         throw new ApiError(400, result.error);
       }
+
+      await logAuditEvent(req, {
+        action: AuditActions.ASSIGNMENT_DELETED,
+        resourceType: 'assignment_rule',
+        resourceId: id,
+        resourceName: summarizeRule(result.deletedRule || { id }),
+        companyId: req.user.company_id,
+        severity: AuditSeverity.WARNING
+      });
 
       res.json({
         success: true,
@@ -133,6 +200,22 @@ class AssignmentController {
 
       if (!result.success) {
         throw new ApiError(400, result.error);
+      }
+
+      if (result.assignment) {
+        await logAuditEvent(req, {
+          action: AuditActions.ASSIGNMENT_UPDATED,
+          resourceType: 'lead',
+          resourceId: result.assignment.lead_id,
+          resourceName: `Lead ${result.assignment.lead_id}`,
+          companyId: req.user.company_id,
+          details: {
+            assigned_to: result.assignment.new_assigned_to,
+            previous_assigned_to: result.assignment.previous_assigned_to,
+            reason: result.assignment.reason,
+            source: 'manual'
+          }
+        });
       }
 
       res.json({
@@ -163,6 +246,20 @@ class AssignmentController {
       if (!result.success) {
         throw new ApiError(400, result.error);
       }
+
+      await logAuditEvent(req, {
+        action: AuditActions.ASSIGNMENT_UPDATED,
+        resourceType: 'lead_assignment_bulk',
+        resourceName: 'Bulk lead assignment',
+        companyId: req.user.company_id,
+        details: {
+          lead_ids: leadIds,
+          assigned_to: assignedTo,
+          success_count: result.results.filter(r => r.success).length,
+          failure_count: result.results.filter(r => !r.success).length,
+          reason
+        }
+      });
 
       res.json({
         success: true,

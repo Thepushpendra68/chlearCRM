@@ -1,7 +1,7 @@
 const { extractTokenFromHeader, verifyAndGetUser, requireRole, requirePermission } = require('../utils/supabaseAuthUtils');
 const ApiError = require('../utils/ApiError');
 const { getUserProfile } = require('../config/supabase');
-const auditService = require('../services/auditService');
+const { AuditActions, AuditSeverity, logAuditEvent } = require('../utils/auditLogger');
 
 /**
  * Authentication middleware to verify Supabase JWT tokens
@@ -68,24 +68,23 @@ const authenticate = async (req, res, next) => {
         isImpersonated: true,
         impersonatedBy: req.originalUser.id
       };
+      req.impersonationStartedAt = Date.now();
 
       // Log impersonation
-      await auditService.logEvent({
-        actorId: req.originalUser.id,
-        actorEmail: req.originalUser.email,
-        actorRole: req.originalUser.role,
-        action: 'impersonate_user',
+      await logAuditEvent(req, {
+        action: AuditActions.PLATFORM_IMPERSONATE_SWITCH,
         resourceType: 'user',
         resourceId: impersonateUserId,
+        resourceName: `${targetUserProfile.first_name} ${targetUserProfile.last_name}`.trim() || targetUserProfile.email,
+        companyId: targetUserProfile.company_id,
+        severity: AuditSeverity.WARNING,
         details: {
           target_user_email: targetUserProfile.email,
           target_user_name: `${targetUserProfile.first_name} ${targetUserProfile.last_name}`
         },
-        isImpersonation: true,
-        impersonatedUserId: impersonateUserId,
-        severity: 'warning',
-        ipAddress: req.ip,
-        userAgent: req.headers['user-agent']
+        metadata: {
+          target_user_company_id: targetUserProfile.company_id
+        }
       });
 
       console.log(`[IMPERSONATION] Successfully impersonating ${targetUserProfile.email}`);

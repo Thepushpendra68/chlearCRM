@@ -1,6 +1,46 @@
 const { validationResult } = require('express-validator');
 const leadService = require('../services/leadService');
 const ApiError = require('../utils/ApiError');
+const { AuditActions, AuditSeverity, logAuditEvent } = require('../utils/auditLogger');
+
+const buildLeadDisplayName = (lead = {}) => {
+  const name = `${lead.first_name || ''} ${lead.last_name || ''}`.trim();
+  return name || lead.name || lead.email || lead.company || `Lead ${lead.id}`;
+};
+
+const computeLeadChanges = (before = {}, after = {}) => {
+  const trackedFields = [
+    ['first_name', 'first_name'],
+    ['last_name', 'last_name'],
+    ['email', 'email'],
+    ['phone', 'phone'],
+    ['company', 'company'],
+    ['title', 'job_title'],
+    ['source', 'lead_source'],
+    ['status', 'status'],
+    ['deal_value', 'deal_value'],
+    ['expected_close_date', 'expected_close_date'],
+    ['notes', 'notes'],
+    ['priority', 'priority'],
+    ['assigned_to', 'assigned_to'],
+    ['pipeline_stage_id', 'pipeline_stage_id']
+  ];
+
+  return trackedFields.reduce((changes, [field, alias]) => {
+    const beforeValue = before[field] ?? null;
+    const afterValue = after[field] ?? null;
+
+    if (beforeValue !== afterValue) {
+      changes.push({
+        field: alias,
+        before: beforeValue,
+        after: afterValue
+      });
+    }
+
+    return changes;
+  }, []);
+};
 
 /**
  * @desc    Get all leads with pagination, search, and filtering
@@ -114,6 +154,23 @@ const createLead = async (req, res, next) => {
 
     const lead = await leadService.createLead(leadData);
 
+    await logAuditEvent(req, {
+      action: AuditActions.LEAD_CREATED,
+      resourceType: 'lead',
+      resourceId: lead.id,
+      resourceName: buildLeadDisplayName(lead),
+      companyId: lead.company_id,
+      details: {
+        status: lead.status,
+        source: lead.source,
+        assigned_to: lead.assigned_to,
+        pipeline_stage_id: lead.pipeline_stage_id
+      },
+      metadata: {
+        created_by: lead.created_by
+      }
+    });
+
     res.status(201).json({
       success: true,
       data: lead,
@@ -157,15 +214,63 @@ const updateLead = async (req, res, next) => {
     const { id } = req.params;
     const leadData = req.body;
 
-    const lead = await leadService.updateLead(id, leadData, req.user);
+    const leadResult = await leadService.updateLead(id, leadData, req.user);
 
-    if (!lead) {
+    if (!leadResult) {
       throw new ApiError('Lead not found', 404);
+    }
+
+    const { updatedLead, previousLead } = leadResult;
+    const changes = computeLeadChanges(previousLead, updatedLead);
+
+    if (changes.length > 0) {
+      await logAuditEvent(req, {
+        action: AuditActions.LEAD_UPDATED,
+        resourceType: 'lead',
+        resourceId: updatedLead.id,
+        resourceName: buildLeadDisplayName(updatedLead),
+        companyId: updatedLead.company_id,
+        details: {
+          changes
+        }
+      });
+
+      const statusChange = changes.find(change => change.field === 'status');
+      if (statusChange) {
+        await logAuditEvent(req, {
+          action: AuditActions.LEAD_STATUS_CHANGED,
+          resourceType: 'lead',
+          resourceId: updatedLead.id,
+          resourceName: buildLeadDisplayName(updatedLead),
+          companyId: updatedLead.company_id,
+          severity: AuditSeverity.INFO,
+          details: {
+            from: statusChange.before,
+            to: statusChange.after
+          }
+        });
+      }
+
+      const ownerChange = changes.find(change => change.field === 'assigned_to');
+      if (ownerChange) {
+        await logAuditEvent(req, {
+          action: AuditActions.LEAD_OWNER_CHANGED,
+          resourceType: 'lead',
+          resourceId: updatedLead.id,
+          resourceName: buildLeadDisplayName(updatedLead),
+          companyId: updatedLead.company_id,
+          severity: AuditSeverity.INFO,
+          details: {
+            from: ownerChange.before,
+            to: ownerChange.after
+          }
+        });
+      }
     }
 
     res.json({
       success: true,
-      data: lead,
+      data: updatedLead,
       message: 'Lead updated successfully'
     });
   } catch (error) {
@@ -181,10 +286,25 @@ const updateLead = async (req, res, next) => {
 const deleteLead = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const deleted = await leadService.deleteLead(id, req.user);
+    const result = await leadService.deleteLead(id, req.user);
 
-    if (!deleted) {
+    if (!result) {
       throw new ApiError('Lead not found', 404);
+    }
+
+    if (result.deletedLead) {
+      await logAuditEvent(req, {
+        action: AuditActions.LEAD_DELETED,
+        resourceType: 'lead',
+        resourceId: result.deletedLead.id,
+        resourceName: buildLeadDisplayName(result.deletedLead),
+        companyId: result.deletedLead.company_id,
+        severity: AuditSeverity.WARNING,
+        details: {
+          assigned_to: result.deletedLead.assigned_to,
+          status: result.deletedLead.status
+        }
+      });
     }
 
     res.json({

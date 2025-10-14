@@ -215,6 +215,17 @@ class TaskService {
     try {
       const supabase = supabaseAdmin;
 
+      const { data: existingTask, error: fetchError } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('id', taskId)
+        .eq('company_id', currentUser.company_id)
+        .single();
+
+      if (fetchError || !existingTask) {
+        throw new ApiError('Task not found', 404);
+      }
+
       // Validate that assigned user exists and belongs to company if being updated
       if (updateData.assigned_to) {
         const { data: assignedUser, error: userError } = await supabase
@@ -263,7 +274,10 @@ class TaskService {
         throw new ApiError('Task not found', 404);
       }
 
-      return task;
+      return {
+        previousTask: existingTask,
+        updatedTask: task
+      };
     } catch (error) {
       if (error instanceof ApiError) throw error;
       console.error('Task update error:', error);
@@ -277,6 +291,17 @@ class TaskService {
   async completeTask(taskId, userId, currentUser) {
     try {
       const supabase = supabaseAdmin;
+
+      const { data: existingTask, error: fetchError } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('id', taskId)
+        .eq('company_id', currentUser.company_id)
+        .single();
+
+      if (fetchError || !existingTask) {
+        throw new ApiError('Task not found', 404);
+      }
 
       const { data: task, error } = await supabase
         .from('tasks')
@@ -294,7 +319,10 @@ class TaskService {
         throw new ApiError('Task not found', 404);
       }
 
-      return task;
+      return {
+        previousTask: existingTask,
+        updatedTask: task
+      };
     } catch (error) {
       if (error instanceof ApiError) throw error;
       throw new ApiError('Failed to complete task', 500);
@@ -308,6 +336,17 @@ class TaskService {
     try {
       const supabase = supabaseAdmin;
 
+      const { data: existingTask, error: fetchError } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('id', taskId)
+        .eq('company_id', currentUser.company_id)
+        .single();
+
+      if (fetchError || !existingTask) {
+        throw new ApiError('Task not found', 404);
+      }
+
       const { error } = await supabase
         .from('tasks')
         .delete()
@@ -318,7 +357,7 @@ class TaskService {
         throw new ApiError('Task not found', 404);
       }
 
-      return { success: true };
+      return { success: true, deletedTask: existingTask };
     } catch (error) {
       if (error instanceof ApiError) throw error;
       throw new ApiError('Failed to delete task', 500);

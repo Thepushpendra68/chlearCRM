@@ -76,25 +76,25 @@ const PlatformDashboard = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
           title="Total Companies"
-          value={stats?.total_companies || 0}
+          value={stats?.totalCompanies || 0}
           icon={BuildingOfficeIcon}
           color="blue"
         />
         <StatCard
           title="Active Users"
-          value={stats?.active_users || 0}
+          value={stats?.activeUsers || 0}
           icon={UsersIcon}
           color="green"
         />
         <StatCard
           title="Total Leads"
-          value={stats?.total_leads || 0}
+          value={stats?.totalLeads || 0}
           icon={DocumentTextIcon}
           color="purple"
         />
         <StatCard
           title="Active (30d)"
-          value={stats?.active_users_30d || 0}
+          value={stats?.activeUsersPeriod ?? stats?.activeUsers30d ?? 0}
           icon={ChartBarIcon}
           color="orange"
         />
@@ -105,19 +105,19 @@ const PlatformDashboard = () => {
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-sm font-medium text-gray-600">New Companies (30d)</h3>
           <p className="text-2xl font-bold text-gray-900 mt-2">
-            {stats?.new_companies_30d || 0}
+            {stats?.newCompaniesPeriod ?? stats?.newCompanies30d ?? 0}
           </p>
         </div>
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-sm font-medium text-gray-600">New Users (30d)</h3>
           <p className="text-2xl font-bold text-gray-900 mt-2">
-            {stats?.new_users_30d || 0}
+            {stats?.newUsersPeriod ?? stats?.newUsers30d ?? 0}
           </p>
         </div>
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-sm font-medium text-gray-600">Leads Created (30d)</h3>
           <p className="text-2xl font-bold text-gray-900 mt-2">
-            {stats?.leads_created_30d || 0}
+            {stats?.leadsCreatedPeriod ?? stats?.leadsCreated30d ?? 0}
           </p>
         </div>
       </div>
@@ -136,10 +136,10 @@ const PlatformDashboard = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-900">
-                      {item.resource_name}
+                      {item.resource_name || item.activity_label || item.activity_type || 'Platform activity'}
                     </p>
                     <p className="text-xs text-gray-500">
-                      {(item.activity_type || 'unknown_activity').replace(/_/g, ' ')}
+                      {(item.activity_label || item.activity_type || 'unknown activity').replace(/_/g, ' ')}
                     </p>
                   </div>
                   <p className="text-xs text-gray-400">

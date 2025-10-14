@@ -128,7 +128,7 @@ class PipelineService {
         return { success: false, error: error.message };
       }
 
-      return { success: true, data: updatedStage };
+      return { success: true, data: updatedStage, previousStage: existingStage };
     } catch (error) {
       console.error('Error updating pipeline stage:', error);
       return { success: false, error: error.message };
@@ -172,7 +172,7 @@ class PipelineService {
         return { success: false, error: error.message };
       }
 
-      return { success: true, message: 'Pipeline stage deleted successfully' };
+      return { success: true, message: 'Pipeline stage deleted successfully', deletedStage: existingStage };
     } catch (error) {
       console.error('Error deleting pipeline stage:', error);
       return { success: false, error: error.message };
@@ -217,7 +217,7 @@ class PipelineService {
         return { success: false, error: error.message };
       }
 
-      return { success: true, data: result || [] };
+      return { success: true, data: result || [], appliedOrder: stageOrders };
     } catch (error) {
       console.error('Error reordering pipeline stages:', error);
       return { success: false, error: error.message };
@@ -340,6 +340,17 @@ class PipelineService {
       }
 
       const previousStageId = lead.pipeline_stage_id;
+      let previousStage = null;
+
+      if (previousStageId) {
+        const { data: fetchedPrevStage } = await supabaseAdmin
+          .from('pipeline_stages')
+          .select('*')
+          .eq('id', previousStageId)
+          .eq('company_id', currentUser.company_id)
+          .single();
+        previousStage = fetchedPrevStage || null;
+      }
 
       // Update lead stage
       const { data: updatedLead, error } = await supabaseAdmin
@@ -367,7 +378,9 @@ class PipelineService {
           lead: updatedLead,
           previous_stage_id: previousStageId,
           new_stage_id: stageId
-        }
+        },
+        previousStage,
+        newStage: stage
       };
     } catch (error) {
       console.error('Error moving lead to stage:', error);

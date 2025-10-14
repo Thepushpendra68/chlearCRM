@@ -1,5 +1,33 @@
 const taskService = require('../services/taskService');
 const ApiError = require('../utils/ApiError');
+const { AuditActions, AuditSeverity, logAuditEvent } = require('../utils/auditLogger');
+
+const buildTaskSummary = (task = {}) =>
+  task.title || task.id || 'Task';
+
+const computeTaskChanges = (before = {}, after = {}) => {
+  const fields = [
+    'title',
+    'description',
+    'due_date',
+    'priority',
+    'status',
+    'task_type',
+    'assigned_to',
+    'lead_id'
+  ];
+
+  return fields.reduce((changes, field) => {
+    const beforeValue = before[field] ?? null;
+    const afterValue = after[field] ?? null;
+
+    if (beforeValue !== afterValue) {
+      changes.push({ field, before: beforeValue, after: afterValue });
+    }
+
+    return changes;
+  }, []);
+};
 
 class TaskController {
   /**
@@ -63,6 +91,22 @@ class TaskController {
       };
 
       const task = await taskService.createTask(taskData, req.user);
+
+      await logAuditEvent(req, {
+        action: AuditActions.TASK_CREATED,
+        resourceType: 'task',
+        resourceId: task.id,
+        resourceName: buildTaskSummary(task),
+        companyId: task.company_id,
+        details: {
+          lead_id: task.lead_id,
+          assigned_to: task.assigned_to,
+          due_date: task.due_date,
+          priority: task.priority,
+          status: task.status,
+          task_type: task.task_type
+        }
+      });
       
       res.status(201).json({
         success: true,
@@ -82,11 +126,40 @@ class TaskController {
       const { id } = req.params;
       const updateData = req.body;
 
-      const task = await taskService.updateTask(id, updateData, req.user);
+      const result = await taskService.updateTask(id, updateData, req.user);
+
+      const { previousTask, updatedTask } = result;
+      const changes = computeTaskChanges(previousTask, updatedTask);
+
+      if (changes.length > 0) {
+        await logAuditEvent(req, {
+          action: AuditActions.TASK_UPDATED,
+          resourceType: 'task',
+          resourceId: updatedTask.id,
+          resourceName: buildTaskSummary(updatedTask),
+          companyId: updatedTask.company_id,
+          details: { changes }
+        });
+
+        const statusChange = changes.find(change => change.field === 'status');
+        if (statusChange && statusChange.after === 'completed') {
+          await logAuditEvent(req, {
+            action: AuditActions.TASK_COMPLETED,
+            resourceType: 'task',
+            resourceId: updatedTask.id,
+            resourceName: buildTaskSummary(updatedTask),
+            companyId: updatedTask.company_id,
+            details: {
+              from: statusChange.before,
+              to: statusChange.after
+            }
+          });
+        }
+      }
       
       res.json({
         success: true,
-        data: task,
+        data: updatedTask,
         message: 'Task updated successfully'
       });
     } catch (error) {
@@ -100,11 +173,24 @@ class TaskController {
   async completeTask(req, res, next) {
     try {
       const { id } = req.params;
-      const task = await taskService.completeTask(id, req.user.id, req.user);
+      const result = await taskService.completeTask(id, req.user.id, req.user);
+
+      await logAuditEvent(req, {
+        action: AuditActions.TASK_COMPLETED,
+        resourceType: 'task',
+        resourceId: result.updatedTask.id,
+        resourceName: buildTaskSummary(result.updatedTask),
+        companyId: result.updatedTask.company_id,
+        severity: AuditSeverity.INFO,
+        details: {
+          completed_by: req.user.id,
+          previous_status: result.previousTask.status
+        }
+      });
       
       res.json({
         success: true,
-        data: task,
+        data: result.updatedTask,
         message: 'Task completed successfully'
       });
     } catch (error) {
@@ -118,7 +204,24 @@ class TaskController {
   async deleteTask(req, res, next) {
     try {
       const { id } = req.params;
-      await taskService.deleteTask(id, req.user);
+      const result = await taskService.deleteTask(id, req.user);
+
+      if (!result?.success) {
+        throw new ApiError('Task not found', 404);
+      }
+
+      await logAuditEvent(req, {
+        action: AuditActions.TASK_DELETED,
+        resourceType: 'task',
+        resourceId: id,
+        resourceName: buildTaskSummary(result.deletedTask || { id }),
+        companyId: result.deletedTask?.company_id ?? req.user.company_id,
+        severity: AuditSeverity.WARNING,
+        details: {
+          lead_id: result.deletedTask?.lead_id ?? null,
+          assigned_to: result.deletedTask?.assigned_to ?? null
+        }
+      });
       
       res.json({
         success: true,

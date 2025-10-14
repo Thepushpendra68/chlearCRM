@@ -322,7 +322,10 @@ const updateLead = async (id, leadData, currentUser) => {
       throw updateError;
     }
 
-    return updatedLead;
+    return {
+      previousLead: existingLead,
+      updatedLead
+    };
   } catch (error) {
     console.error('Error in updateLead:', error);
     if (error instanceof ApiError) {
@@ -364,7 +367,10 @@ const deleteLead = async (id, currentUser) => {
       throw deleteError;
     }
 
-    return true;
+    return {
+      deleted: true,
+      deletedLead: existingLead
+    };
   } catch (error) {
     console.error('Error deleting lead:', error);
     if (error instanceof ApiError) {

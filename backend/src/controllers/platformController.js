@@ -2,6 +2,7 @@ const platformService = require('../services/platformService');
 const auditService = require('../services/auditService');
 const ApiError = require('../utils/ApiError');
 const { validationResult } = require('express-validator');
+const { AuditActions, AuditSeverity, logAuditEvent } = require('../utils/auditLogger');
 
 /**
  * Platform Controller - Super Admin Operations
@@ -26,22 +27,19 @@ class PlatformController {
 
       const result = await platformService.createUserForCompany(req.user, payload);
 
-      await auditService.logEvent({
-        actorId: req.user.id,
-        actorEmail: req.user.email,
-        actorRole: req.user.role,
-        action: 'platform_create_user',
+      await logAuditEvent(req, {
+        action: AuditActions.PLATFORM_CREATE_USER,
         resourceType: 'user',
         resourceId: result?.id,
+        resourceName: `${payload.first_name} ${payload.last_name}`.trim() || payload.email,
+        companyId: payload.company_id,
+        severity: AuditSeverity.WARNING,
         details: {
           company_id: payload.company_id,
           email: payload.email,
           role: payload.role,
           is_active: payload.is_active
-        },
-        severity: 'warning',
-        ipAddress: req.ip,
-        userAgent: req.headers['user-agent']
+        }
       });
 
       res.status(201).json({
@@ -69,15 +67,10 @@ class PlatformController {
       });
 
       // Audit log
-      await auditService.logEvent({
-        actorId: req.user.id,
-        actorEmail: req.user.email,
-        actorRole: req.user.role,
-        action: 'view_all_companies',
+      await logAuditEvent(req, {
+        action: AuditActions.PLATFORM_VIEW_COMPANIES,
         resourceType: 'platform',
         details: { search, status },
-        ipAddress: req.ip,
-        userAgent: req.headers['user-agent']
       });
 
       res.json({
@@ -95,16 +88,12 @@ class PlatformController {
    */
   getPlatformStats = async (req, res, next) => {
     try {
-      const stats = await platformService.getPlatformStats();
+      const { range = '30d' } = req.query;
+      const stats = await platformService.getPlatformStats(range);
 
-      await auditService.logEvent({
-        actorId: req.user.id,
-        actorEmail: req.user.email,
-        actorRole: req.user.role,
-        action: 'view_platform_stats',
-        resourceType: 'platform',
-        ipAddress: req.ip,
-        userAgent: req.headers['user-agent']
+      await logAuditEvent(req, {
+        action: AuditActions.PLATFORM_VIEW_STATS,
+        resourceType: 'platform'
       });
 
       res.json({
@@ -125,15 +114,12 @@ class PlatformController {
 
       const details = await platformService.getCompanyDetails(companyId);
 
-      await auditService.logEvent({
-        actorId: req.user.id,
-        actorEmail: req.user.email,
-        actorRole: req.user.role,
-        action: 'view_company_details',
+      await logAuditEvent(req, {
+        action: AuditActions.PLATFORM_VIEW_COMPANY,
         resourceType: 'company',
         resourceId: companyId,
-        ipAddress: req.ip,
-        userAgent: req.headers['user-agent']
+        resourceName: details?.company?.name || null,
+        companyId
       });
 
       res.json({
@@ -155,17 +141,14 @@ class PlatformController {
 
       const company = await platformService.updateCompanyStatus(companyId, status, reason);
 
-      await auditService.logEvent({
-        actorId: req.user.id,
-        actorEmail: req.user.email,
-        actorRole: req.user.role,
-        action: 'update_company_status',
+      await logAuditEvent(req, {
+        action: AuditActions.PLATFORM_UPDATE_COMPANY_STATUS,
         resourceType: 'company',
         resourceId: companyId,
-        details: { status, reason },
-        severity: 'warning',
-        ipAddress: req.ip,
-        userAgent: req.headers['user-agent']
+        resourceName: company?.name || null,
+        companyId,
+        severity: AuditSeverity.WARNING,
+        details: { status, reason }
       });
 
       res.json({
@@ -192,15 +175,10 @@ class PlatformController {
         limit: parseInt(limit)
       });
 
-      await auditService.logEvent({
-        actorId: req.user.id,
-        actorEmail: req.user.email,
-        actorRole: req.user.role,
-        action: 'search_platform_users',
+      await logAuditEvent(req, {
+        action: AuditActions.PLATFORM_SEARCH_USERS,
         resourceType: 'platform',
-        details: { search, company_id, role },
-        ipAddress: req.ip,
-        userAgent: req.headers['user-agent']
+        details: { search, company_id, role }
       });
 
       res.json({
@@ -292,24 +270,22 @@ class PlatformController {
       }
 
       // Log impersonation start
-      await auditService.logEvent({
-        actorId: req.user.id,
-        actorEmail: req.user.email,
-        actorRole: req.user.role,
-        action: 'start_impersonation',
+      await logAuditEvent(req, {
+        action: AuditActions.PLATFORM_IMPERSONATE_START,
         resourceType: 'user',
         resourceId: userId,
+        resourceName: `${targetUser.first_name} ${targetUser.last_name}`.trim() || targetUser.email,
+        companyId: targetUser.company_id,
+        severity: AuditSeverity.WARNING,
         details: {
           target_user_email: targetUser.email,
           target_user_name: `${targetUser.first_name} ${targetUser.last_name}`,
           target_user_role: targetUser.role,
           target_user_company: targetUser.company_name
         },
-        isImpersonation: true,
-        impersonatedUserId: userId,
-        severity: 'warning',
-        ipAddress: req.ip,
-        userAgent: req.headers['user-agent']
+        metadata: {
+          target_user_company_id: targetUser.company_id
+        }
       });
 
       res.json({

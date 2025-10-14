@@ -1,5 +1,6 @@
 const reportService = require('../services/reportService');
 const ApiError = require('../utils/ApiError');
+const { AuditActions, AuditSeverity, logAuditEvent } = require('../utils/auditLogger');
 
 /**
  * Get lead performance metrics
@@ -26,6 +27,14 @@ const getLeadPerformance = async (req, res, next) => {
 
     const metrics = await reportService.getLeadPerformanceMetrics(req.user, filters);
     
+    await logAuditEvent(req, {
+      action: AuditActions.REPORT_GENERATED,
+      resourceType: 'report',
+      resourceName: 'lead_performance',
+      companyId: req.user.company_id,
+      details: { filters }
+    });
+
     res.json({
       success: true,
       data: metrics
@@ -54,6 +63,14 @@ const getConversionFunnel = async (req, res, next) => {
 
     const funnel = await reportService.getConversionFunnel(req.user, filters);
     
+    await logAuditEvent(req, {
+      action: AuditActions.REPORT_GENERATED,
+      resourceType: 'report',
+      resourceName: 'conversion_funnel',
+      companyId: req.user.company_id,
+      details: { filters }
+    });
+
     res.json({
       success: true,
       data: funnel
@@ -86,6 +103,14 @@ const getActivitySummary = async (req, res, next) => {
 
     const summary = await reportService.getActivitySummary(req.user, filters);
     
+    await logAuditEvent(req, {
+      action: AuditActions.REPORT_GENERATED,
+      resourceType: 'report',
+      resourceName: 'activity_summary',
+      companyId: req.user.company_id,
+      details: { filters }
+    });
+
     res.json({
       success: true,
       data: summary
@@ -114,6 +139,14 @@ const getTeamPerformance = async (req, res, next) => {
 
     const performance = await reportService.getTeamPerformanceMetrics(req.user, filters);
     
+    await logAuditEvent(req, {
+      action: AuditActions.REPORT_GENERATED,
+      resourceType: 'report',
+      resourceName: 'team_performance',
+      companyId: req.user.company_id,
+      details: { filters }
+    });
+
     res.json({
       success: true,
       data: performance
@@ -148,6 +181,14 @@ const getPipelineHealth = async (req, res, next) => {
     const health = await reportService.getPipelineHealthAnalysis(req.user, filters);
 
     console.log('✅ [PIPELINE HEALTH] Analysis completed successfully');
+
+    await logAuditEvent(req, {
+      action: AuditActions.REPORT_GENERATED,
+      resourceType: 'report',
+      resourceName: 'pipeline_health',
+      companyId: req.user.company_id,
+      details: { filters }
+    });
 
     res.json({
       success: true,
@@ -192,6 +233,19 @@ const generateCustomReport = async (req, res, next) => {
 
     const report = await reportService.generateCustomReport(req.user, reportConfig);
     
+    await logAuditEvent(req, {
+      action: AuditActions.REPORT_GENERATED,
+      resourceType: 'report',
+      resourceName: `custom_${reportConfig.reportType || 'custom'}`,
+      companyId: req.user.company_id,
+      details: {
+        reportType: reportConfig.reportType,
+        metrics: reportConfig.metrics,
+        dimensions: reportConfig.dimensions,
+        filters: reportConfig.filters
+      }
+    });
+
     res.json({
       success: true,
       data: report
@@ -224,6 +278,17 @@ const exportReport = async (req, res, next) => {
 
     const result = await reportService.exportReport(req.user, exportConfig);
     
+    await logAuditEvent(req, {
+      action: AuditActions.REPORT_EXPORTED,
+      resourceType: 'report',
+      resourceName: exportConfig.reportType,
+      companyId: req.user.company_id,
+      details: {
+        format: exportConfig.type,
+        filename: result.filename
+      }
+    });
+
     res.setHeader('Content-Type', result.contentType);
     res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
     res.send(result.data);
@@ -276,6 +341,19 @@ const scheduleReport = async (req, res, next) => {
 
     const scheduledReport = await reportService.scheduleReport(req.user, scheduleConfig);
     
+    await logAuditEvent(req, {
+      action: AuditActions.REPORT_SCHEDULED,
+      resourceType: 'report_schedule',
+      resourceId: scheduledReport.id,
+      resourceName: scheduleConfig.name || scheduleConfig.reportType,
+      companyId: req.user.company_id,
+      details: {
+        schedule: scheduleConfig.schedule,
+        format: scheduleConfig.format,
+        recipients: scheduleConfig.recipients
+      }
+    });
+
     res.json({
       success: true,
       data: scheduledReport

@@ -2,6 +2,7 @@ const { validationResult } = require('express-validator');
 const preferencesService = require('../services/preferencesService');
 const userService = require('../services/userService');
 const ApiError = require('../utils/ApiError');
+const { AuditActions, AuditSeverity, logAuditEvent } = require('../utils/auditLogger');
 
 /**
  * @desc    Get current user preferences
@@ -63,6 +64,18 @@ const updatePreferences = async (req, res, next) => {
       },
       message: 'Preferences updated successfully'
     });
+
+    await logAuditEvent(req, {
+      action: AuditActions.USER_PREFERENCES_UPDATED,
+      resourceType: 'user_preferences',
+      resourceId: userId,
+      resourceName: req.user.email || userId,
+      companyId: req.user.company_id,
+      details: {
+        updated_fields: Object.keys(preferencesData),
+        updated_profile_fields: Object.keys(profileUpdates)
+      }
+    });
   } catch (error) {
     next(error);
   }
@@ -82,6 +95,14 @@ const resetPreferences = async (req, res, next) => {
       success: true,
       data: preferences,
       message: 'Preferences reset to defaults'
+    });
+
+    await logAuditEvent(req, {
+      action: AuditActions.USER_PREFERENCES_RESET,
+      resourceType: 'user_preferences',
+      resourceId: userId,
+      resourceName: req.user.email || userId,
+      companyId: req.user.company_id
     });
   } catch (error) {
     next(error);
