@@ -242,11 +242,18 @@ const PlatformUsers = () => {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               >
                 <option value="">All Companies</option>
-                {companies.map((company) => (
-                  <option key={company.id} value={company.id}>
-                    {company.name}
-                  </option>
-                ))}
+                {companies.map((company) => {
+                  const companyId = company.id || company.company_id;
+                  const companyName = company.name || company.company_name || 'Unnamed Company';
+                  if (!companyId) {
+                    return null;
+                  }
+                  return (
+                    <option key={companyId} value={companyId}>
+                      {companyName}
+                    </option>
+                  );
+                })}
               </select>
             </div>
           </div>
@@ -391,11 +398,18 @@ const PlatformUsers = () => {
                     required
                   >
                     <option value="">Select company</option>
-                    {companies.map((company) => (
-                      <option key={company.id} value={company.id}>
-                        {company.name}
-                      </option>
-                    ))}
+                    {companies.map((company) => {
+                      const companyId = company.id || company.company_id;
+                      const companyName = company.name || company.company_name || 'Unnamed Company';
+                      if (!companyId) {
+                        return null;
+                      }
+                      return (
+                        <option key={companyId} value={companyId}>
+                          {companyName}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
 

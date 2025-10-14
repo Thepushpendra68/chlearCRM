@@ -162,23 +162,52 @@ const getUsers = async (currentUser, page = 1, limit = 20, filters = {}) => {
 /**
  * Get user by ID
  */
-const getUserById = async (id, currentUser) => {
+const getUserById = async (id, currentUser = {}) => {
   try {
     const supabase = supabaseAdmin;
 
-    const { data: user, error } = await supabase
+    let query = supabase
       .from('user_profiles')
       .select('*')
-      .eq('id', id)
-      .eq('company_id', currentUser.company_id)
-      .single();
+      .eq('id', id);
+
+    if (currentUser?.company_id) {
+      query = query.eq('company_id', currentUser.company_id);
+    }
+
+    let { data: user, error } = await query.single();
+
+    const shouldRetryWithoutScope =
+      (error || !user) &&
+      currentUser?.role === 'super_admin' &&
+      currentUser?.company_id;
+
+    if (shouldRetryWithoutScope) {
+      const { data: fallbackUser, error: fallbackError } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (fallbackUser) {
+        user = fallbackUser;
+        error = null;
+      } else {
+        error = fallbackError;
+      }
+    }
 
     if (error || !user) {
       throw new ApiError('User not found', 404);
     }
 
     // Add email from auth
-    const { data: authUser } = await supabase.auth.admin.getUserById(user.id);
+    const { data: authUser, error: authError } = await supabase.auth.admin.getUserById(user.id);
+
+    if (authError) {
+      console.error('Error fetching auth user:', authError);
+    }
+
     return {
       ...user,
       email: authUser?.user?.email || null,
@@ -187,6 +216,9 @@ const getUserById = async (id, currentUser) => {
     };
   } catch (error) {
     console.error('Error fetching user:', error);
+    if (error instanceof ApiError) {
+      throw error;
+    }
     throw new ApiError('Failed to fetch user', 500);
   }
 };
@@ -194,7 +226,7 @@ const getUserById = async (id, currentUser) => {
 /**
  * Get user by email
  */
-const getUserByEmail = async (email, currentUser) => {
+const getUserByEmail = async (email, currentUser = {}) => {
   try {
     const supabase = supabaseAdmin;
 
@@ -213,19 +245,48 @@ const getUserByEmail = async (email, currentUser) => {
     }
 
     // Then get the user profile
-    const { data: user, error } = await supabase
+    let profileQuery = supabase
       .from('user_profiles')
       .select('*')
-      .eq('id', authUser.id)
-      .eq('company_id', currentUser.company_id)
-      .single();
+      .eq('id', authUser.id);
+
+    if (currentUser?.company_id) {
+      profileQuery = profileQuery.eq('company_id', currentUser.company_id);
+    }
+
+    const { data: user, error } = await profileQuery.maybeSingle();
 
     if (error) {
       console.error('Error fetching user profile:', error);
-      return null;
+      throw new ApiError('Failed to fetch user', 500);
     }
 
-    return user;
+    if (user) {
+      return user;
+    }
+
+    // If no profile found in scoped company, check if it exists elsewhere
+    const { data: otherCompanyUser, error: otherCompanyError } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('id', authUser.id)
+      .maybeSingle();
+
+    if (otherCompanyError) {
+      console.error('Error fetching user profile for other company:', otherCompanyError);
+      throw new ApiError('Failed to fetch user', 500);
+    }
+
+    if (otherCompanyUser) {
+      return otherCompanyUser;
+    }
+
+    // Auth user exists but profile not yet created (still treat as existing to prevent duplicates)
+    return {
+      id: authUser.id,
+      email: authUser.email,
+      existsInAuthOnly: true
+    };
   } catch (error) {
     console.error('Error fetching user by email:', error);
     throw new ApiError('Failed to fetch user', 500);
@@ -269,7 +330,11 @@ const createUser = async (userData, currentUser) => {
       company_id: targetCompanyId
     });
     if (existingUser) {
-      throw new ApiError('Email already exists', 400);
+      const message =
+        existingUser.company_id && existingUser.company_id !== targetCompanyId
+          ? 'Email already exists in another company'
+          : 'Email already exists';
+      throw new ApiError(message, 400, 'EMAIL_EXISTS');
     }
 
     // Check if current user has permission to create users
@@ -298,24 +363,48 @@ const createUser = async (userData, currentUser) => {
 
     if (authError) {
       console.error('Error creating auth user:', authError);
+      if (authError.code === 'email_exists') {
+        throw new ApiError('Email already exists', 400, 'EMAIL_EXISTS');
+      }
       throw new ApiError('Failed to create user', 500);
     }
 
-    // The user profile will be created automatically by database triggers
-    // Wait a moment for the trigger to complete
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // The user profile will be created automatically by database triggers.
+    // Poll briefly to allow the trigger to finish before fetching the profile.
+    const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+    const maxAttempts = 5;
+    let createdUser = null;
 
-    // Get the created user profile
-    const createdUser = await getUserById(authUser.user.id, {
-      ...currentUser,
-      company_id: targetCompanyId
-    });
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      // Exponential-ish backoff: first attempt after 300ms, then grow.
+      const delayMs = 300 * (attempt + 1);
+      await wait(delayMs);
+      try {
+        createdUser = await getUserById(authUser.user.id, {
+          ...currentUser,
+          company_id: targetCompanyId
+        });
+        if (createdUser) {
+          break;
+        }
+      } catch (fetchError) {
+        const isNotFound = fetchError instanceof ApiError && fetchError.statusCode === 404;
+        if (isNotFound && attempt < maxAttempts - 1) {
+          continue;
+        }
+        throw fetchError;
+      }
+    }
+
+    if (!createdUser) {
+      throw new ApiError('Failed to create user profile', 500);
+    }
 
     return createdUser;
   } catch (error) {
     console.error('Error creating user:', error);
-    if (error.message.includes('already exists')) {
-      throw new ApiError('Email already exists', 400);
+    if (error instanceof ApiError) {
+      throw error;
     }
     throw new ApiError('Failed to create user', 500);
   }

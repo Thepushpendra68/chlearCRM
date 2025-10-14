@@ -171,7 +171,9 @@ class PlatformService {
         const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(profile.id);
         return {
           ...profile,
-          email: authUser?.user?.email || null
+          email: authUser?.user?.email || null,
+          company_name: profile.companies?.name || null,
+          company_slug: profile.companies?.company_slug || null
         };
       })
     );
