@@ -1,6 +1,15 @@
 const { supabaseAdmin } = require('../config/supabase');
 const ApiError = require('../utils/ApiError');
 
+const normalizeEmail = (email) => {
+  if (typeof email !== 'string') {
+    return null;
+  }
+
+  const trimmed = email.trim();
+  return trimmed.length === 0 ? null : trimmed.toLowerCase();
+};
+
 /**
  * Get all leads with pagination, search, and filtering - Optimized version
  */
@@ -168,12 +177,14 @@ const createLead = async (leadData) => {
     const { supabaseAdmin } = require('../config/supabase');
 
     // Transform frontend field names to database column names
+    const normalizedEmail = normalizeEmail(leadData.email);
+
     const transformedData = {
       company_id: leadData.company_id,
       first_name: leadData.first_name,
       last_name: leadData.last_name,
       name: `${leadData.first_name} ${leadData.last_name}`.trim(), // Keep for backward compatibility
-      email: leadData.email,
+      email: normalizedEmail,
       phone: leadData.phone,
       company: leadData.company,
       title: leadData.job_title, // Map job_title to title
@@ -279,7 +290,7 @@ const updateLead = async (id, leadData, currentUser) => {
       // Keep name field for backward compatibility
       transformedData.name = `${leadData.first_name || ''} ${leadData.last_name || ''}`.trim();
     }
-    if (leadData.email !== undefined) transformedData.email = leadData.email;
+    if (leadData.email !== undefined) transformedData.email = normalizeEmail(leadData.email);
     if (leadData.phone !== undefined) transformedData.phone = leadData.phone;
     if (leadData.company !== undefined) transformedData.company = leadData.company;
     if (leadData.job_title !== undefined) transformedData.title = leadData.job_title; // Map job_title to title

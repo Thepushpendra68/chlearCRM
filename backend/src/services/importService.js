@@ -9,12 +9,29 @@ class ImportService {
   }
 
   /**
+   * Resolve the company associated with a given user.
+   */
+  async getUserCompanyId(userId) {
+    const { data: userProfile, error: profileError } = await supabaseAdmin
+      .from('user_profiles')
+      .select('company_id')
+      .eq('id', userId)
+      .single();
+
+    if (profileError || !userProfile?.company_id) {
+      throw new ApiError('Failed to get user company information', 500);
+    }
+
+    return userProfile.company_id;
+  }
+
+  /**
    * Import leads from CSV/Excel file
    */
   async importLeads(fileBuffer, fileName, userId, options = {}) {
     try {
       let leads = [];
-      
+
       // Determine file type and parse accordingly
       if (fileName.endsWith('.csv')) {
         leads = await csvParser.parseCSV(fileBuffer, options.fieldMapping);
@@ -25,10 +42,11 @@ class ImportService {
       }
 
       // Validate leads data
-      const validationResult = await this.validateLeads(leads);
-      
+      const companyId = await this.getUserCompanyId(userId);
+      const validationResult = await this.validateLeads(leads, companyId);
+
       // Import leads to database
-      const importResult = await this.bulkInsertLeads(validationResult.validatedLeads, userId);
+      const importResult = await this.bulkInsertLeads(validationResult.validatedLeads, userId, companyId);
       
       // Log import history
       await this.logImportHistory({
@@ -57,9 +75,10 @@ class ImportService {
   /**
    * Validate leads data
    */
-  async validateLeads(leads) {
+  async validateLeads(leads, companyId = null) {
     const validatedLeads = [];
     const errors = [];
+    const seenEmails = new Set();
 
     for (let i = 0; i < leads.length; i++) {
       const lead = leads[i];
@@ -85,16 +104,30 @@ class ImportService {
       }
 
       // Check for duplicate email (if provided)
+      let normalizedEmail = null;
       if (lead.email) {
-        const { data: existingLead, error } = await supabaseAdmin
-          .from('leads')
-          .select('id')
-          .eq('email', lead.email.trim().toLowerCase())
-          .limit(1)
-          .single();
+        normalizedEmail = lead.email.trim().toLowerCase();
 
-        if (!error && existingLead) {
-          rowErrors.push('Email already exists');
+        if (seenEmails.has(normalizedEmail)) {
+          rowErrors.push('Duplicate email found in import file');
+        } else {
+          seenEmails.add(normalizedEmail);
+        }
+
+        if (companyId && !rowErrors.includes('Duplicate email found in import file')) {
+          const { data: existingLead, error } = await supabaseAdmin
+            .from('leads')
+            .select('id')
+            .eq('company_id', companyId)
+            .eq('email', normalizedEmail)
+            .maybeSingle();
+
+          if (error) {
+            console.error('Failed to validate lead email uniqueness:', error);
+            rowErrors.push('Could not validate email uniqueness. Please try again.');
+          } else if (existingLead) {
+            rowErrors.push('Email already exists');
+          }
         }
       }
 
@@ -127,7 +160,7 @@ class ImportService {
         validatedLeads.push({
           first_name: lead.first_name.trim(),
           last_name: lead.last_name.trim(),
-          email: lead.email ? lead.email.trim().toLowerCase() : null,
+          email: normalizedEmail,
           phone: lead.phone ? lead.phone.trim() : null,
           company: lead.company ? lead.company.trim() : null,
           job_title: lead.job_title ? lead.job_title.trim() : null,
@@ -156,7 +189,7 @@ class ImportService {
   /**
    * Bulk insert leads
    */
-  async bulkInsertLeads(leads, userId) {
+  async bulkInsertLeads(leads, userId, companyId) {
     const result = {
       successful: 0,
       failed: 0,
@@ -164,18 +197,9 @@ class ImportService {
     };
 
     try {
-      // Get user's company_id for multi-tenancy
-      const { data: userProfile, error: profileError } = await supabaseAdmin
-        .from('user_profiles')
-        .select('company_id')
-        .eq('id', userId)
-        .single();
-
-      if (profileError || !userProfile?.company_id) {
-        throw new ApiError('Failed to get user company information', 500);
+      if (!companyId) {
+        throw new ApiError('Failed to determine company for lead import', 500);
       }
-
-      const companyId = userProfile.company_id;
 
       // Determine which columns actually exist in the leads table (cached)
       const availableColumns = await this.getLeadsTableColumns();
