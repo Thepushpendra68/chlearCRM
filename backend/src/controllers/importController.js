@@ -49,7 +49,7 @@ class ImportController {
       res.json({
         success: true,
         data: result,
-        message: `Import completed. ${result.successful} leads imported successfully, ${result.failed} failed.`
+        message: `Import completed. ${result.successful_imports} leads imported successfully, ${result.failed_imports} failed.`
       });
     } catch (error) {
       next(error);
@@ -145,13 +145,13 @@ class ImportController {
   /**
    * Get import template
    */
-  async getImportTemplate(req, res, next) {
+  getImportTemplate = async (req, res, next) => {
     try {
       const template = importService.generateImportTemplate();
-      
+
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', 'attachment; filename="leads_import_template.csv"');
-      
+
       const csvContent = this.convertToCSV(template);
       res.send(csvContent);
     } catch (error) {
@@ -210,7 +210,7 @@ class ImportController {
   /**
    * Get file headers for field mapping
    */
-  async getFileHeaders(req, res, next) {
+  getFileHeaders = async (req, res, next) => {
     try {
       if (!req.file) {
         throw new ApiError('No file uploaded', 400);

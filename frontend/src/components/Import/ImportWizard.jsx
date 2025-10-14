@@ -324,8 +324,12 @@ const ImportWizard = ({ isOpen, onClose, onImportComplete, initialStageId }) => 
 
         {currentStep === 3 && importResult && (
           <div className="text-center">
-            <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100">
-              <svg className="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className={`mx-auto flex items-center justify-center h-12 w-12 rounded-full ${
+              importResult.failed_imports > 0 ? 'bg-yellow-100' : 'bg-green-100'
+            }`}>
+              <svg className={`h-6 w-6 ${
+                importResult.failed_imports > 0 ? 'text-yellow-600' : 'text-green-600'
+              }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </div>
@@ -341,6 +345,54 @@ const ImportWizard = ({ isOpen, onClose, onImportComplete, initialStageId }) => 
                 <strong>Failed:</strong> {importResult.failed_imports}
               </p>
             </div>
+
+            {/* Validation Errors */}
+            {importResult.validation_errors && importResult.validation_errors.length > 0 && (
+              <div className="mt-6 text-left">
+                <h4 className="text-sm font-semibold text-red-800 mb-3">Validation Errors:</h4>
+                <div className="max-h-64 overflow-y-auto space-y-3">
+                  {importResult.validation_errors.map((error, index) => (
+                    <div key={index} className="bg-red-50 border border-red-200 rounded-lg p-3">
+                      <p className="text-sm font-medium text-red-900 mb-1">
+                        Row {error.row}:
+                      </p>
+                      <ul className="list-disc list-inside text-sm text-red-800 space-y-1">
+                        {error.errors.map((err, errIndex) => (
+                          <li key={errIndex}>{err}</li>
+                        ))}
+                      </ul>
+                      {error.data && (
+                        <details className="mt-2">
+                          <summary className="text-xs text-red-700 cursor-pointer hover:text-red-900">
+                            Show data
+                          </summary>
+                          <pre className="mt-2 text-xs bg-white p-2 rounded border border-red-200 overflow-x-auto">
+                            {JSON.stringify(error.data, null, 2)}
+                          </pre>
+                        </details>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Import Errors */}
+            {importResult.errors && importResult.errors.length > 0 && (
+              <div className="mt-6 text-left">
+                <h4 className="text-sm font-semibold text-red-800 mb-3">Import Errors:</h4>
+                <div className="max-h-64 overflow-y-auto space-y-2">
+                  {importResult.errors.map((error, index) => (
+                    <div key={index} className="bg-red-50 border border-red-200 rounded-lg p-3">
+                      <p className="text-sm text-red-800">
+                        {error.batch && <strong>Batch {error.batch}: </strong>}
+                        {error.error || JSON.stringify(error)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
