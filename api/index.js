@@ -70,6 +70,7 @@ try {
   const searchRoutes = require('../backend/src/routes/searchRoutes');
   const chatbotRoutes = require('../backend/src/routes/chatbotRoutes');
   const platformRoutes = require('../backend/src/routes/platformRoutes');
+  const picklistRoutes = require('../backend/src/routes/picklistRoutes');
 
   app.use('/api/auth', authRoutes);
   app.use('/api/supabase-auth', supabaseAuthRoutes);
@@ -85,6 +86,7 @@ try {
   app.use('/api/search', searchRoutes);
   app.use('/api/chatbot', chatbotRoutes);
   app.use('/api/platform', platformRoutes);
+  app.use('/api/picklists', picklistRoutes);
 } catch (error) {
   console.error('Failed to load backend routes:', error);
 
