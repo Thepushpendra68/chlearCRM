@@ -4,6 +4,22 @@ const multer = require('multer');
 const path = require('path');
 const { AuditActions, AuditSeverity, logAuditEvent } = require('../utils/auditLogger');
 
+const safeParseJSON = (value, fallback = {}) => {
+  if (!value) {
+    return fallback;
+  }
+
+  if (typeof value === 'object') {
+    return value;
+  }
+
+  try {
+    return JSON.parse(value);
+  } catch (error) {
+    throw new ApiError('Invalid JSON payload provided in request body', 400);
+  }
+};
+
 // Configure multer for file uploads
 const storage = multer.memoryStorage();
 const upload = multer({
@@ -34,8 +50,8 @@ class ImportController {
       }
 
       const { fieldMapping, options } = req.body;
-      const parsedFieldMapping = fieldMapping ? JSON.parse(fieldMapping) : {};
-      const parsedOptions = options ? JSON.parse(options) : {};
+      const parsedFieldMapping = safeParseJSON(fieldMapping, {});
+      const parsedOptions = safeParseJSON(options, {});
 
       await logAuditEvent(req, {
         action: AuditActions.IMPORT_STARTED,
@@ -93,6 +109,54 @@ class ImportController {
         }).catch(() => {});
       }
 
+      next(error);
+    }
+  }
+
+  /**
+   * Perform a dry-run validation of the import file and return detailed feedback.
+   */
+  async dryRunLeads(req, res, next) {
+    try {
+      if (!req.file) {
+        throw new ApiError('No file uploaded', 400);
+      }
+
+      const { fieldMapping, options } = req.body;
+      const parsedFieldMapping = safeParseJSON(fieldMapping, {});
+      const parsedOptions = safeParseJSON(options, {});
+
+      const result = await importService.dryRunLeads(
+        req.file.buffer,
+        req.file.originalname,
+        req.user.id,
+        {
+          fieldMapping: parsedFieldMapping,
+          ...parsedOptions
+        }
+      );
+
+      await logAuditEvent(req, {
+        action: AuditActions.IMPORT_FILE_VALIDATED,
+        resourceType: 'lead_import',
+        resourceName: req.file.originalname,
+        companyId: req.user.company_id,
+        details: {
+          filename: req.file.originalname,
+          total_records: result.total_records,
+          valid_records: result.stats?.valid ?? 0,
+          invalid_records: result.stats?.invalid ?? 0,
+          config_version: result.config_version || null,
+          mode: 'dry_run'
+        }
+      });
+
+      res.json({
+        success: true,
+        data: result,
+        message: `Validation completed. ${result.stats?.valid ?? 0} rows ready to import, ${result.stats?.invalid ?? 0} rows need attention.`
+      });
+    } catch (error) {
       next(error);
     }
   }

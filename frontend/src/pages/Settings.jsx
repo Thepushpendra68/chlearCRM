@@ -42,26 +42,31 @@ const Settings = () => {
   const handleSavePreferences = async (data) => {
     try {
       const response = await preferencesService.updatePreferences(data)
-      if (response.data.success) {
-        const payload = response.data.data || {}
-        const nextPreferences =
-          payload.preferences || payload
-        setPreferences({
-          ...(preferences || {}),
-          ...nextPreferences
-        })
-
-        if (payload.profile) {
-          applyUserPatch(payload.profile)
-        }
-
-        return response.data
+      if (!response.data.success) {
+        throw new Error('Failed to update preferences')
       }
-    } catch (error) {
-      throw error
-    }
 
-    throw new Error('Failed to update preferences')
+      const payload = response.data.data || {}
+      const nextPreferences = payload.preferences || payload
+
+      setPreferences({
+        ...(preferences || {}),
+        ...nextPreferences
+      })
+
+      if (payload.profile) {
+        applyUserPatch(payload.profile)
+      }
+
+      return response.data
+    } catch (error) {
+      const message =
+        error?.response?.data?.message ||
+        error?.message ||
+        'Failed to update preferences'
+      toast.error(message)
+      throw new Error(message)
+    }
   }
 
   // Navigation sections configuration

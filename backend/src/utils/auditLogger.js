@@ -80,7 +80,8 @@ const AuditActions = Object.freeze({
   PLATFORM_SEARCH_USERS: 'search_platform_users',
   PLATFORM_IMPERSONATE_START: 'start_impersonation',
   PLATFORM_IMPERSONATE_SWITCH: 'impersonate_user',
-  PLATFORM_IMPERSONATE_END: 'end_impersonation'
+  PLATFORM_IMPERSONATE_END: 'end_impersonation',
+  IMPORT_TELEMETRY_VIEWED: 'import_telemetry_viewed'
 });
 
 const removeUndefined = (obj = {}) =>

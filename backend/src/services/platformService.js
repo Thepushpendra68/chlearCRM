@@ -322,6 +322,248 @@ class PlatformService {
       company_name: createdUser.company_name || company.name
     };
   }
+
+  /**
+   * Get lead import telemetry summary for the platform dashboard
+   */
+  async getImportTelemetry(rangeKey = '30d', limit = 20) {
+    const range = resolveRange(rangeKey);
+    const now = Date.now();
+    const periodStart = new Date(now - range.days * MS_PER_DAY).toISOString();
+
+    let telemetryRows = [];
+
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('import_telemetry')
+        .select('*')
+        .gte('created_at', periodStart)
+        .order('created_at', { ascending: false })
+        .limit(500);
+
+      if (error) {
+        if (error.code === '42P01') {
+          return this.buildTelemetryPayload([], range, limit);
+        }
+        throw error;
+      }
+
+      telemetryRows = Array.isArray(data) ? data : [];
+    } catch (error) {
+      if (error?.code === '42P01') {
+        return this.buildTelemetryPayload([], range, limit);
+      }
+      console.error('Failed to fetch import telemetry:', error);
+      throw new ApiError('Failed to fetch import telemetry', 500);
+    }
+
+    return this.buildTelemetryPayload(telemetryRows, range, limit);
+  }
+
+  async buildTelemetryPayload(rows, range, limit = 20) {
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return {
+        range: {
+          key: range.key,
+          label: range.label,
+          days: range.days,
+          start: range.days ? new Date(Date.now() - range.days * MS_PER_DAY).toISOString() : null
+        },
+        summary: {
+          totalRuns: 0,
+          dryRuns: 0,
+          imports: 0,
+          successRate: 0,
+          totalRowsValidated: 0,
+          totalRowsImported: 0,
+          totalWarnings: 0,
+          totalErrors: 0,
+          avgDurationMs: 0,
+          p95DurationMs: 0
+        },
+        duplicatePolicies: [],
+        topCompanies: [],
+        recent: []
+      };
+    }
+
+    const dryRuns = [];
+    const imports = [];
+    const durations = [];
+    const duplicatePolicyCounts = new Map();
+    const companyStats = new Map();
+
+    const safeNumber = (value) => {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+
+    rows.forEach((row) => {
+      const stats = row?.stats || {};
+      const metadata = row?.metadata || {};
+      const companyId = row?.company_id || null;
+
+      if (row?.duration_ms !== null && row?.duration_ms !== undefined) {
+        const normalizedDuration = safeNumber(row.duration_ms);
+        if (normalizedDuration > 0) {
+          durations.push(normalizedDuration);
+        }
+      }
+
+      if (row?.duplicate_policy) {
+        const key = row.duplicate_policy;
+        duplicatePolicyCounts.set(key, (duplicatePolicyCounts.get(key) || 0) + 1);
+      }
+
+      const targetCollection = row?.phase === 'import' ? imports : dryRuns;
+      targetCollection.push(row);
+
+      if (companyId) {
+        const existing = companyStats.get(companyId) || {
+          companyId,
+          runs: 0,
+          dryRuns: 0,
+          imports: 0,
+          warnings: 0,
+          errors: 0,
+          rowsValidated: 0,
+          rowsImported: 0,
+          lastSeen: row?.created_at || null
+        };
+
+        existing.runs += 1;
+        if (row?.phase === 'import') {
+          existing.imports += 1;
+          existing.rowsImported += safeNumber(metadata.inserted_count ?? stats.valid);
+        } else {
+          existing.dryRuns += 1;
+        }
+
+        existing.warnings += safeNumber(row?.warning_count);
+        existing.errors += safeNumber(row?.error_count);
+        existing.rowsValidated += safeNumber(stats.total);
+
+        if (!existing.lastSeen || (row?.created_at && row.created_at > existing.lastSeen)) {
+          existing.lastSeen = row.created_at;
+        }
+
+        companyStats.set(companyId, existing);
+      }
+    });
+
+    const totalRuns = rows.length;
+    const totalDryRuns = dryRuns.length;
+    const totalImports = imports.length;
+
+    const totalWarnings = rows.reduce((acc, row) => acc + safeNumber(row?.warning_count), 0);
+    const totalErrors = rows.reduce((acc, row) => acc + safeNumber(row?.error_count), 0);
+    const totalRowsValidated = rows.reduce((acc, row) => acc + safeNumber(row?.stats?.total), 0);
+    const totalRowsImported = imports.reduce(
+      (acc, row) => acc + safeNumber(row?.metadata?.inserted_count ?? row?.stats?.valid),
+      0
+    );
+    const successfulImports = imports.filter((row) => safeNumber(row?.error_count) === 0).length;
+    const successRate = totalImports > 0 ? (successfulImports / totalImports) * 100 : 0;
+
+    durations.sort((a, b) => a - b);
+    const avgDurationMs =
+      durations.length > 0
+        ? Math.round(durations.reduce((sum, value) => sum + value, 0) / durations.length)
+        : 0;
+    const p95DurationMs =
+      durations.length > 0
+        ? durations[Math.min(durations.length - 1, Math.floor(durations.length * 0.95))]
+        : 0;
+
+    const duplicatePolicies = Array.from(duplicatePolicyCounts.entries())
+      .map(([policy, count]) => ({ policy, count }))
+      .sort((a, b) => b.count - a.count);
+
+    const companyIds = Array.from(companyStats.keys());
+    let companyLookup = {};
+
+    if (companyIds.length > 0) {
+      try {
+        const { data, error } = await supabaseAdmin
+          .from('companies')
+          .select('id, name')
+          .in('id', companyIds);
+
+        if (!error && Array.isArray(data)) {
+          companyLookup = data.reduce((acc, company) => {
+            acc[company.id] = company.name;
+            return acc;
+          }, {});
+        }
+      } catch (error) {
+        console.warn('Failed to fetch company names for telemetry view:', error);
+      }
+    }
+
+    const topCompanies = Array.from(companyStats.values())
+      .map((stat) => ({
+        companyId: stat.companyId,
+        companyName: companyLookup[stat.companyId] || 'Unknown company',
+        runs: stat.runs,
+        dryRuns: stat.dryRuns,
+        imports: stat.imports,
+        warnings: stat.warnings,
+        errors: stat.errors,
+        rowsValidated: stat.rowsValidated,
+        rowsImported: stat.rowsImported,
+        lastSeen: stat.lastSeen
+      }))
+      .sort((a, b) => {
+        if (b.errors !== a.errors) {
+          return b.errors - a.errors;
+        }
+        if (b.rowsImported !== a.rowsImported) {
+          return b.rowsImported - a.rowsImported;
+        }
+        return (b.lastSeen || '').localeCompare(a.lastSeen || '');
+      })
+      .slice(0, 10);
+
+    const recent = rows.slice(0, Math.max(5, Math.min(limit, 50))).map((row) => ({
+      id: row.id,
+      phase: row.phase,
+      companyId: row.company_id,
+      companyName: companyLookup[row.company_id] || null,
+      createdAt: row.created_at,
+      stats: row.stats || {},
+      warningCount: safeNumber(row.warning_count),
+      errorCount: safeNumber(row.error_count),
+      duplicatePolicy: row.duplicate_policy || null,
+      configVersion: row.config_version || null,
+      durationMs: row.duration_ms || null,
+      insertedCount: safeNumber(row?.metadata?.inserted_count ?? row?.stats?.valid),
+      fileName: row?.metadata?.file_name || null
+    }));
+
+    return {
+      range: {
+        key: range.key,
+        label: range.label,
+        days: range.days,
+        start: range.days ? new Date(Date.now() - range.days * MS_PER_DAY).toISOString() : null
+      },
+      summary: {
+        totalRuns,
+        dryRuns: totalDryRuns,
+        imports: totalImports,
+        successRate: Math.round(successRate * 10) / 10,
+        totalRowsValidated,
+        totalRowsImported,
+        totalWarnings,
+        totalErrors,
+        avgDurationMs,
+        p95DurationMs
+      },
+      duplicatePolicies,
+      topCompanies,
+      recent
+    };
+  }
 }
 
 module.exports = new PlatformService();

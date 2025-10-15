@@ -246,6 +246,32 @@ class PlatformController {
   };
 
   /**
+   * Get lead import telemetry summary
+   */
+  getImportTelemetry = async (req, res, next) => {
+    try {
+      const { range = '30d', limit = 20 } = req.query;
+      const payload = await platformService.getImportTelemetry(range, parseInt(limit));
+
+      await logAuditEvent(req, {
+        action: AuditActions.IMPORT_TELEMETRY_VIEWED,
+        resourceType: 'platform',
+        details: {
+          range,
+          limit
+        }
+      });
+
+      res.json({
+        success: true,
+        data: payload
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
    * Start impersonating a user
    */
   startImpersonation = async (req, res, next) => {

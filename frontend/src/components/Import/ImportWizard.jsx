@@ -7,13 +7,15 @@ const ImportWizard = ({ isOpen, onClose, onImportComplete, initialStageId }) => 
   const [filePreview, setFilePreview] = useState(null);
   const [fieldMapping, setFieldMapping] = useState({});
   const [importOptions, setImportOptions] = useState({
-    skipDuplicates: true,
-    updateExisting: false,
+    duplicatePolicy: 'skip',
     pipelineStageId: initialStageId || null
   });
   const [loading, setLoading] = useState(false);
+  const [validationLoading, setValidationLoading] = useState(false);
   const [error, setError] = useState('');
   const [importResult, setImportResult] = useState(null);
+  const [dryRunResult, setDryRunResult] = useState(null);
+  const [rowFilter, setRowFilter] = useState('invalid');
   const fileInputRef = useRef(null);
 
   const steps = [
@@ -25,6 +27,9 @@ const ImportWizard = ({ isOpen, onClose, onImportComplete, initialStageId }) => 
   const handleFileSelect = async (selectedFile) => {
     setError('');
     setFile(selectedFile);
+    setDryRunResult(null);
+    setImportResult(null);
+    setRowFilter('invalid');
 
     try {
       // Validate file type
@@ -62,14 +67,108 @@ const ImportWizard = ({ isOpen, onClose, onImportComplete, initialStageId }) => 
       ...prev,
       [csvField]: dbField
     }));
+    setDryRunResult(null);
+    setRowFilter('invalid');
+  };
+
+  const getFilteredRows = () => {
+    if (!dryRunResult?.rows) {
+      return [];
+    }
+
+    const filtered = dryRunResult.rows.filter((row) => {
+      if (rowFilter === 'invalid') {
+        return !row.isValid;
+      }
+      if (rowFilter === 'valid') {
+        return row.isValid;
+      }
+      if (rowFilter === 'warnings') {
+        return Array.isArray(row.warnings) && row.warnings.length > 0;
+      }
+      return true;
+    });
+
+    return filtered.slice(0, 50);
+  };
+
+  const getValidationCounts = () => {
+    if (!dryRunResult) {
+      return { total: 0, valid: 0, invalid: 0, warnings: 0 };
+    }
+
+    const stats = dryRunResult.stats || {};
+    const total = stats.total ?? (dryRunResult.rows ? dryRunResult.rows.length : 0);
+    const valid =
+      stats.valid ??
+      (dryRunResult.rows ? dryRunResult.rows.filter((row) => row.isValid).length : 0);
+    const invalid =
+      stats.invalid ??
+      (dryRunResult.rows ? dryRunResult.rows.filter((row) => !row.isValid).length : Math.max(total - valid, 0));
+    const warnings =
+      dryRunResult.validation_warnings?.length ??
+      (dryRunResult.rows
+        ? dryRunResult.rows.filter((row) => Array.isArray(row.warnings) && row.warnings.length > 0).length
+        : 0);
+
+    return { total, valid, invalid, warnings };
+  };
+
+  const handleDryRun = async () => {
+    if (!file) {
+      setError('Please select a file before running validation');
+      return;
+    }
+
+    setValidationLoading(true);
+    setError('');
+
+    try {
+      const result = await importService.dryRunLeads(
+        file,
+        fieldMapping,
+        {
+          duplicate_policy: importOptions.duplicatePolicy,
+          pipeline_stage_id: importOptions.pipelineStageId
+        }
+      );
+
+      setDryRunResult(result.data);
+      setImportResult(null);
+      if (result.data?.stats) {
+        setRowFilter(result.data.stats.invalid > 0 ? 'invalid' : 'valid');
+      }
+    } catch (error) {
+      setDryRunResult(null);
+      setError(error.message);
+    } finally {
+      setValidationLoading(false);
+    }
   };
 
   const handleImport = async () => {
+    if (!dryRunResult) {
+      setError('Please run validation before importing your leads.');
+      return;
+    }
+
+    if (dryRunResult?.stats?.valid === 0) {
+      setError('No valid rows to import. Please fix the errors highlighted in the validation results.');
+      return;
+    }
+
     setLoading(true);
     setError('');
 
     try {
-      const result = await importService.importLeads(file, fieldMapping, importOptions);
+      const result = await importService.importLeads(
+        file,
+        fieldMapping,
+        {
+          duplicate_policy: importOptions.duplicatePolicy,
+          pipeline_stage_id: importOptions.pipelineStageId
+        }
+      );
       setImportResult(result.data);
       setCurrentStep(3);
       
@@ -89,12 +188,13 @@ const ImportWizard = ({ isOpen, onClose, onImportComplete, initialStageId }) => 
     setFilePreview(null);
     setFieldMapping({});
     setImportOptions({
-      skipDuplicates: true,
-      updateExisting: false,
+      duplicatePolicy: 'skip',
       pipelineStageId: initialStageId || null
     });
     setError('');
     setImportResult(null);
+    setDryRunResult(null);
+    setRowFilter('invalid');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -104,6 +204,9 @@ const ImportWizard = ({ isOpen, onClose, onImportComplete, initialStageId }) => 
     handleReset();
     onClose();
   };
+
+  const validationCounts = getValidationCounts();
+  const previewRows = getFilteredRows();
 
   if (!isOpen) return null;
 
@@ -295,28 +398,169 @@ const ImportWizard = ({ isOpen, onClose, onImportComplete, initialStageId }) => 
               </div>
             </div>
 
+            {/* Validation Controls */}
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900">Validation</h3>
+                  <p className="text-sm text-gray-600">
+                    Run a dry run to confirm mappings and surface issues before importing.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleDryRun}
+                  disabled={validationLoading}
+                  className="inline-flex items-center justify-center px-4 py-2 rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+                >
+                  {validationLoading ? 'Validating...' : dryRunResult ? 'Re-run Validation' : 'Run Validation'}
+                </button>
+              </div>
+
+              {dryRunResult && (
+                <div className="border border-gray-200 rounded-lg p-4 space-y-4 bg-white">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="rounded-lg bg-gray-50 p-4">
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Total Rows</p>
+                      <p className="mt-2 text-2xl font-semibold text-gray-900">{validationCounts.total}</p>
+                    </div>
+                    <div className="rounded-lg bg-green-50 p-4">
+                      <p className="text-xs font-semibold text-green-700 uppercase tracking-wide">Ready to Import</p>
+                      <p className="mt-2 text-2xl font-semibold text-green-700">{validationCounts.valid}</p>
+                    </div>
+                    <div className="rounded-lg bg-red-50 p-4">
+                      <p className="text-xs font-semibold text-red-700 uppercase tracking-wide">Needs Attention</p>
+                      <p className="mt-2 text-2xl font-semibold text-red-700">{validationCounts.invalid}</p>
+                    </div>
+                  </div>
+
+                  {validationCounts.warnings > 0 && (
+                    <div className="rounded-md bg-yellow-50 border border-yellow-200 p-3 text-sm text-yellow-800">
+                      {validationCounts.warnings} row{validationCounts.warnings === 1 ? '' : 's'} include warnings. Review before importing.
+                    </div>
+                  )}
+
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2 mb-3">
+                      {[
+                        { key: 'invalid', label: `Invalid (${validationCounts.invalid})` },
+                        { key: 'warnings', label: `Warnings (${validationCounts.warnings})` },
+                        { key: 'valid', label: `Valid (${validationCounts.valid})` },
+                        { key: 'all', label: `All (${validationCounts.total})` }
+                      ].map((filter) => (
+                        <button
+                          key={filter.key}
+                          type="button"
+                          onClick={() => setRowFilter(filter.key)}
+                          className={`px-3 py-1.5 text-sm rounded-md border ${
+                            rowFilter === filter.key
+                              ? 'bg-indigo-600 text-white border-indigo-600'
+                              : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'
+                          }`}
+                        >
+                          {filter.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="overflow-x-auto border border-gray-200 rounded-lg">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Row</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Errors</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Warnings</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {previewRows.length === 0 && (
+                            <tr>
+                              <td colSpan={4} className="px-4 py-6 text-center text-sm text-gray-500">
+                                No rows match the selected filter. Re-run validation if you updated mappings.
+                              </td>
+                            </tr>
+                          )}
+                          {previewRows.map((row) => (
+                            <tr key={row.rowNumber}>
+                              <td className="px-4 py-3 text-sm text-gray-900">Row {row.rowNumber}</td>
+                              <td className="px-4 py-3 text-sm">
+                                {row.isValid ? (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-green-700 bg-green-100">
+                                    Valid
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-red-700 bg-red-100">
+                                    Invalid
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 text-sm">
+                                {row.errors && row.errors.length > 0 ? (
+                                  <ul className="list-disc list-inside text-red-600 space-y-1 text-xs">
+                                    {row.errors.map((err, idx) => (
+                                      <li key={idx}>{err}</li>
+                                    ))}
+                                  </ul>
+                                ) : (
+                                  <span className="text-xs text-gray-500">None</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 text-sm">
+                                {row.warnings && row.warnings.length > 0 ? (
+                                  <ul className="list-disc list-inside text-yellow-600 space-y-1 text-xs">
+                                    {row.warnings.map((warning, idx) => (
+                                      <li key={idx}>{warning}</li>
+                                    ))}
+                                  </ul>
+                                ) : (
+                                  <span className="text-xs text-gray-500">None</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <p className="mt-2 text-xs text-gray-500">
+                      Showing up to {previewRows.length} rows. Re-run validation to refresh after editing mappings.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Import Options */}
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Import Options</h3>
-              <div className="space-y-3">
-                <label className="flex items-center">
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium text-gray-900">Import Options</h3>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Duplicate handling</label>
+                  <select
+                    value={importOptions.duplicatePolicy}
+                    onChange={(e) => setImportOptions(prev => ({ ...prev, duplicatePolicy: e.target.value }))}
+                    className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="skip">Skip duplicates (recommended)</option>
+                    <option value="update">Update existing leads</option>
+                  </select>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Determine how to handle rows when an email already exists in your workspace.
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Pipeline stage (optional)</label>
                   <input
-                    type="checkbox"
-                    checked={importOptions.skipDuplicates}
-                    onChange={(e) => setImportOptions(prev => ({ ...prev, skipDuplicates: e.target.checked }))}
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    type="text"
+                    value={importOptions.pipelineStageId || ''}
+                    onChange={(e) => setImportOptions(prev => ({ ...prev, pipelineStageId: e.target.value || null }))}
+                    placeholder="Pipeline stage ID"
+                    className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
-                  <span className="ml-2 text-sm text-gray-700">Skip duplicate emails</span>
-                </label>
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={importOptions.updateExisting}
-                    onChange={(e) => setImportOptions(prev => ({ ...prev, updateExisting: e.target.checked }))}
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                  />
-                  <span className="ml-2 text-sm text-gray-700">Update existing leads</span>
-                </label>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Provide a pipeline stage ID to assign all imported leads. Leave blank to keep default stage.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -334,17 +578,56 @@ const ImportWizard = ({ isOpen, onClose, onImportComplete, initialStageId }) => 
               </svg>
             </div>
             <h3 className="mt-4 text-lg font-medium text-gray-900">Import Completed!</h3>
-            <div className="mt-4 bg-gray-50 p-4 rounded-lg">
-              <p className="text-sm text-gray-600">
-                <strong>Total Records:</strong> {importResult.total_records}
-              </p>
-              <p className="text-sm text-gray-600">
-                <strong>Successful:</strong> {importResult.successful_imports}
-              </p>
-              <p className="text-sm text-gray-600">
-                <strong>Failed:</strong> {importResult.failed_imports}
-              </p>
+            <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="rounded-lg bg-gray-50 p-4 text-sm text-gray-600">
+                <p className="font-medium text-gray-800">Total Rows</p>
+                <p className="mt-1 text-xl font-semibold text-gray-900">
+                  {importResult.stats?.total ?? importResult.total_records}
+                </p>
+              </div>
+              <div className="rounded-lg bg-green-50 p-4 text-sm text-green-700">
+                <p className="font-medium">Imported Successfully</p>
+                <p className="mt-1 text-xl font-semibold">
+                  {importResult.successful_imports}
+                </p>
+              </div>
+              <div className="rounded-lg bg-red-50 p-4 text-sm text-red-700">
+                <p className="font-medium">Failed or Skipped</p>
+                <p className="mt-1 text-xl font-semibold">
+                  {importResult.failed_imports}
+                </p>
+              </div>
             </div>
+
+            {importResult.validation_warnings && importResult.validation_warnings.length > 0 && (
+              <div className="mt-6 text-left">
+                <h4 className="text-sm font-semibold text-yellow-800 mb-3">Warnings:</h4>
+                <div className="max-h-64 overflow-y-auto space-y-3">
+                  {importResult.validation_warnings.map((warning, index) => (
+                    <div key={index} className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                      <p className="text-sm font-medium text-yellow-900 mb-1">
+                        Row {warning.row}:
+                      </p>
+                      <ul className="list-disc list-inside text-sm text-yellow-800 space-y-1">
+                        {warning.warnings.map((warn, warnIndex) => (
+                          <li key={warnIndex}>{warn}</li>
+                        ))}
+                      </ul>
+                      {warning.data && (
+                        <details className="mt-2">
+                          <summary className="text-xs text-yellow-700 cursor-pointer hover:text-yellow-900">
+                            Show data
+                          </summary>
+                          <pre className="mt-2 text-xs bg-white p-2 rounded border border-yellow-200 overflow-x-auto">
+                            {JSON.stringify(warning.data, null, 2)}
+                          </pre>
+                        </details>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Validation Errors */}
             {importResult.validation_errors && importResult.validation_errors.length > 0 && (
@@ -408,10 +691,22 @@ const ImportWizard = ({ isOpen, onClose, onImportComplete, initialStageId }) => 
           {currentStep === 2 && (
             <button
               onClick={handleImport}
-              disabled={loading}
+              disabled={
+                loading ||
+                validationLoading ||
+                !dryRunResult ||
+                (dryRunResult?.stats?.valid ?? 0) === 0
+              }
               className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+              title={
+                !dryRunResult
+                  ? 'Run validation to enable importing.'
+                  : (dryRunResult?.stats?.valid ?? 0) === 0
+                    ? 'Fix validation errors before importing.'
+                    : undefined
+              }
             >
-              {loading ? 'Importing...' : 'Import Leads'}
+              {loading ? 'Importing...' : 'Import Valid Rows'}
             </button>
           )}
           

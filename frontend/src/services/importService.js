@@ -24,6 +24,30 @@ class ImportService {
   }
 
   /**
+   * Perform a dry-run validation before importing.
+   */
+  async dryRunLeads(file, fieldMapping = {}, options = {}) {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('fieldMapping', JSON.stringify(fieldMapping));
+      formData.append('options', JSON.stringify({
+        ...options,
+        mode: 'dry_run'
+      }));
+
+      const response = await api.post('/import/leads/dry-run', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Failed to validate import file');
+    }
+  }
+
+  /**
    * Export leads to various formats
    */
   async exportLeads(filters = {}, format = 'csv') {

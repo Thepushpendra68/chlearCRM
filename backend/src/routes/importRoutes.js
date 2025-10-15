@@ -8,6 +8,7 @@ router.use(authenticate);
 
 // Import operations
 router.post('/leads', importController.getUploadMiddleware(), importController.importLeads);
+router.post('/leads/dry-run', importController.getUploadMiddleware(), importController.dryRunLeads);
 router.get('/template', importController.getImportTemplate);
 router.get('/history', importController.getImportHistory);
 router.post('/validate', importController.getUploadMiddleware(), importController.validateImportFile);

@@ -2,10 +2,128 @@ const { supabaseAdmin } = require('../config/supabase');
 const ApiError = require('../utils/ApiError');
 const csvParser = require('../utils/csvParser');
 const excelParser = require('../utils/excelParser');
+const importConfigService = require('./importConfigService');
+const ImportValidationEngine = require('./importValidationEngine');
+const importTelemetryService = require('./importTelemetryService');
+
+const normalizeString = value => (typeof value === 'string' ? value.trim() : value);
+const normalizeEmail = value => {
+  const normalized = normalizeString(value);
+  return normalized ? normalized.toLowerCase() : null;
+};
+const normalizePhone = value => {
+  const normalized = normalizeString(value);
+  return normalized ? normalized.replace(/[\s\-\(\)]/g, '') : null;
+};
+const chunkArray = (array, size) => {
+  const chunks = [];
+  for (let i = 0; i < array.length; i += size) {
+    chunks.push(array.slice(i, i + size));
+  }
+  return chunks;
+};
 
 class ImportService {
   constructor() {
     this.leadsTableColumns = null;
+  }
+
+  /**
+   * Parse uploaded file buffer into lead objects using the appropriate parser.
+   */
+  async parseLeadsFromFile(fileBuffer, fileName, fieldMapping = {}) {
+    let leads = [];
+
+    if (fileName.endsWith('.csv')) {
+      leads = await csvParser.parseCSV(fileBuffer, fieldMapping);
+    } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+      leads = await excelParser.parseExcel(fileBuffer, fieldMapping);
+    } else {
+      throw new ApiError('Unsupported file format. Please use CSV or Excel files.', 400);
+    }
+
+    return leads;
+  }
+
+  /**
+   * Build duplicate lookup context for a set of leads.
+   */
+  async buildDuplicateContext(leads, companyId) {
+    const emailCandidates = new Set();
+    const phoneCandidates = new Set();
+
+    leads.forEach(lead => {
+      const email = normalizeEmail(lead.email);
+      if (email) {
+        emailCandidates.add(email);
+      }
+
+      const phone = normalizePhone(lead.phone);
+      if (phone) {
+        phoneCandidates.add(phone);
+      }
+    });
+
+    if (!companyId || (emailCandidates.size === 0 && phoneCandidates.size === 0)) {
+      return {
+        emails: new Set(),
+        phones: new Set()
+      };
+    }
+
+    const [existingEmails, existingPhones] = await Promise.all([
+      this.fetchExistingValues(companyId, Array.from(emailCandidates), 'email'),
+      this.fetchExistingValues(companyId, Array.from(phoneCandidates), 'phone')
+    ]);
+
+    return {
+      emails: new Set(existingEmails.map(record => normalizeEmail(record.email))),
+      phones: new Set(existingPhones.map(record => normalizePhone(record.phone)))
+    };
+  }
+
+  /**
+   * Fetch existing leads with matching values for the provided column.
+   */
+  async fetchExistingValues(companyId, values, column) {
+    if (!companyId || !Array.isArray(values) || values.length === 0) {
+      return [];
+    }
+
+    const sanitizedValues = values.filter(value => value !== null && value !== undefined && value !== '');
+
+    if (sanitizedValues.length === 0) {
+      return [];
+    }
+
+    const chunks = chunkArray(sanitizedValues, 500);
+    const results = [];
+
+    for (const chunk of chunks) {
+      try {
+        const { data, error } = await supabaseAdmin
+          .from('leads')
+          .select('id, email, phone')
+          .eq('company_id', companyId)
+          .in(column, chunk);
+
+        if (error) {
+          if (error.code === '42P01') {
+            return [];
+          }
+          throw error;
+        }
+
+        if (data) {
+          results.push(...data);
+        }
+      } catch (error) {
+        console.error(`Failed to fetch existing ${column} values`, error);
+        throw new ApiError('Could not validate duplicate records. Please try again later.', 500);
+      }
+    }
+
+    return results;
   }
 
   /**
@@ -29,24 +147,69 @@ class ImportService {
    * Import leads from CSV/Excel file
    */
   async importLeads(fileBuffer, fileName, userId, options = {}) {
-    try {
-      let leads = [];
+    const parseStartedAt = Date.now();
 
-      // Determine file type and parse accordingly
-      if (fileName.endsWith('.csv')) {
-        leads = await csvParser.parseCSV(fileBuffer, options.fieldMapping);
-      } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
-        leads = await excelParser.parseExcel(fileBuffer, options.fieldMapping);
-      } else {
-        throw new ApiError('Unsupported file format. Please use CSV or Excel files.', 400);
-      }
+    try {
+      const leads = await this.parseLeadsFromFile(fileBuffer, fileName, options.fieldMapping);
+      const parseDurationMs = Date.now() - parseStartedAt;
 
       // Validate leads data
       const companyId = await this.getUserCompanyId(userId);
-      const validationResult = await this.validateLeads(leads, companyId);
+      const validationStartedAt = Date.now();
+      const validationResult = await this.validateLeads(leads, companyId, options);
+      const validationDurationMs = Date.now() - validationStartedAt;
+
+      if (options.mode && options.mode.toLowerCase() === 'dry_run') {
+        await importTelemetryService.recordDryRun({
+          companyId,
+          userId,
+          fileName,
+          stats: validationResult.stats,
+          warningCount: validationResult.warnings?.length || 0,
+          errorCount: validationResult.errors?.length || 0,
+          duplicatePolicy: options.duplicate_policy || null,
+          configVersion: validationResult.config?.version || null,
+          durationMs: validationDurationMs + parseDurationMs,
+          metadata: {
+            row_count: leads.length
+          }
+        });
+
+        return {
+          total_records: leads.length,
+          successful_imports: 0,
+          failed_imports: validationResult.stats.invalid,
+          validation_errors: validationResult.errors,
+          validation_warnings: validationResult.warnings,
+          stats: validationResult.stats,
+          config_version: validationResult.config?.version || null,
+          timings: {
+            parse_ms: parseDurationMs,
+            validation_ms: validationDurationMs,
+            insert_ms: 0
+          },
+          config: validationResult.config,
+          rows: validationResult.rows
+        };
+      }
 
       // Import leads to database
-      const importResult = await this.bulkInsertLeads(validationResult.validatedLeads, userId, companyId);
+      let importResult = { successful: 0, failed: 0, errors: [] };
+
+      let insertDurationMs = 0;
+      if (validationResult.validatedLeads.length > 0) {
+        const insertStartedAt = Date.now();
+        importResult = await this.bulkInsertLeads(validationResult.validatedLeads, userId, companyId);
+        insertDurationMs = Date.now() - insertStartedAt;
+      }
+
+      const failedCount = validationResult.errors.length + importResult.failed;
+
+      const timings = {
+        parse_ms: parseDurationMs,
+        validation_ms: validationDurationMs,
+        insert_ms: insertDurationMs
+      };
       
       // Log import history
       await this.logImportHistory({
@@ -54,17 +217,46 @@ class ImportService {
         file_name: fileName,
         total_records: leads.length,
         successful_imports: importResult.successful,
-        failed_imports: importResult.failed,
-        errors: importResult.errors.concat(validationResult.errors || [])
+        failed_imports: failedCount,
+        errors: importResult.errors.concat(validationResult.errors || []),
+        validation_errors: validationResult.errors,
+        validation_warnings: validationResult.warnings,
+        mode: options.mode || 'apply',
+        config_version: validationResult.config?.version || null,
+        duplicate_policy: options.duplicate_policy || null,
+        stats: validationResult.stats,
+        timings
+      });
+
+      await importTelemetryService.recordImport({
+        companyId,
+        userId,
+        fileName,
+        stats: validationResult.stats,
+        warningCount: validationResult.warnings?.length || 0,
+        errorCount: failedCount,
+        duplicatePolicy: options.duplicate_policy || null,
+        configVersion: validationResult.config?.version || null,
+        durationMs: timings.parse_ms + timings.validation_ms + timings.insert_ms,
+        metadata: {
+          inserted_count: importResult.successful,
+          failed_count: failedCount,
+          attempted_count: leads.length
+        }
       });
 
       // Return data with frontend-compatible field names
       return {
         total_records: leads.length,
         successful_imports: importResult.successful,
-        failed_imports: importResult.failed,
+        failed_imports: failedCount,
         errors: importResult.errors,
-        validation_errors: validationResult.errors || []
+        validation_errors: validationResult.errors || [],
+        validation_warnings: validationResult.warnings || [],
+        stats: validationResult.stats,
+        timings,
+        config_version: validationResult.config?.version || null,
+        config: validationResult.config
       };
     } catch (error) {
       if (error instanceof ApiError) throw error;
@@ -72,118 +264,74 @@ class ImportService {
     }
   }
 
+  async dryRunLeads(fileBuffer, fileName, userId, options = {}) {
+    return this.importLeads(fileBuffer, fileName, userId, {
+      ...options,
+      mode: 'dry_run'
+    });
+  }
+
   /**
    * Validate leads data
    */
-  async validateLeads(leads, companyId = null) {
+  async validateLeads(leads, companyId = null, options = {}) {
+    const config = await importConfigService.getCompanyConfig(companyId);
+    const engine = new ImportValidationEngine(config);
+    const duplicateLookup = await this.buildDuplicateContext(leads, companyId);
+
+    const context = {
+      duplicates: {
+        inFile: {
+          emails: new Set(),
+          phones: new Set()
+        },
+        inDb: duplicateLookup
+      }
+    };
+
+    const rowResults = engine.validateRows(leads, context);
+
     const validatedLeads = [];
     const errors = [];
-    const seenEmails = new Set();
+    const warnings = [];
 
-    for (let i = 0; i < leads.length; i++) {
-      const lead = leads[i];
-      const rowErrors = [];
-
-      // Required field validation - first_name and last_name are required
-      if (!lead.first_name || lead.first_name.trim() === '') {
-        rowErrors.push('First name is required');
-      }
-
-      if (!lead.last_name || lead.last_name.trim() === '') {
-        rowErrors.push('Last name is required');
-      }
-
-      // Email format validation (if provided)
-      if (lead.email && !this.isValidEmail(lead.email)) {
-        rowErrors.push('Invalid email format');
-      }
-
-      // Phone validation (if provided)
-      if (lead.phone && !this.isValidPhone(lead.phone)) {
-        rowErrors.push('Invalid phone format');
-      }
-
-      // Check for duplicate email (if provided)
-      let normalizedEmail = null;
-      if (lead.email) {
-        normalizedEmail = lead.email.trim().toLowerCase();
-
-        if (seenEmails.has(normalizedEmail)) {
-          rowErrors.push('Duplicate email found in import file');
-        } else {
-          seenEmails.add(normalizedEmail);
-        }
-
-        if (companyId && !rowErrors.includes('Duplicate email found in import file')) {
-          const { data: existingLead, error } = await supabaseAdmin
-            .from('leads')
-            .select('id')
-            .eq('company_id', companyId)
-            .eq('email', normalizedEmail)
-            .maybeSingle();
-
-          if (error) {
-            console.error('Failed to validate lead email uniqueness:', error);
-            rowErrors.push('Could not validate email uniqueness. Please try again.');
-          } else if (existingLead) {
-            rowErrors.push('Email already exists');
-          }
-        }
-      }
-
-      // Validate status if provided
-      if (lead.status && !['new', 'contacted', 'qualified', 'converted', 'lost'].includes(lead.status.toLowerCase())) {
-        rowErrors.push('Invalid status. Must be one of: new, contacted, qualified, converted, lost');
-      }
-
-      // Validate lead_source if provided
-      if (lead.lead_source && !['website', 'referral', 'cold_call', 'social_media', 'advertisement', 'other'].includes(lead.lead_source.toLowerCase())) {
-        rowErrors.push('Invalid lead source. Must be one of: website, referral, cold_call, social_media, advertisement, other');
-      }
-
-      // Validate priority if provided
-      if (lead.priority && !['low', 'medium', 'high', 'urgent'].includes(lead.priority.toLowerCase())) {
-        rowErrors.push('Invalid priority. Must be one of: low, medium, high, urgent');
-      }
-
-      // Validate deal_value if provided
-      if (lead.deal_value && (isNaN(parseFloat(lead.deal_value)) || parseFloat(lead.deal_value) < 0)) {
-        rowErrors.push('Deal value must be a positive number');
-      }
-
-      // Validate probability if provided
-      if (lead.probability && (isNaN(parseInt(lead.probability)) || parseInt(lead.probability) < 0 || parseInt(lead.probability) > 100)) {
-        rowErrors.push('Probability must be between 0 and 100');
-      }
-
-      if (rowErrors.length === 0) {
+    rowResults.forEach(result => {
+      if (result.isValid) {
+        const now = new Date();
         validatedLeads.push({
-          first_name: lead.first_name.trim(),
-          last_name: lead.last_name.trim(),
-          email: normalizedEmail,
-          phone: lead.phone ? lead.phone.trim() : null,
-          company: lead.company ? lead.company.trim() : null,
-          job_title: lead.job_title ? lead.job_title.trim() : null,
-          lead_source: lead.lead_source ? lead.lead_source.trim().toLowerCase() : 'import',
-          status: lead.status ? lead.status.trim().toLowerCase() : 'new',
-          notes: lead.notes ? lead.notes.trim() : null,
-          deal_value: lead.deal_value ? parseFloat(lead.deal_value) : null,
-          probability: lead.probability ? parseInt(lead.probability) : 0,
-          expected_close_date: lead.expected_close_date ? new Date(lead.expected_close_date) : null,
-          priority: lead.priority ? lead.priority.trim().toLowerCase() : 'medium',
-          created_at: new Date(),
-          updated_at: new Date()
+          ...result.normalized,
+          created_at: now,
+          updated_at: now
         });
       } else {
         errors.push({
-          row: i + 1,
-          data: lead,
-          errors: rowErrors
+          row: result.rowNumber,
+          data: result.raw,
+          errors: result.errors
         });
       }
-    }
 
-    return { validatedLeads, errors };
+      if (result.warnings.length > 0) {
+        warnings.push({
+          row: result.rowNumber,
+          data: result.raw,
+          warnings: result.warnings
+        });
+      }
+    });
+
+    return {
+      config,
+      rows: rowResults,
+      validatedLeads,
+      errors,
+      warnings,
+      stats: {
+        total: leads.length,
+        valid: validatedLeads.length,
+        invalid: errors.length
+      }
+    };
   }
 
   /**
@@ -579,6 +727,22 @@ class ImportService {
           successful_records: importData.successful_imports,
           failed_records: importData.failed_imports,
           error_details: importData.errors && importData.errors.length > 0 ? importData.errors : null,
+          validation_errors: importData.validation_errors && importData.validation_errors.length > 0 ? importData.validation_errors : null,
+          validation_warnings: importData.validation_warnings && importData.validation_warnings.length > 0 ? importData.validation_warnings : null,
+          mode: importData.mode || 'apply',
+          duplicate_policy: importData.duplicate_policy || null,
+          config_version: importData.config_version || null,
+          summary: importData.stats
+            ? {
+                stats: importData.stats,
+                warnings: importData.validation_warnings ? importData.validation_warnings.length : 0,
+                errors: importData.validation_errors ? importData.validation_errors.length : 0,
+                timings: importData.timings || null
+              }
+            : importData.timings
+              ? { timings: importData.timings }
+              : null,
+          error_report_url: importData.error_report_url || null,
           status: importData.successful_imports > 0 ? 'completed' : 'failed',
           created_at: new Date().toISOString()
         });

@@ -158,7 +158,9 @@ npm install
 
 1. **Create Supabase Project**: Go to [supabase.com](https://supabase.com) and create a new project
 2. **Get Credentials**: Copy your Project URL and anon/service keys from Settings > API
-3. **Schema Setup**: Run the SQL schema from `SUPABASE_SETUP.md` in the SQL editor
+3. **Schema Setup**: Run the SQL schema from `SUPABASE_SETUP.md` in the SQL editor, then apply incremental importer migrations:
+   - `migrations/20251014_lead_import_config_tables.sql`
+   - `migrations/20251014_import_telemetry.sql`
 4. **Authentication**: Enable Row Level Security (RLS) and configure auth policies
 
 ### 3. Environment Configuration
@@ -173,6 +175,10 @@ JWT_EXPIRES_IN=24h
 PORT=5000
 NODE_ENV=development
 FRONTEND_URL=http://localhost:3000
+# Optional structured log forwarding (Logflare / Datadog / etc.)
+# LOG_AGGREGATOR_URL=https://logflare.app/api/logs?source=...
+# LOG_AGGREGATOR_TOKEN=your_api_token
+# LOG_AGGREGATOR_TIMEOUT_MS=1000
 ```
 
 **Frontend** (`frontend/.env`):

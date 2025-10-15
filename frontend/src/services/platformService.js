@@ -140,6 +140,19 @@ const platformService = {
   },
 
   /**
+   * Get lead import telemetry summary
+   */
+  async getImportTelemetry(range, limit) {
+    const params = {};
+    if (range) params.range = range;
+    if (limit) params.limit = limit;
+
+    const config = Object.keys(params).length > 0 ? { params } : undefined;
+    const response = await api.get('/platform/imports/telemetry', config);
+    return response.data;
+  },
+
+  /**
    * Start impersonating a user
    */
   async startImpersonation(userId) {

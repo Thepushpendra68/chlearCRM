@@ -69,6 +69,7 @@ router.get('/audit-logs', platformController.getAuditLogs);
  * @access  Super Admin
  */
 router.get('/activity', platformController.getRecentActivity);
+router.get('/imports/telemetry', platformController.getImportTelemetry);
 
 /**
  * @route   POST /api/platform/users
