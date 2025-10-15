@@ -1,4 +1,14 @@
 const { body } = require('express-validator');
+const { getLeadPicklists } = require('../services/picklistService');
+
+const ensureLeadPicklists = async (req) => {
+  if (!req.leadPicklists) {
+    const companyId = req.user?.company_id || null;
+    req.leadPicklists = await getLeadPicklists(companyId, { includeInactive: false });
+  }
+
+  return req.leadPicklists;
+};
 
 /**
  * Validation rules for lead creation and updates
@@ -61,13 +71,33 @@ const validateLead = [
 
   body('lead_source')
     .optional()
-    .isIn(['website', 'referral', 'cold_call', 'social_media', 'advertisement', 'other'])
-    .withMessage('Invalid lead source'),
+    .custom(async (value, { req }) => {
+      if (!value) return true;
+
+      const { sources } = await ensureLeadPicklists(req);
+      const allowed = sources.map(option => option.value);
+
+      if (!allowed.includes(value)) {
+        throw new Error('Invalid lead source');
+      }
+
+      return true;
+    }),
 
   body('status')
     .optional()
-    .isIn(['new', 'contacted', 'qualified', 'converted', 'lost'])
-    .withMessage('Invalid lead status'),
+    .custom(async (value, { req }) => {
+      if (!value) return true;
+
+      const { statuses } = await ensureLeadPicklists(req);
+      const allowed = statuses.map(option => option.value);
+
+      if (!allowed.includes(value)) {
+        throw new Error('Invalid lead status');
+      }
+
+      return true;
+    }),
 
   body('assigned_to')
     .optional()
@@ -130,13 +160,33 @@ const validateLeadSearch = [
 
   body('status')
     .optional()
-    .isIn(['new', 'contacted', 'qualified', 'converted', 'lost'])
-    .withMessage('Invalid status filter'),
+    .custom(async (value, { req }) => {
+      if (!value) return true;
+
+      const { statuses } = await ensureLeadPicklists(req);
+      const allowed = statuses.map(option => option.value);
+
+      if (!allowed.includes(value)) {
+        throw new Error('Invalid status filter');
+      }
+
+      return true;
+    }),
 
   body('source')
     .optional()
-    .isIn(['website', 'referral', 'cold_call', 'social_media', 'advertisement', 'other'])
-    .withMessage('Invalid source filter'),
+    .custom(async (value, { req }) => {
+      if (!value) return true;
+
+      const { sources } = await ensureLeadPicklists(req);
+      const allowed = sources.map(option => option.value);
+
+      if (!allowed.includes(value)) {
+        throw new Error('Invalid source filter');
+      }
+
+      return true;
+    }),
 
   body('assigned_to')
     .optional()

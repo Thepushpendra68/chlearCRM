@@ -7,6 +7,7 @@ import ActivityForm from '../components/Activities/ActivityForm'
 import TaskForm from '../components/Tasks/TaskForm'
 import taskService from '../services/taskService'
 import toast from 'react-hot-toast'
+import { usePicklists } from '../context/PicklistContext'
 
 const LeadDetail = () => {
   const { id } = useParams()
@@ -17,6 +18,25 @@ const LeadDetail = () => {
   const [showActivityForm, setShowActivityForm] = useState(false)
   const [showTaskForm, setShowTaskForm] = useState(false)
   const [activityType, setActivityType] = useState('note')
+  const { leadSources, leadStatuses } = usePicklists()
+
+  const formatPicklistValue = (value, fallback = 'Unknown') => {
+    if (!value) return fallback
+    return value.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())
+  }
+
+  const getStatusOption = (status) => leadStatuses.find(option => option.value === status)
+  const getSourceOption = (source) => leadSources.find(option => option.value === source)
+
+  const getStatusLabel = (status) => {
+    const option = getStatusOption(status)
+    return option?.label || formatPicklistValue(status)
+  }
+
+  const getSourceLabel = (source) => {
+    const option = getSourceOption(source)
+    return option?.label || formatPicklistValue(source)
+  }
 
   useEffect(() => {
     fetchLead()
@@ -37,6 +57,16 @@ const LeadDetail = () => {
   }
 
   const getStatusColor = (status) => {
+    const option = getStatusOption(status)
+
+    if (option?.metadata?.is_won) {
+      return 'bg-emerald-100 text-emerald-800'
+    }
+
+    if (option?.metadata?.is_lost) {
+      return 'bg-red-100 text-red-800'
+    }
+
     switch (status) {
       case 'new':
         return 'bg-green-100 text-green-800'
@@ -44,26 +74,46 @@ const LeadDetail = () => {
         return 'bg-blue-100 text-blue-800'
       case 'qualified':
         return 'bg-yellow-100 text-yellow-800'
-      case 'converted':
+      case 'proposal':
+        return 'bg-amber-100 text-amber-800'
+      case 'negotiation':
         return 'bg-purple-100 text-purple-800'
-      case 'lost':
-        return 'bg-red-100 text-red-800'
+      case 'nurture':
+        return 'bg-slate-100 text-slate-800'
       default:
         return 'bg-gray-100 text-gray-800'
     }
   }
 
   const getSourceColor = (source) => {
+    const option = getSourceOption(source)
+
     switch (source) {
       case 'website':
         return 'bg-primary-100 text-primary-800'
       case 'referral':
         return 'bg-green-100 text-green-800'
-      case 'social_media':
-        return 'bg-pink-100 text-pink-800'
+      case 'outbound_call':
       case 'cold_call':
         return 'bg-orange-100 text-orange-800'
+      case 'social_media':
+        return 'bg-pink-100 text-pink-800'
+      case 'social_paid':
+        return 'bg-violet-100 text-violet-800'
+      case 'event':
+        return 'bg-amber-100 text-amber-800'
+      case 'partner':
+        return 'bg-indigo-100 text-indigo-800'
+      case 'email':
+        return 'bg-blue-100 text-blue-800'
+      case 'advertisement':
+        return 'bg-rose-100 text-rose-800'
+      case 'import':
+        return 'bg-slate-100 text-slate-800'
       default:
+        if (option?.metadata?.is_system) {
+          return 'bg-slate-100 text-slate-800'
+        }
         return 'bg-gray-100 text-gray-800'
     }
   }
@@ -174,7 +224,7 @@ const LeadDetail = () => {
                     </h1>
                     <div className="flex items-center space-x-2">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(lead.status)}`}>
-                        {lead.status?.charAt(0).toUpperCase() + lead.status?.slice(1)}
+                        {getStatusLabel(lead.status)}
                       </span>
                       {lead.company && (
                         <span className="text-xs text-gray-500">• {lead.company}</span>
@@ -277,13 +327,13 @@ const LeadDetail = () => {
                   <div>
                     <p className="text-sm font-medium text-gray-500 mb-1">Lead Source</p>
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getSourceColor(lead.lead_source)}`}>
-                      {lead.lead_source?.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Unknown'}
+                      {getSourceLabel(lead.lead_source)}
                     </span>
                   </div>
                   <div>
                     <p className="text-sm font-medium text-gray-500 mb-1">Status</p>
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(lead.status)}`}>
-                      {lead.status?.charAt(0).toUpperCase() + lead.status?.slice(1)}
+                      {getStatusLabel(lead.status)}
                     </span>
                   </div>
                   <div>

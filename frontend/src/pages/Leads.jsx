@@ -8,6 +8,7 @@ import { useLeads } from '../context/LeadContext'
 import pipelineService from '../services/pipelineService'
 import leadService from '../services/leadService'
 import toast from 'react-hot-toast'
+import { usePicklists } from '../context/PicklistContext'
 
 const Leads = () => {
   const navigate = useNavigate()
@@ -21,6 +22,25 @@ const Leads = () => {
   const [showBulkActions, setShowBulkActions] = useState(false)
   const [pipelineStages, setPipelineStages] = useState([])
   const [isPageChanging, setIsPageChanging] = useState(false)
+  const { leadSources, leadStatuses } = usePicklists()
+
+  const formatPicklistValue = (value, fallback = 'Unknown') => {
+    if (!value) return fallback
+    return value.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())
+  }
+
+  const getStatusOption = (status) => leadStatuses.find(option => option.value === status)
+  const getSourceOption = (source) => leadSources.find(option => option.value === source)
+
+  const getStatusLabel = (status) => {
+    const option = getStatusOption(status)
+    return option?.label || formatPicklistValue(status)
+  }
+
+  const getSourceLabel = (source) => {
+    const option = getSourceOption(source)
+    return option?.label || formatPicklistValue(source)
+  }
  
   // Use the global leads context
   const { leads, loading, pagination, fetchLeads, deleteLead, lastUpdated, refreshLeads } = useLeads()
@@ -77,6 +97,16 @@ const Leads = () => {
   }, [lastUpdated])
 
   const getStatusColor = (status) => {
+    const option = getStatusOption(status)
+
+    if (option?.metadata?.is_won) {
+      return 'bg-emerald-100 text-emerald-800'
+    }
+
+    if (option?.metadata?.is_lost) {
+      return 'bg-red-100 text-red-800'
+    }
+
     switch (status) {
       case 'new':
         return 'bg-green-100 text-green-800'
@@ -84,26 +114,75 @@ const Leads = () => {
         return 'bg-blue-100 text-blue-800'
       case 'qualified':
         return 'bg-yellow-100 text-yellow-800'
-      case 'converted':
+      case 'proposal':
+        return 'bg-amber-100 text-amber-800'
+      case 'negotiation':
         return 'bg-purple-100 text-purple-800'
-      case 'lost':
-        return 'bg-red-100 text-red-800'
+      case 'nurture':
+        return 'bg-slate-100 text-slate-800'
       default:
         return 'bg-gray-100 text-gray-800'
     }
   }
 
+  const getStatusIndicatorColor = (status) => {
+    const option = getStatusOption(status)
+
+    if (option?.metadata?.is_won) {
+      return 'bg-emerald-500'
+    }
+
+    if (option?.metadata?.is_lost) {
+      return 'bg-red-500'
+    }
+
+    switch (status) {
+      case 'new':
+        return 'bg-green-400'
+      case 'contacted':
+        return 'bg-blue-400'
+      case 'qualified':
+        return 'bg-yellow-400'
+      case 'proposal':
+        return 'bg-amber-400'
+      case 'negotiation':
+        return 'bg-purple-400'
+      case 'nurture':
+        return 'bg-slate-400'
+      default:
+        return 'bg-gray-400'
+    }
+  }
+
   const getSourceColor = (source) => {
+    const option = getSourceOption(source)
+
     switch (source) {
       case 'website':
         return 'bg-primary-100 text-primary-800'
       case 'referral':
         return 'bg-green-100 text-green-800'
-      case 'social_media':
-        return 'bg-pink-100 text-pink-800'
+      case 'outbound_call':
       case 'cold_call':
         return 'bg-orange-100 text-orange-800'
+      case 'social_media':
+        return 'bg-pink-100 text-pink-800'
+      case 'social_paid':
+        return 'bg-violet-100 text-violet-800'
+      case 'event':
+        return 'bg-amber-100 text-amber-800'
+      case 'partner':
+        return 'bg-indigo-100 text-indigo-800'
+      case 'email':
+        return 'bg-blue-100 text-blue-800'
+      case 'advertisement':
+        return 'bg-rose-100 text-rose-800'
+      case 'import':
+        return 'bg-slate-100 text-slate-800'
       default:
+        if (option?.metadata?.is_system) {
+          return 'bg-slate-100 text-slate-800'
+        }
         return 'bg-gray-100 text-gray-800'
     }
   }
@@ -392,19 +471,20 @@ const Leads = () => {
             </div>
             <div className="flex flex-wrap gap-3">
               <select className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200">
-                <option>All Status</option>
-                <option>New</option>
-                <option>Contacted</option>
-                <option>Qualified</option>
-                <option>Converted</option>
-                <option>Lost</option>
+                <option>All Statuses</option>
+                {leadStatuses.map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label || formatPicklistValue(option.value)}
+                  </option>
+                ))}
               </select>
               <select className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200">
                 <option>All Sources</option>
-                <option>Website</option>
-                <option>Referral</option>
-                <option>Cold Call</option>
-                <option>Social Media</option>
+                {leadSources.map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label || formatPicklistValue(option.value)}
+                  </option>
+                ))}
               </select>
               <select className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200">
                 <option>All Stages</option>
@@ -516,19 +596,13 @@ const Leads = () => {
                       </td>
                       <td className="px-6 py-5 whitespace-nowrap cursor-pointer" onClick={() => navigate(`/app/leads/${lead.id}`)}>
                         <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(lead.status)} shadow-sm`}>
-                          <div className={`w-2 h-2 rounded-full mr-2 ${
-                            lead.status === 'new' ? 'bg-green-400' :
-                            lead.status === 'contacted' ? 'bg-blue-400' :
-                            lead.status === 'qualified' ? 'bg-yellow-400' :
-                            lead.status === 'converted' ? 'bg-purple-400' :
-                            'bg-red-400'
-                          }`}></div>
-                          {lead.status.charAt(0).toUpperCase() + lead.status.slice(1)}
+                          <div className={`w-2 h-2 rounded-full mr-2 ${getStatusIndicatorColor(lead.status)}`}></div>
+                          {getStatusLabel(lead.status)}
                         </span>
                       </td>
                       <td className="px-6 py-5 whitespace-nowrap cursor-pointer" onClick={() => navigate(`/app/leads/${lead.id}`)}>
                         <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${getSourceColor(lead.lead_source)} shadow-sm`}>
-                          {lead.lead_source?.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) || '-'}
+                          {getSourceLabel(lead.lead_source)}
                         </span>
                       </td>
                       <td className="px-6 py-5 whitespace-nowrap cursor-pointer" onClick={() => navigate(`/app/leads/${lead.id}`)}>

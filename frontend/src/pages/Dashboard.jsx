@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { ChartBarIcon, UsersIcon, UserGroupIcon, CurrencyDollarIcon } from '@heroicons/react/24/outline';
 import dashboardService from '../services/dashboardService';
 import toast from 'react-hot-toast';
+import { usePicklists } from '../context/PicklistContext';
 
 const Dashboard = () => {
   const [stats, setStats] = useState({
@@ -15,8 +16,101 @@ const Dashboard = () => {
     conversion_rate_change: '+0%'
   });
   const [recentLeads, setRecentLeads] = useState([]);
-  const [leadSources, setLeadSources] = useState([]);
+  const [leadSourceStats, setLeadSourceStats] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { leadStatuses, leadSources: picklistSources } = usePicklists();
+
+  const formatValue = useCallback((value, fallback = '-') => {
+    if (!value) return fallback;
+    return value.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+  }, []);
+
+  const wonStatusTitle = useMemo(() => {
+    const wonStatuses = leadStatuses.filter(option => option.metadata?.is_won);
+    if (wonStatuses.length === 1) {
+      return `${wonStatuses[0].label} Leads`;
+    }
+    if (wonStatuses.length > 1) {
+      return 'Won Leads';
+    }
+    return 'Won Leads';
+  }, [leadStatuses]);
+
+  const getStatusOption = useCallback(
+    (status) => leadStatuses.find(option => option.value === status),
+    [leadStatuses]
+  );
+
+  const getStatusLabel = useCallback(
+    (status) => getStatusOption(status)?.label || formatValue(status, 'Unknown'),
+    [getStatusOption, formatValue]
+  );
+
+  const getStatusBadge = useCallback((status) => {
+    const option = getStatusOption(status);
+
+    if (option?.metadata?.is_won) {
+      return 'bg-emerald-100 text-emerald-800';
+    }
+
+    if (option?.metadata?.is_lost) {
+      return 'bg-red-100 text-red-800';
+    }
+
+    switch (status) {
+      case 'new':
+        return 'bg-green-100 text-green-800';
+      case 'contacted':
+        return 'bg-blue-100 text-blue-800';
+      case 'qualified':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'proposal':
+        return 'bg-amber-100 text-amber-800';
+      case 'negotiation':
+        return 'bg-purple-100 text-purple-800';
+      case 'nurture':
+        return 'bg-slate-100 text-slate-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  }, [getStatusOption]);
+
+  const getStatusIndicator = useCallback((status) => {
+    const option = getStatusOption(status);
+
+    if (option?.metadata?.is_won) {
+      return 'bg-emerald-500';
+    }
+
+    if (option?.metadata?.is_lost) {
+      return 'bg-red-500';
+    }
+
+    switch (status) {
+      case 'new':
+        return 'bg-green-400';
+      case 'contacted':
+        return 'bg-blue-400';
+      case 'qualified':
+        return 'bg-yellow-400';
+      case 'proposal':
+        return 'bg-amber-400';
+      case 'negotiation':
+        return 'bg-purple-400';
+      case 'nurture':
+        return 'bg-slate-400';
+      default:
+        return 'bg-gray-400';
+    }
+  }, [getStatusOption]);
+
+  const getSourceLabel = useCallback(
+    (source) => {
+      const option = picklistSources.find(item => item.value === source);
+      return option?.label || formatValue(source, 'Unknown');
+    },
+    [picklistSources, formatValue]
+  );
 
   // Memoize stats data to prevent unnecessary recalculations
   const statsData = useMemo(() => [
@@ -35,7 +129,7 @@ const Dashboard = () => {
       changeType: stats.new_leads_change?.startsWith('+') ? 'increase' : 'decrease'
     },
     {
-      name: 'Converted',
+      name: wonStatusTitle,
       value: stats.converted_leads.toLocaleString(),
       icon: CurrencyDollarIcon,
       change: stats.converted_leads_change || '+0%',
@@ -48,7 +142,7 @@ const Dashboard = () => {
       change: stats.conversion_rate_change || '+0%',
       changeType: stats.conversion_rate_change?.startsWith('+') ? 'increase' : 'decrease'
     },
-  ], [stats]);
+  ], [stats, wonStatusTitle]);
 
   // Memoize the data loading function to prevent recreation on every render
   const loadDashboardData = useCallback(async () => {
@@ -94,7 +188,7 @@ const Dashboard = () => {
 
       setStats(finalStats);
       setRecentLeads(recentLeadsResult.data || []);
-      setLeadSources(sourcesResult.data || []);
+      setLeadSourceStats(sourcesResult.data || []);
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
       toast.error('Failed to load dashboard data');
@@ -245,9 +339,9 @@ const Dashboard = () => {
                   </div>
                 ))}
               </div>
-            ) : leadSources.length > 0 ? (
+            ) : leadSourceStats.length > 0 ? (
               <div className="space-y-4">
-                {leadSources.map((source, index) => {
+                {leadSourceStats.map((source, index) => {
                   const colors = ['bg-primary-500', 'bg-green-500', 'bg-yellow-500', 'bg-red-500', 'bg-purple-500', 'bg-blue-500'];
                   const color = colors[index % colors.length];
                   
@@ -256,7 +350,7 @@ const Dashboard = () => {
                       <div className="flex items-center">
                         <div className={`h-3 w-3 rounded-full ${color} mr-3`}></div>
                         <span className="text-sm text-gray-900 capitalize">
-                          {source.source?.replace('_', ' ')}
+                          {getSourceLabel(source.source)}
                         </span>
                       </div>
                       <span className="text-sm font-medium text-gray-900">
@@ -279,3 +373,7 @@ const Dashboard = () => {
 }
 
 export default Dashboard
+
+
+
+

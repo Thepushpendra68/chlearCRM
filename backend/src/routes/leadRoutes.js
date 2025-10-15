@@ -1,6 +1,7 @@
 const express = require('express');
 const { authenticate } = require('../middleware/authMiddleware');
 const { validateLead } = require('../validators/leadValidators');
+const { loadLeadPicklists } = require('../middleware/picklistMiddleware');
 const {
   getLeads,
   getLeadById,
@@ -43,14 +44,14 @@ router.get('/:id', getLeadById);
  * @desc    Create new lead
  * @access  Private
  */
-router.post('/', validateLead, createLead);
+router.post('/', loadLeadPicklists, validateLead, createLead);
 
 /**
  * @route   PUT /api/leads/:id
  * @desc    Update lead
  * @access  Private
  */
-router.put('/:id', validateLead, updateLead);
+router.put('/:id', loadLeadPicklists, validateLead, updateLead);
 
 /**
  * @route   DELETE /api/leads/:id

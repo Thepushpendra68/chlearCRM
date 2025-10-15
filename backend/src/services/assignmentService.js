@@ -1,5 +1,6 @@
 const { supabaseAdmin } = require('../config/supabase');
 const AssignmentRules = require('../utils/assignmentRules');
+const picklistService = require('./picklistService');
 
 class AssignmentService {
   // Get all assignment rules
@@ -457,6 +458,29 @@ class AssignmentService {
         return { success: false, error: countsError.message };
       }
 
+      let wonStatuses = new Set(['converted', 'won']);
+      let lostStatuses = new Set(['lost']);
+
+      try {
+        const picklists = await picklistService.getLeadPicklists(currentUser.company_id, { includeInactive: false });
+        const resolvedWon = picklists.statuses
+          .filter(option => option.metadata?.is_won || ['converted', 'won', 'closed_won'].includes(option.value))
+          .map(option => option.value);
+        const resolvedLost = picklists.statuses
+          .filter(option => option.metadata?.is_lost || ['lost', 'closed_lost'].includes(option.value))
+          .map(option => option.value);
+
+        if (resolvedWon.length > 0) {
+          wonStatuses = new Set(resolvedWon);
+        }
+
+        if (resolvedLost.length > 0) {
+          lostStatuses = new Set(resolvedLost);
+        }
+      } catch (error) {
+        console.warn('Failed to resolve picklist metadata for assignment workload calculations', error);
+      }
+
       // Calculate workload for each user
       const workload = users.map(user => {
         const userLeads = leadCounts.filter(lead => lead.assigned_to === user.id);
@@ -470,8 +494,8 @@ class AssignmentService {
         const lastName = user.last_name || '';
         const displayName = `${firstName} ${lastName}`.trim() || user.email || 'Unnamed User';
         const activeLeads = userLeads.filter(lead => lead.status === 'active').length;
-        const wonLeads = userLeads.filter(lead => lead.status === 'converted').length;
-        const lostLeads = userLeads.filter(lead => lead.status === 'lost').length;
+        const wonLeads = userLeads.filter(lead => wonStatuses.has(lead.status)).length;
+        const lostLeads = userLeads.filter(lead => lostStatuses.has(lead.status)).length;
 
         return {
           user_id: user.id,
@@ -591,3 +615,4 @@ class AssignmentService {
 }
 
 module.exports = new AssignmentService();
+

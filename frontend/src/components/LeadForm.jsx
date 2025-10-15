@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import Modal from './Modal';
 import leadService from '../services/leadService';
 import userService from '../services/userService';
 import pipelineService from '../services/pipelineService';
 import { useLeads } from '../context/LeadContext';
+import { usePicklists } from '../context/PicklistContext';
 import toast from 'react-hot-toast';
 
 const LeadForm = ({ lead = null, onClose, onSuccess, initialStageId = null, onSubmit, onCancel }) => {
@@ -16,6 +17,8 @@ const LeadForm = ({ lead = null, onClose, onSuccess, initialStageId = null, onSu
   
   // Use the global leads context
   const { addLead, updateLead } = useLeads();
+  const { leadSourcesDisplay, leadStatusesDisplay, loading: picklistsLoading } = usePicklists();
+  const picklistDefaultsInitialized = useRef(false);
 
   // Enhanced form configuration with strict validation
   const {
@@ -49,6 +52,75 @@ const LeadForm = ({ lead = null, onClose, onSuccess, initialStageId = null, onSu
   // Watch email and phone for CRM validation
   const emailValue = watch('email');
   const phoneValue = watch('phone');
+  const leadSourceValue = watch('lead_source');
+  const leadStatusValue = watch('status');
+
+  const formatPicklistLabel = (value) => {
+    if (!value) return '';
+    return value
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (char) => char.toUpperCase());
+  };
+
+  const normalizedLeadSources = useMemo(() => {
+    if (lead?.lead_source && !leadSourcesDisplay.some(option => option.value === lead.lead_source)) {
+      return [
+        ...leadSourcesDisplay,
+        {
+          value: lead.lead_source,
+          label: `${formatPicklistLabel(lead.lead_source)} (Archived)`,
+          metadata: { isArchived: true },
+          sort_order: Number.MAX_SAFE_INTEGER
+        }
+      ];
+    }
+    return leadSourcesDisplay;
+  }, [leadSourcesDisplay, lead]);
+
+  const normalizedLeadStatuses = useMemo(() => {
+    if (lead?.status && !leadStatusesDisplay.some(option => option.value === lead.status)) {
+      return [
+        ...leadStatusesDisplay,
+        {
+          value: lead.status,
+          label: `${formatPicklistLabel(lead.status)} (Archived)`,
+          metadata: { isArchived: true },
+          sort_order: Number.MAX_SAFE_INTEGER
+        }
+      ];
+    }
+    return leadStatusesDisplay;
+  }, [leadStatusesDisplay, lead]);
+
+  useEffect(() => {
+    if (lead || picklistDefaultsInitialized.current) {
+      return;
+    }
+
+    if (leadSourcesDisplay.length === 0 || leadStatusesDisplay.length === 0) {
+      return;
+    }
+
+    const sourceValues = leadSourcesDisplay.map(option => option.value);
+    const statusValues = leadStatusesDisplay.map(option => option.value);
+
+    if (!leadSourceValue || !sourceValues.includes(leadSourceValue)) {
+      setValue('lead_source', leadSourcesDisplay[0].value);
+    }
+
+    if (!leadStatusValue || !statusValues.includes(leadStatusValue)) {
+      setValue('status', leadStatusesDisplay[0].value);
+    }
+
+    picklistDefaultsInitialized.current = true;
+  }, [
+    lead,
+    leadSourceValue,
+    leadStatusValue,
+    leadSourcesDisplay,
+    leadStatusesDisplay,
+    setValue
+  ]);
 
   // Load users and stages for dropdowns
   useEffect(() => {
@@ -79,14 +151,17 @@ const LeadForm = ({ lead = null, onClose, onSuccess, initialStageId = null, onSu
   // Populate form when editing
   useEffect(() => {
     if (lead) {
+      const fallbackSource = leadSourcesDisplay[0]?.value || 'website';
+      const fallbackStatus = leadStatusesDisplay[0]?.value || 'new';
+
       setValue('first_name', lead.first_name || '');
       setValue('last_name', lead.last_name || '');
       setValue('email', lead.email || '');
       setValue('phone', lead.phone || '');
       setValue('company', lead.company || '');
       setValue('job_title', lead.job_title || '');
-      setValue('lead_source', lead.lead_source || 'website');
-      setValue('status', lead.status || 'new');
+      setValue('lead_source', lead.lead_source || fallbackSource);
+      setValue('status', lead.status || fallbackStatus);
       setValue('assigned_to', lead.assigned_to || '');
       setValue('notes', lead.notes || '');
       setValue('pipeline_stage_id', lead.pipeline_stage_id || '');
@@ -97,7 +172,7 @@ const LeadForm = ({ lead = null, onClose, onSuccess, initialStageId = null, onSu
     } else if (initialStageId) {
       setValue('pipeline_stage_id', initialStageId);
     }
-  }, [lead, initialStageId, setValue]);
+  }, [lead, initialStageId, setValue, leadSourcesDisplay, leadStatusesDisplay]);
 
   const handleFormSubmit = async (data) => {
     try {
@@ -407,14 +482,23 @@ const LeadForm = ({ lead = null, onClose, onSuccess, initialStageId = null, onSu
               <select
                 {...register('lead_source')}
                 className="input"
+                disabled={loadingUsers || picklistsLoading}
               >
-                <option value="website">Website</option>
-                <option value="referral">Referral</option>
-                <option value="cold_call">Cold Call</option>
-                <option value="social_media">Social Media</option>
-                <option value="advertisement">Advertisement</option>
-                <option value="other">Other</option>
+                {normalizedLeadSources.length === 0 ? (
+                  <option value="">No sources configured</option>
+                ) : (
+                  normalizedLeadSources.map(option => (
+                    <option key={option.value} value={option.value}>
+                      {option.label || formatPicklistLabel(option.value)}
+                    </option>
+                  ))
+                )}
               </select>
+              {normalizedLeadSources.length === 0 && (
+                <p className="text-sm text-amber-600 mt-1">
+                  No lead sources configured. Please contact your administrator.
+                </p>
+              )}
             </div>
 
             {/* Status */}
@@ -425,13 +509,23 @@ const LeadForm = ({ lead = null, onClose, onSuccess, initialStageId = null, onSu
               <select
                 {...register('status')}
                 className="input"
+                disabled={loadingUsers || picklistsLoading}
               >
-                <option value="new">New</option>
-                <option value="contacted">Contacted</option>
-                <option value="qualified">Qualified</option>
-                <option value="converted">Converted</option>
-                <option value="lost">Lost</option>
+                {normalizedLeadStatuses.length === 0 ? (
+                  <option value="">No statuses configured</option>
+                ) : (
+                  normalizedLeadStatuses.map(option => (
+                    <option key={option.value} value={option.value}>
+                      {option.label || formatPicklistLabel(option.value)}
+                    </option>
+                  ))
+                )}
               </select>
+              {normalizedLeadStatuses.length === 0 && (
+                <p className="text-sm text-amber-600 mt-1">
+                  No lead statuses configured. Please contact your administrator.
+                </p>
+              )}
             </div>
 
             {/* Pipeline Stage */}
@@ -591,7 +685,14 @@ const LeadForm = ({ lead = null, onClose, onSuccess, initialStageId = null, onSu
             <button
               type="submit"
               className="px-8 py-3 border border-transparent rounded-lg text-sm font-medium text-white bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-              disabled={loading || isSubmitting || loadingUsers || loadingStages || (!emailValue?.trim() && !phoneValue?.trim())}
+              disabled={
+                loading ||
+                isSubmitting ||
+                loadingUsers ||
+                loadingStages ||
+                picklistsLoading ||
+                (!emailValue?.trim() && !phoneValue?.trim())
+              }
               title={(!emailValue?.trim() && !phoneValue?.trim()) ? 'Please provide email or phone to create a lead' : ''}
             >
               {(loading || isSubmitting) ? (

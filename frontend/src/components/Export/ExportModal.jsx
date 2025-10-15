@@ -3,6 +3,7 @@ import importService from '../../services/importService';
 import userService from '../../services/userService';
 import leadService from '../../services/leadService';
 import pipelineService from '../../services/pipelineService';
+import { usePicklists } from '../../context/PicklistContext';
 
 const ExportModal = ({ isOpen, onClose }) => {
   const [filters, setFilters] = useState({
@@ -19,6 +20,12 @@ const ExportModal = ({ isOpen, onClose }) => {
   const [users, setUsers] = useState([]);
   const [leads, setLeads] = useState([]);
   const [pipelineStages, setPipelineStages] = useState([]);
+  const { leadSources, leadStatuses, loading: picklistsLoading } = usePicklists();
+
+  const formatPicklistLabel = (value) => {
+    if (!value) return '';
+    return value.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+  };
 
   React.useEffect(() => {
     if (isOpen) {
@@ -169,14 +176,20 @@ const ExportModal = ({ isOpen, onClose }) => {
                 value={filters.status}
                 onChange={(e) => handleFilterChange('status', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={picklistsLoading}
               >
-                <option value="">All Status</option>
-                <option value="new">New</option>
-                <option value="contacted">Contacted</option>
-                <option value="qualified">Qualified</option>
-                <option value="converted">Converted</option>
-                <option value="lost">Lost</option>
+                <option value="">All Statuses</option>
+                {leadStatuses.map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label || formatPicklistLabel(option.value)}
+                  </option>
+                ))}
               </select>
+              {leadStatuses.length === 0 && !picklistsLoading && (
+                <p className="text-xs text-amber-600 mt-1">
+                  No statuses available. Please configure lead statuses in settings.
+                </p>
+              )}
             </div>
 
             {/* Source */}
@@ -188,15 +201,20 @@ const ExportModal = ({ isOpen, onClose }) => {
                 value={filters.lead_source}
                 onChange={(e) => handleFilterChange('lead_source', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={picklistsLoading}
               >
                 <option value="">All Sources</option>
-                <option value="website">Website</option>
-                <option value="referral">Referral</option>
-                <option value="social_media">Social Media</option>
-                <option value="advertisement">Advertisement</option>
-                <option value="cold_call">Cold Call</option>
-                <option value="other">Other</option>
+                {leadSources.map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label || formatPicklistLabel(option.value)}
+                  </option>
+                ))}
               </select>
+              {leadSources.length === 0 && !picklistsLoading && (
+                <p className="text-xs text-amber-600 mt-1">
+                  No lead sources available. Please configure picklist options.
+                </p>
+              )}
             </div>
 
             {/* Assigned To */}

@@ -1,6 +1,41 @@
 const { supabaseAdmin, getSupabaseForUser } = require('../config/supabase');
 const ApiError = require('../utils/ApiError');
 const cache = require('../utils/cache');
+const picklistService = require('./picklistService');
+
+const FALLBACK_WON_STATUSES = ['converted', 'won'];
+const FALLBACK_LOST_STATUSES = ['lost'];
+
+const getLeadStatusSegments = async (companyId) => {
+  try {
+    const picklists = await picklistService.getLeadPicklists(companyId, { includeInactive: false });
+    const won = new Set();
+    const lost = new Set();
+
+    picklists.statuses.forEach((option) => {
+      const metadata = option.metadata || {};
+
+      if (metadata.is_won || ['converted', 'won', 'closed_won'].includes(option.value)) {
+        won.add(option.value);
+      }
+
+      if (metadata.is_lost || ['lost', 'closed_lost'].includes(option.value)) {
+        lost.add(option.value);
+      }
+    });
+
+    return {
+      won: won.size ? Array.from(won) : FALLBACK_WON_STATUSES,
+      lost: lost.size ? Array.from(lost) : FALLBACK_LOST_STATUSES
+    };
+  } catch (error) {
+    console.warn('Failed to load lead status segments from picklists:', error);
+    return {
+      won: FALLBACK_WON_STATUSES,
+      lost: FALLBACK_LOST_STATUSES
+    };
+  }
+};
 
 /**
  * Get dashboard statistics with period comparison
@@ -61,7 +96,28 @@ const getDashboardStatsWithComparison = async (currentUser, thirtyDaysAgo, sixty
       return query;
     };
 
-    // Execute queries for different time periods
+    const { won: wonStatuses } = await getLeadStatusSegments(currentUser.company_id);
+    const emptyResult = { count: 0, error: null };
+
+    const totalPromise = createBaseQuery();
+    const currentNewPromise = createBaseQuery().gte('created_at', thirtyDaysAgo.toISOString());
+    const previousNewPromise = createBaseQuery()
+      .gte('created_at', sixtyDaysAgo.toISOString())
+      .lt('created_at', thirtyDaysAgo.toISOString());
+
+    const currentConvertedPromise = wonStatuses.length
+      ? createBaseQuery()
+          .in('status', wonStatuses)
+          .gte('created_at', thirtyDaysAgo.toISOString())
+      : Promise.resolve(emptyResult);
+
+    const previousConvertedPromise = wonStatuses.length
+      ? createBaseQuery()
+          .in('status', wonStatuses)
+          .gte('created_at', sixtyDaysAgo.toISOString())
+          .lt('created_at', thirtyDaysAgo.toISOString())
+      : Promise.resolve(emptyResult);
+
     const [
       totalResult,
       currentNewResult,
@@ -69,11 +125,11 @@ const getDashboardStatsWithComparison = async (currentUser, thirtyDaysAgo, sixty
       currentConvertedResult,
       previousConvertedResult
     ] = await Promise.all([
-      createBaseQuery(), // Total leads
-      createBaseQuery().gte('created_at', thirtyDaysAgo.toISOString()), // New leads (last 30 days)
-      createBaseQuery().gte('created_at', sixtyDaysAgo.toISOString()).lt('created_at', thirtyDaysAgo.toISOString()), // New leads (30-60 days ago)
-      createBaseQuery().eq('status', 'converted').gte('created_at', thirtyDaysAgo.toISOString()), // Converted leads (last 30 days)
-      createBaseQuery().eq('status', 'converted').gte('created_at', sixtyDaysAgo.toISOString()).lt('created_at', thirtyDaysAgo.toISOString()) // Converted leads (30-60 days ago)
+      totalPromise,
+      currentNewPromise,
+      previousNewPromise,
+      currentConvertedPromise,
+      previousConvertedPromise
     ]);
 
     if (totalResult.error) throw totalResult.error;
@@ -136,22 +192,32 @@ const getDashboardStatsFallback = async (currentUser, thirtyDaysAgo) => {
   try {
     const supabase = supabaseAdmin;
 
-    // Build base query with filters
-    let baseQuery = supabase
-      .from('leads')
-      .select('*', { count: 'exact' })
-      .eq('company_id', currentUser.company_id);
+    const createBaseQuery = () => {
+      let query = supabase
+        .from('leads')
+        .select('*', { count: 'exact' })
+        .eq('company_id', currentUser.company_id);
 
-    // Non-admin users only see their assigned leads
-    if (currentUser.role !== 'company_admin' && currentUser.role !== 'super_admin') {
-      baseQuery = baseQuery.eq('assigned_to', currentUser.id);
-    }
+      if (currentUser.role !== 'company_admin' && currentUser.role !== 'super_admin') {
+        query = query.eq('assigned_to', currentUser.id);
+      }
 
-    // Execute optimized queries in parallel
+      return query;
+    };
+
+    const { won: wonStatuses } = await getLeadStatusSegments(currentUser.company_id);
+    const emptyResult = { count: 0, error: null };
+
+    const totalPromise = createBaseQuery();
+    const newPromise = createBaseQuery().gte('created_at', thirtyDaysAgo.toISOString());
+    const convertedPromise = wonStatuses.length
+      ? createBaseQuery().in('status', wonStatuses)
+      : Promise.resolve(emptyResult);
+
     const [totalResult, newResult, convertedResult] = await Promise.all([
-      baseQuery, // Total leads
-      baseQuery.gte('created_at', thirtyDaysAgo.toISOString()), // New leads (last 30 days)
-      baseQuery.eq('status', 'converted') // Converted leads
+      totalPromise,
+      newPromise,
+      convertedPromise
     ]);
 
     if (totalResult.error) throw totalResult.error;
@@ -492,6 +558,9 @@ const getUserPerformance = async (currentUser) => {
       throw leadsError;
     }
 
+    const { won: wonStatuses } = await getLeadStatusSegments(currentUser.company_id);
+    const wonStatusSet = new Set(wonStatuses);
+
     // Calculate 30 days ago
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -499,7 +568,7 @@ const getUserPerformance = async (currentUser) => {
     // Group leads by assigned user and calculate metrics
     const userPerformance = users.map(user => {
       const userLeads = leads.filter(lead => lead.assigned_to === user.id);
-      const convertedLeads = userLeads.filter(lead => lead.status === 'converted');
+      const convertedLeads = userLeads.filter(lead => wonStatusSet.has(lead.status));
       const recentLeads = userLeads.filter(lead => new Date(lead.created_at) >= thirtyDaysAgo);
 
       return {

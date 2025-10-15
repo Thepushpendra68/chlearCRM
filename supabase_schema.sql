@@ -93,6 +93,21 @@ CREATE TABLE pipeline_stages (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Lead picklist options (sources, statuses, etc.)
+CREATE TABLE lead_picklist_options (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
+  type TEXT NOT NULL CHECK (type IN ('source', 'status')),
+  value TEXT NOT NULL,
+  label TEXT NOT NULL,
+  sort_order INTEGER DEFAULT 0,
+  is_active BOOLEAN DEFAULT true,
+  metadata JSONB DEFAULT '{}'::jsonb,
+  created_by UUID REFERENCES user_profiles(id),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Leads
 CREATE TABLE leads (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -196,6 +211,9 @@ CREATE INDEX idx_leads_created_at ON leads(created_at);
 CREATE INDEX idx_leads_assigned_to ON leads(assigned_to);
 CREATE INDEX idx_leads_pipeline_stage_id ON leads(pipeline_stage_id);
 CREATE INDEX idx_leads_created_by ON leads(created_by);
+CREATE INDEX idx_lead_picklist_options_company_type ON lead_picklist_options(company_id, type, sort_order);
+CREATE UNIQUE INDEX uq_lead_picklist_company_value ON lead_picklist_options(company_id, type, value);
+CREATE UNIQUE INDEX uq_lead_picklist_default_value ON lead_picklist_options(type, value) WHERE company_id IS NULL;
 
 -- Activities
 CREATE INDEX idx_activities_company ON activities(company_id);
@@ -223,6 +241,7 @@ CREATE INDEX idx_import_history_created_by ON import_history(created_by);
 ALTER TABLE companies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pipeline_stages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE lead_picklist_options ENABLE ROW LEVEL SECURITY;
 ALTER TABLE leads ENABLE ROW LEVEL SECURITY;
 ALTER TABLE activities ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
@@ -358,6 +377,38 @@ CREATE POLICY "pipeline_stages_update_policy" ON pipeline_stages
   FOR UPDATE TO authenticated
   USING (public.user_belongs_to_company(company_id))
   WITH CHECK (public.user_belongs_to_company(company_id));
+
+-- Lead picklist policies
+CREATE POLICY "lead_picklist_select_policy" ON lead_picklist_options
+  FOR SELECT TO authenticated
+  USING (
+    company_id IS NULL OR public.user_belongs_to_company(company_id)
+  );
+
+CREATE POLICY "lead_picklist_insert_policy" ON lead_picklist_options
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    (company_id IS NULL AND public.get_user_role() = 'super_admin')
+    OR (company_id IS NOT NULL AND public.user_belongs_to_company(company_id) AND public.get_user_role() IN ('company_admin', 'manager'))
+  );
+
+CREATE POLICY "lead_picklist_update_policy" ON lead_picklist_options
+  FOR UPDATE TO authenticated
+  USING (
+    (company_id IS NULL AND public.get_user_role() = 'super_admin')
+    OR (company_id IS NOT NULL AND public.user_belongs_to_company(company_id) AND public.get_user_role() IN ('company_admin', 'manager'))
+  )
+  WITH CHECK (
+    (company_id IS NULL AND public.get_user_role() = 'super_admin')
+    OR (company_id IS NOT NULL AND public.user_belongs_to_company(company_id) AND public.get_user_role() IN ('company_admin', 'manager'))
+  );
+
+CREATE POLICY "lead_picklist_delete_policy" ON lead_picklist_options
+  FOR DELETE TO authenticated
+  USING (
+    (company_id IS NULL AND public.get_user_role() = 'super_admin')
+    OR (company_id IS NOT NULL AND public.user_belongs_to_company(company_id) AND public.get_user_role() IN ('company_admin', 'manager'))
+  );
 
 -- Leads policies (with role-based access)
 CREATE POLICY "leads_select_policy" ON leads
@@ -585,6 +636,32 @@ INSERT INTO role_permissions (role, permissions, description) VALUES
   'Sales representative with limited access to assigned leads'
 )
 ON CONFLICT (role) DO NOTHING;
+
+-- Insert default lead picklist options (global scope)
+INSERT INTO lead_picklist_options (company_id, type, value, label, sort_order, is_active, metadata, created_at, updated_at)
+VALUES
+  (NULL, 'source', 'website', 'Website', 1, true, '{}'::jsonb, NOW(), NOW()),
+  (NULL, 'source', 'referral', 'Referral', 2, true, '{}'::jsonb, NOW(), NOW()),
+  (NULL, 'source', 'outbound_call', 'Outbound Call', 3, true, '{}'::jsonb, NOW(), NOW()),
+  (NULL, 'source', 'cold_call', 'Cold Call', 4, true, '{}'::jsonb, NOW(), NOW()),
+  (NULL, 'source', 'social_paid', 'Social/Paid Campaign', 5, true, '{}'::jsonb, NOW(), NOW()),
+  (NULL, 'source', 'social_media', 'Organic Social', 6, true, '{}'::jsonb, NOW(), NOW()),
+  (NULL, 'source', 'event', 'Event', 7, true, '{}'::jsonb, NOW(), NOW()),
+  (NULL, 'source', 'partner', 'Partner', 8, true, '{}'::jsonb, NOW(), NOW()),
+  (NULL, 'source', 'email', 'Email', 9, true, '{}'::jsonb, NOW(), NOW()),
+  (NULL, 'source', 'advertisement', 'Advertisement', 10, true, '{}'::jsonb, NOW(), NOW()),
+  (NULL, 'source', 'other', 'Other', 11, true, '{}'::jsonb, NOW(), NOW()),
+  (NULL, 'source', 'import', 'Import (System)', 99, true, '{"is_system": true}'::jsonb, NOW(), NOW()),
+  (NULL, 'status', 'new', 'New', 1, true, '{}'::jsonb, NOW(), NOW()),
+  (NULL, 'status', 'contacted', 'Contacted', 2, true, '{}'::jsonb, NOW(), NOW()),
+  (NULL, 'status', 'qualified', 'Qualified', 3, true, '{}'::jsonb, NOW(), NOW()),
+  (NULL, 'status', 'proposal', 'Proposal Sent', 4, true, '{}'::jsonb, NOW(), NOW()),
+  (NULL, 'status', 'negotiation', 'Negotiation', 5, true, '{}'::jsonb, NOW(), NOW()),
+  (NULL, 'status', 'won', 'Closed Won', 6, true, '{"is_won": true}'::jsonb, NOW(), NOW()),
+  (NULL, 'status', 'converted', 'Converted (Legacy)', 7, true, '{"is_won": true, "legacy": true}'::jsonb, NOW(), NOW()),
+  (NULL, 'status', 'lost', 'Closed Lost', 8, true, '{"is_lost": true}'::jsonb, NOW(), NOW()),
+  (NULL, 'status', 'nurture', 'Nurture', 9, true, '{"is_nurture": true}'::jsonb, NOW(), NOW())
+ON CONFLICT DO NOTHING;
 
 -- =====================================================
 -- 10. CREATE SECURE VIEWS (FIXED SYNTAX)

@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { AuthProvider } from './context/AuthContext'
 import { LeadProvider } from './context/LeadContext'
+import { PicklistProvider } from './context/PicklistContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import RoleProtectedRoute from './components/RoleProtectedRoute'
 import ErrorBoundary from './components/ErrorBoundary'
@@ -41,6 +42,7 @@ function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
+        <PicklistProvider>
         <LeadProvider>
           <div className="min-h-screen bg-gray-50">
           <Suspense fallback={<RouteLoadingFallback />}><Routes>
@@ -130,6 +132,7 @@ function App() {
           />
           </div>
         </LeadProvider>
+        </PicklistProvider>
       </AuthProvider>
     </ErrorBoundary>
   )

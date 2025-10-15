@@ -1,4 +1,7 @@
 const { supabaseAdmin } = require('../config/supabase');
+const picklistService = require('./picklistService');
+
+const cloneConfig = (config) => JSON.parse(JSON.stringify(config));
 
 const DEFAULT_CONFIG_VERSION = 1;
 const DEFAULT_CONFIG = {
@@ -20,8 +23,21 @@ const DEFAULT_CONFIG = {
     'pipeline_stage_id'
   ],
   enums: {
-    status: ['new', 'contacted', 'qualified', 'converted', 'lost'],
-    lead_source: ['website', 'referral', 'cold_call', 'social_media', 'advertisement', 'other', 'import'],
+    status: ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'won', 'converted', 'lost', 'nurture'],
+    lead_source: [
+      'website',
+      'referral',
+      'outbound_call',
+      'cold_call',
+      'social_paid',
+      'social_media',
+      'event',
+      'partner',
+      'email',
+      'advertisement',
+      'other',
+      'import'
+    ],
     priority: ['low', 'medium', 'high', 'urgent']
   },
   duplicateStrategy: {
@@ -41,7 +57,9 @@ class ImportConfigService {
 
   async getCompanyConfig(companyId) {
     if (!companyId) {
-      return DEFAULT_CONFIG;
+      const config = cloneConfig(DEFAULT_CONFIG);
+      await this.enrichWithPicklists(config, null);
+      return config;
     }
 
     if (this.cache.has(companyId)) {
@@ -57,7 +75,7 @@ class ImportConfigService {
 
       if (error) {
         if (error.code === '42P01') {
-          return DEFAULT_CONFIG;
+      return cloneConfig(DEFAULT_CONFIG);
         }
         throw error;
       }
@@ -68,12 +86,15 @@ class ImportConfigService {
       }
 
       const mergedConfig = this.mergeWithDefaults(data.schema_json, data.duplicate_policy_default, data.version);
+      await this.enrichWithPicklists(mergedConfig, companyId);
       this.cache.set(companyId, mergedConfig);
       return mergedConfig;
     } catch (error) {
       console.warn('Failed to fetch company import config, using defaults', error);
-      this.cache.set(companyId, DEFAULT_CONFIG);
-      return DEFAULT_CONFIG;
+      const fallbackConfig = cloneConfig(DEFAULT_CONFIG);
+      await this.enrichWithPicklists(fallbackConfig, companyId);
+      this.cache.set(companyId, fallbackConfig);
+      return fallbackConfig;
     }
   }
 
@@ -98,6 +119,27 @@ class ImportConfigService {
         probability: schemaJson?.numericRanges?.probability || DEFAULT_CONFIG.numericRanges.probability
       }
     };
+  }
+
+  async enrichWithPicklists(config, companyId) {
+    try {
+      const picklists = await picklistService.getLeadPicklists(companyId, { includeInactive: false });
+
+      const sources = Array.from(new Set([
+        ...picklists.sources.map(option => option.value),
+        ...DEFAULT_CONFIG.enums.lead_source
+      ]));
+
+      const statuses = Array.from(new Set([
+        ...picklists.statuses.map(option => option.value),
+        ...DEFAULT_CONFIG.enums.status
+      ]));
+
+      config.enums.lead_source = sources;
+      config.enums.status = statuses;
+    } catch (error) {
+      console.warn('Failed to merge picklist options into import config', error);
+    }
   }
 
   invalidateCache(companyId) {

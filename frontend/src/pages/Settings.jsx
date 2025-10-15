@@ -6,7 +6,8 @@ import {
   LockClosedIcon,
   UsersIcon,
   BuildingOfficeIcon,
-  WrenchScrewdriverIcon
+  WrenchScrewdriverIcon,
+  TagIcon
 } from '@heroicons/react/24/outline'
 import { useAuth } from '../context/AuthContext'
 import preferencesService from '../services/preferencesService'
@@ -14,6 +15,7 @@ import toast from 'react-hot-toast'
 import DisplaySettings from '../components/Settings/DisplaySettings'
 import NotificationSettings from '../components/Settings/NotificationSettings'
 import RegionalSettings from '../components/Settings/RegionalSettings'
+import LeadPicklistSettings from '../components/Settings/LeadPicklistSettings'
 
 const Settings = () => {
   const { user, applyUserPatch } = useAuth()
@@ -171,6 +173,15 @@ const Settings = () => {
             Company-wide configuration and settings coming soon.
           </p>
         </div>
+      )
+    },
+    {
+      id: 'lead-picklists',
+      name: 'Lead Picklists',
+      icon: TagIcon,
+      roles: ['manager', 'company_admin', 'super_admin'],
+      component: (
+        <LeadPicklistSettings />
       )
     },
     {
