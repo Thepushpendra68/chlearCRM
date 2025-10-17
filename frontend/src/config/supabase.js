@@ -168,16 +168,42 @@ export async function signIn(email, password) {
  */
 export async function signOut() {
   try {
-    const { error } = await supabase.auth.signOut();
+    // Create a timeout promise to prevent hanging on expired tokens
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Sign out timeout')), 5000)
+    );
 
-    if (error) {
-      throw error;
+    // Race between signOut and timeout
+    try {
+      await Promise.race([
+        supabase.auth.signOut(),
+        timeoutPromise
+      ]);
+    } catch (timeoutError) {
+      // If timeout or network error, clear local session storage directly
+      console.warn('Sign out request timed out or failed, clearing local session:', timeoutError.message);
+      
+      // Clear Supabase session storage directly
+      const storageKey = supabase.auth?.storageKey || 'sb-qlivxpsvlymxfnamxvhz-auth-token';
+      localStorage.removeItem(storageKey);
+      sessionStorage.removeItem(storageKey);
+      
+      // Also clear any auth-related items
+      const keys = Object.keys(localStorage);
+      keys.forEach(key => {
+        if (key.includes('auth') || key.includes('session')) {
+          localStorage.removeItem(key);
+        }
+      });
     }
 
+    // Clear the cached session
+    setCachedSession(null);
     return { error: null };
   } catch (error) {
     console.error('Error signing out:', error);
-    return { error };
+    // Always return success for logout - we want to clear the client state regardless
+    return { error: null };
   }
 }
 

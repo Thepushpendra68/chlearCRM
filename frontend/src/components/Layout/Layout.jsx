@@ -11,7 +11,7 @@ const ChatbotWidget = lazy(() => import('../Chatbot/ChatbotWidget'))
 const Layout = () => {
   const { isImpersonating, impersonatedUser, endImpersonation } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [isCollapsed, setIsCollapsed] = useState(false)
+  const [isCollapsed, setIsCollapsed] = useState(true)
   const location = useLocation()
 
   return (

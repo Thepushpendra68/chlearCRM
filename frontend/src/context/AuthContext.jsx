@@ -218,7 +218,13 @@ export const AuthProvider = ({ children }) => {
   // Logout function
   const logout = async () => {
     try {
-      await signOut()
+      // Add a timeout to prevent hanging on expired sessions
+      const signOutPromise = signOut();
+      const timeoutPromise = new Promise((resolve) =>
+        setTimeout(() => resolve({ error: null }), 3000)
+      );
+
+      await Promise.race([signOutPromise, timeoutPromise]);
       dispatch({ type: 'AUTH_LOGOUT' })
       toast.success('Logged out successfully')
     } catch (error) {
