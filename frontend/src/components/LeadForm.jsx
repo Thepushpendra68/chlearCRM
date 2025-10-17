@@ -1,3 +1,4 @@
+import { format } from 'date-fns';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import Modal from './Modal';
@@ -167,7 +168,7 @@ const LeadForm = ({ lead = null, onClose, onSuccess, initialStageId = null, onSu
       setValue('pipeline_stage_id', lead.pipeline_stage_id || '');
       setValue('deal_value', lead.deal_value || '');
       setValue('probability', lead.probability || 0);
-      setValue('expected_close_date', lead.expected_close_date || '');
+      setValue('expected_close_date', lead.expected_close_date ? format(new Date(lead.expected_close_date), 'yyyy-MM-dd') : '');
       setValue('priority', lead.priority || 'medium');
     } else if (initialStageId) {
       setValue('pipeline_stage_id', initialStageId);

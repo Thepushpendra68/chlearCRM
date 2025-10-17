@@ -1,3 +1,4 @@
+import { format } from 'date-fns';
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeftIcon, PencilIcon, TrashIcon, PhoneIcon, EnvelopeIcon, BuildingOfficeIcon } from '@heroicons/react/24/outline'
@@ -403,12 +404,7 @@ const LeadDetail = () => {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                       </svg>
                       <p className="text-sm text-gray-900 font-medium">
-                        {new Date(lead.expected_close_date).toLocaleDateString('en-US', {
-                          weekday: 'long',
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric'
-                        })}
+                                                {format(new Date(lead.expected_close_date), 'dd-MM-yyyy')}
                       </p>
                       <span className={`px-2 py-1 text-xs rounded-full ${
                         new Date(lead.expected_close_date) < new Date() ? 'bg-red-100 text-red-800' :
@@ -456,21 +452,13 @@ const LeadDetail = () => {
                   <div className="flex justify-between items-center">
                     <dt className="text-xs font-medium text-gray-500">Created</dt>
                     <dd className="text-xs text-gray-900">
-                      {new Date(lead.created_at).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric'
-                      })}
+                      {format(new Date(lead.created_at), 'dd-MM-yyyy')}
                     </dd>
                   </div>
                   <div className="flex justify-between items-center">
                     <dt className="text-xs font-medium text-gray-500">Last Updated</dt>
                     <dd className="text-xs text-gray-900">
-                      {new Date(lead.updated_at).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric'
-                      })}
+                      {format(new Date(lead.updated_at), 'dd-MM-yyyy')}
                     </dd>
                   </div>
                   {(lead.assigned_user_first_name || lead.assigned_user_last_name) && (

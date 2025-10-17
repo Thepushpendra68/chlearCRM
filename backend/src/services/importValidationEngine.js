@@ -1,3 +1,5 @@
+const Fuse = require('fuse.js');
+
 const parseISO = (value) => {
   if (!value) return null;
 
@@ -25,6 +27,20 @@ const normalizePhone = (value) => {
 class ImportValidationEngine {
   constructor(config) {
     this.config = config;
+    this.fuseInstances = {};
+
+    // Initialize Fuse.js for each enum field
+    if (this.config.enums) {
+      Object.keys(this.config.enums).forEach(field => {
+        const enumList = this.config.enums[field];
+        if (Array.isArray(enumList) && enumList.length > 0) {
+          this.fuseInstances[field] = new Fuse(enumList, {
+            includeScore: true,
+            threshold: 0.3, // Stricter threshold, closer to 0 is more similar
+          });
+        }
+      });
+    }
   }
 
   validateRows(rows, context) {
@@ -184,7 +200,24 @@ class ImportValidationEngine {
     }
 
     const lowerValue = value.toString().trim().toLowerCase();
-    return enumList.includes(lowerValue) ? lowerValue : null;
+    if (enumList.includes(lowerValue)) {
+      return lowerValue;
+    }
+
+    // Fuzzy matching with Fuse.js
+    const fuse = this.fuseInstances[field];
+    if (fuse) {
+      const results = fuse.search(lowerValue);
+      if (results.length > 0) {
+        // score: 0 is perfect match, 1 is complete mismatch
+        // We accept if score is below the threshold
+        if (results[0].score < fuse.options.threshold) {
+          return results[0].item;
+        }
+      }
+    }
+
+    return null; // Return null if no exact or close match is found
   }
 
   parseNumber(value) {
