@@ -4,6 +4,7 @@ const csvParser = require('../utils/csvParser');
 const excelParser = require('../utils/excelParser');
 const importConfigService = require('./importConfigService');
 const ImportValidationEngine = require('./importValidationEngine');
+const { parseDateFlexible } = require('./importValidationEngine');
 const importTelemetryService = require('./importTelemetryService');
 
 const normalizeString = value => (typeof value === 'string' ? value.trim() : value);
@@ -275,6 +276,9 @@ class ImportService {
    * Validate leads data
    */
   async validateLeads(leads, companyId = null, options = {}) {
+    // Clear the import config cache to ensure we get fresh picklist data
+    importConfigService.invalidateCache(companyId);
+    
     const config = await importConfigService.getCompanyConfig(companyId);
     const engine = new ImportValidationEngine(config);
     const duplicateLookup = await this.buildDuplicateContext(leads, companyId);
@@ -580,10 +584,7 @@ class ImportService {
       value = trimmed;
     }
 
-    const parsed =
-      value instanceof Date
-        ? value
-        : new Date(typeof value === 'number' ? value : String(value));
+    const parsed = parseDateFlexible(value);
 
     if (Number.isNaN(parsed.getTime())) {
       return fallback;

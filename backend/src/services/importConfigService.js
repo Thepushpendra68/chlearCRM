@@ -75,14 +75,18 @@ class ImportConfigService {
 
       if (error) {
         if (error.code === '42P01') {
-      return cloneConfig(DEFAULT_CONFIG);
+          const fallbackConfig = cloneConfig(DEFAULT_CONFIG);
+          await this.enrichWithPicklists(fallbackConfig, companyId);
+          return fallbackConfig;
         }
         throw error;
       }
 
       if (!data?.schema_json) {
-        this.cache.set(companyId, DEFAULT_CONFIG);
-        return DEFAULT_CONFIG;
+        const defaultConfig = cloneConfig(DEFAULT_CONFIG);
+        await this.enrichWithPicklists(defaultConfig, companyId);
+        this.cache.set(companyId, defaultConfig);
+        return defaultConfig;
       }
 
       const mergedConfig = this.mergeWithDefaults(data.schema_json, data.duplicate_policy_default, data.version);
@@ -124,6 +128,8 @@ class ImportConfigService {
   async enrichWithPicklists(config, companyId) {
     try {
       const picklists = await picklistService.getLeadPicklists(companyId, { includeInactive: false });
+      
+      console.log(`[PICKLIST_ENRICH] Company: ${companyId}, Sources count: ${picklists.sources.length}, Statuses count: ${picklists.statuses.length}`);
 
       const sources = Array.from(new Set([
         ...picklists.sources.map(option => option.value),
@@ -137,8 +143,38 @@ class ImportConfigService {
 
       config.enums.lead_source = sources;
       config.enums.status = statuses;
+
+      // Add fuzzy matching data with both values and labels
+      const statusFuzzyData = Array.from(new Set([
+        ...picklists.statuses.map(option => ({ value: option.value, label: option.label })),
+        ...DEFAULT_CONFIG.enums.status.map(value => ({ value, label: value }))
+      ]));
+      
+      const sourceFuzzyData = Array.from(new Set([
+        ...picklists.sources.map(option => ({ value: option.value, label: option.label })),
+        ...DEFAULT_CONFIG.enums.lead_source.map(value => ({ value, label: value }))
+      ]));
+      
+      config.fuzzyMatchData = {
+        status: statusFuzzyData,
+        lead_source: sourceFuzzyData,
+        priority: DEFAULT_CONFIG.enums.priority.map(value => ({ value, label: value }))
+      };
+      
+      console.log(`[PICKLIST_ENRICH] Status labels: ${statusFuzzyData.map(d => `${d.label}→${d.value}`).join(', ')}`);
+      console.log(`[PICKLIST_ENRICH] Lead source labels: ${sourceFuzzyData.map(d => `${d.label}→${d.value}`).join(', ')}`);
     } catch (error) {
-      console.warn('Failed to merge picklist options into import config', error);
+      console.warn('Failed to merge picklist options into import config, using defaults', error.message);
+      
+      // FALLBACK: Set fuzzyMatchData with enum values as both value and label
+      // This ensures fuzzy matching still works even if picklists are unavailable
+      config.fuzzyMatchData = {
+        status: DEFAULT_CONFIG.enums.status.map(value => ({ value, label: value })),
+        lead_source: DEFAULT_CONFIG.enums.lead_source.map(value => ({ value, label: value })),
+        priority: DEFAULT_CONFIG.enums.priority.map(value => ({ value, label: value }))
+      };
+      
+      console.log(`[PICKLIST_ENRICH] Using fallback fuzzyMatchData with defaults`);
     }
   }
 

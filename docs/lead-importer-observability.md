@@ -84,6 +84,53 @@ LIMIT 10;
 - **Alerts:** Configure your monitoring tool to alert when `error_count` spikes or when `duration_ms` exceeds expected thresholds.
 - **Data retention:** If telemetry volume grows, attach a retention policy (e.g., Supabase configurable retention or scheduled purge job).
 
+## Fuzzy Matching for Enum Fields
+
+The import system now uses an intelligent fuzzy matching algorithm to automatically convert common variations of status, lead_source, and priority values to their canonical enum values.
+
+### Matching Strategy (7-Step Process)
+
+1. **Exact Match (case-insensitive)** - Converts "New" → "new", "PROPOSAL" → "proposal"
+2. **Substring Match** - Converts "New Lead" → "new" (substring contains the enum value)
+3. **Enhanced Fuzzy Matching (Labels)** - Uses Fuse.js with picklist labels: "Instagram" → "social_media"
+4. **Levenshtein Distance** - Matches similar strings with 60% minimum similarity threshold
+5. **Label-Based Levenshtein** - Matches against picklist labels: "Insta" could match "Instagram" label → "social_media"
+6. **Basic Fuse.js Matching** - Final Fuse.js search with relaxed threshold (0.4)
+7. **No Match** - Returns null, triggering validation error
+
+### Example Conversions
+
+| Input | Field | Matched Strategy | Output |
+|-------|-------|-----------------|--------|
+| "new" | status | Exact Match | "new" |
+| "New Lead" | status | Substring Match | "new" |
+| "Closed Lost" | status | Levenshtein (dist=2) | "lost" |
+| "Proposal S" | status | Levenshtein (dist=3) | "proposal" |
+| "Instagram" | lead_source | Label Exact Match | "social_media" |
+| "Walk-In" | lead_source | Label Exact Match | "event" |
+| "web" | lead_source | Substring Match | "website" |
+| "referal" | lead_source | Levenshtein | "referral" |
+
+### Configuring Custom Labels
+
+The system reads picklist labels from the database. To add custom mappings:
+
+```sql
+INSERT INTO picklists (company_id, type, value, label)
+VALUES 
+  (company_id, 'lead_source', 'social_media', 'Instagram'),
+  (company_id, 'lead_source', 'event', 'Walk-In'),
+  (company_id, 'status', 'new', 'New Lead');
+```
+
+### Configuration Thresholds
+
+- Levenshtein similarity threshold: **0.6** (60% minimum match)
+- Fuse.js threshold: **0.4** (lower is stricter)
+- Minimum match character length: **2**
+
+To modify thresholds, edit `ImportValidationEngine.fuzzyMatch()` in `backend/src/services/importValidationEngine.js`.
+
 ## Related Docs
 
 - `docs/lead-importer-prd.md` — Product context and roadmap.

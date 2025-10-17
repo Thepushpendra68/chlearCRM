@@ -68,5 +68,61 @@ describe('ImportValidationEngine', () => {
     test('should return default for null priority', () => {
       expect(engine.normalizeEnumValue(null, 'priority')).toBe('medium');
     });
+
+    // NEW TESTS: User's specific data
+    test('should match "New Lead" to "new" status', () => {
+      expect(engine.normalizeEnumValue('New Lead', 'status')).toBe('new');
+    });
+
+    test('should match "Closed Lost" to "lost" status', () => {
+      expect(engine.normalizeEnumValue('Closed Lost', 'status')).toBe('lost');
+    });
+
+    test('should match "Proposal S" to "proposal" status', () => {
+      expect(engine.normalizeEnumValue('Proposal S', 'status')).toBe('proposal');
+    });
+
+    test('should match "Instagram" to "social_media" lead_source', () => {
+      // Note: This requires enriched config with picklist data
+      const engineWithPicklists = new ImportValidationEngine({
+        ...mockConfig,
+        enums: {
+          ...mockConfig.enums,
+          lead_source: [...mockConfig.enums.lead_source, 'social_media', 'cold_call', 'event']
+        },
+        fuzzyMatchData: {
+          lead_source: [
+            { value: 'website', label: 'Website' },
+            { value: 'referral', label: 'Referral' },
+            { value: 'social_media', label: 'Instagram' },
+            { value: 'social_media', label: 'Facebook' },
+            { value: 'event', label: 'Walk-In' },
+            { value: 'cold_call', label: 'Cold Call' }
+          ]
+        }
+      });
+      expect(engineWithPicklists.normalizeEnumValue('Instagram', 'lead_source')).toBe('social_media');
+    });
+
+    test('should match "Walk-In" to "event" lead_source', () => {
+      const engineWithPicklists = new ImportValidationEngine({
+        ...mockConfig,
+        enums: {
+          ...mockConfig.enums,
+          lead_source: [...mockConfig.enums.lead_source, 'social_media', 'cold_call', 'event']
+        },
+        fuzzyMatchData: {
+          lead_source: [
+            { value: 'website', label: 'Website' },
+            { value: 'referral', label: 'Referral' },
+            { value: 'social_media', label: 'Instagram' },
+            { value: 'social_media', label: 'Facebook' },
+            { value: 'event', label: 'Walk-In' },
+            { value: 'cold_call', label: 'Cold Call' }
+          ]
+        }
+      });
+      expect(engineWithPicklists.normalizeEnumValue('Walk-In', 'lead_source')).toBe('event');
+    });
   });
 });
