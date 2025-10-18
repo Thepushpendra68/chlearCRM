@@ -75,6 +75,26 @@ const authReducer = (state, action) => {
         ...state,
         chatPanelOpen: !state.chatPanelOpen
       }
+    case 'SET_CHAT_MESSAGES':
+      return {
+        ...state,
+        chatMessages: action.payload
+      }
+    case 'ADD_CHAT_MESSAGE':
+      return {
+        ...state,
+        chatMessages: [...(state.chatMessages || []), action.payload]
+      }
+    case 'CLEAR_CHAT_MESSAGES':
+      return {
+        ...state,
+        chatMessages: []
+      }
+    case 'SET_CHAT_PANEL_SIZE':
+      return {
+        ...state,
+        chatPanelSize: action.payload
+      }
     case 'CLEAR_ERROR':
       return {
         ...state,
@@ -99,7 +119,9 @@ const getInitialState = () => ({
   impersonatedUser: null,
   originalUser: null,
   isImpersonating: false,
-  chatPanelOpen: false
+  chatPanelOpen: false,
+  chatMessages: [],
+  chatPanelSize: { width: 400 }
 })
 
 export const AuthProvider = ({ children }) => {
@@ -482,6 +504,78 @@ export const AuthProvider = ({ children }) => {
     restoreImpersonation()
   }, [state.isAuthenticated, state.user])
 
+  // Load chat messages from localStorage
+  const loadChatMessages = (userId) => {
+    try {
+      const key = `sakha_chatMessages_${userId}`
+      const messages = localStorage.getItem(key)
+      if (messages) {
+        dispatch({ type: 'SET_CHAT_MESSAGES', payload: JSON.parse(messages) })
+      }
+    } catch (error) {
+      console.error('Failed to load chat messages:', error)
+    }
+  }
+
+  // Save chat messages to localStorage
+  const saveChatMessages = (userId, messages) => {
+    try {
+      const key = `sakha_chatMessages_${userId}`
+      localStorage.setItem(key, JSON.stringify(messages))
+    } catch (error) {
+      console.error('Failed to save chat messages:', error)
+    }
+  }
+
+  // Add a message to chat
+  const addChatMessage = (message) => {
+    dispatch({ type: 'ADD_CHAT_MESSAGE', payload: message })
+    if (state.user?.id) {
+      saveChatMessages(state.user.id, [...state.chatMessages, message])
+    }
+  }
+
+  // Clear all chat messages
+  const clearChatMessages = () => {
+    dispatch({ type: 'CLEAR_CHAT_MESSAGES' })
+    if (state.user?.id) {
+      const key = `sakha_chatMessages_${state.user.id}`
+      localStorage.removeItem(key)
+    }
+  }
+
+  // Set chat panel size
+  const setChatPanelSize = (size) => {
+    dispatch({ type: 'SET_CHAT_PANEL_SIZE', payload: size })
+    try {
+      const key = `sakha_chatPanelSize_${state.user?.id}`
+      localStorage.setItem(key, JSON.stringify(size))
+    } catch (error) {
+      console.error('Failed to save chat panel size:', error)
+    }
+  }
+
+  // Load chat panel size from localStorage
+  const loadChatPanelSize = (userId) => {
+    try {
+      const key = `sakha_chatPanelSize_${userId}`
+      const size = localStorage.getItem(key)
+      if (size) {
+        dispatch({ type: 'SET_CHAT_PANEL_SIZE', payload: JSON.parse(size) })
+      }
+    } catch (error) {
+      console.error('Failed to load chat panel size:', error)
+    }
+  }
+
+  // Load chat data when user logs in
+  useEffect(() => {
+    if (state.user?.id) {
+      loadChatMessages(state.user.id)
+      loadChatPanelSize(state.user.id)
+    }
+  }, [state.user?.id])
+
   const value = {
     ...state,
     login,
@@ -494,7 +588,12 @@ export const AuthProvider = ({ children }) => {
     clearError,
     toggleChatPanel,
     startImpersonation,
-    endImpersonation
+    endImpersonation,
+    addChatMessage,
+    clearChatMessages,
+    setChatPanelSize,
+    loadChatMessages,
+    loadChatPanelSize
   }
 
   return (

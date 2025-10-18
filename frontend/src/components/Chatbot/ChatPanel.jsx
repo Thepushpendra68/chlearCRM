@@ -106,19 +106,67 @@ const buildActionSummary = (action, parameters = {}) => {
 };
 
 const ChatPanel = () => {
-  const { chatPanelOpen, toggleChatPanel } = useAuth();
-  const [messages, setMessages] = useState([
+  const { chatPanelOpen, toggleChatPanel, chatMessages, addChatMessage, clearChatMessages, setChatPanelSize, chatPanelSize } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null);
+  const [width, setWidth] = useState(chatPanelSize?.width || 400);
+  const [isResizing, setIsResizing] = useState(false);
+  const messagesEndRef = useRef(null);
+  const chatContainerRef = useRef(null);
+  const resizeHandleRef = useRef(null);
+
+  // Initialize messages from context
+  const messages = chatMessages.length > 0 ? chatMessages : [
     {
       id: '1',
       role: 'assistant',
       content: 'Hello! I\'m your CRM assistant. I can help you create leads, search for leads, update lead information, and show you statistics. What would you like to do?',
       timestamp: new Date()
     }
-  ]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [pendingAction, setPendingAction] = useState(null);
-  const messagesEndRef = useRef(null);
-  const chatContainerRef = useRef(null);
+  ];
+
+  // Handle resize start
+  const handleResizeStart = (e) => {
+    e.preventDefault();
+    setIsResizing(true);
+  };
+
+  // Handle resize
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseMove = (e) => {
+      const container = chatContainerRef.current;
+      if (!container) return;
+
+      const rect = container.getBoundingClientRect();
+      const newWidth = rect.right - e.clientX;
+
+      // Enforce min/max width
+      const constrainedWidth = Math.max(300, Math.min(600, newWidth));
+      setWidth(constrainedWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      setChatPanelSize({ width });
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing, width, setChatPanelSize]);
+
+  // Update width from context
+  useEffect(() => {
+    if (chatPanelSize?.width) {
+      setWidth(chatPanelSize.width);
+    }
+  }, [chatPanelSize]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -131,14 +179,13 @@ const ChatPanel = () => {
   const clearConversation = async () => {
     try {
       await chatbotService.clearHistory();
-      setMessages([
-        {
-          id: Date.now().toString(),
-          role: 'assistant',
-          content: 'Conversation cleared. How can I help you?',
-          timestamp: new Date()
-        }
-      ]);
+      clearChatMessages();
+      addChatMessage({
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: 'Conversation cleared. How can I help you?',
+        timestamp: new Date()
+      });
       setPendingAction(null);
       toast.success('Conversation cleared');
     } catch (error) {
@@ -155,7 +202,7 @@ const ChatPanel = () => {
       content: messageText,
       timestamp: new Date()
     };
-    setMessages(prev => [...prev, userMessage]);
+    addChatMessage(userMessage);
     setIsLoading(true);
 
     try {
@@ -181,7 +228,7 @@ const ChatPanel = () => {
         }
       };
 
-      setMessages(prev => [...prev, assistantMessage]);
+      addChatMessage(assistantMessage);
 
       if (response.needsConfirmation && response.action !== 'CHAT') {
         const pendingParameters = response.data?.parameters || normalizedParameters;
@@ -208,7 +255,7 @@ const ChatPanel = () => {
         isError: true,
         meta: { source: 'system' }
       };
-      setMessages(prev => [...prev, errorMessage]);
+      addChatMessage(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -236,7 +283,7 @@ const ChatPanel = () => {
         meta: { source: 'system' }
       };
 
-      setMessages(prev => [...prev, assistantMessage]);
+      addChatMessage(assistantMessage);
       setPendingAction(null);
       toast.success('Action completed');
     } catch (error) {
@@ -249,7 +296,7 @@ const ChatPanel = () => {
         isError: true,
         meta: { source: 'system' }
       };
-      setMessages(prev => [...prev, errorMessage]);
+      addChatMessage(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -264,7 +311,7 @@ const ChatPanel = () => {
       timestamp: new Date(),
       meta: { source: 'system' }
     };
-    setMessages(prev => [...prev, cancelMessage]);
+    addChatMessage(cancelMessage);
   };
 
   const getActionSuccessMessage = (action) => {
@@ -298,9 +345,13 @@ const ChatPanel = () => {
       )}
       
       {/* Chat Panel - Desktop sidebar / Mobile overlay */}
-      <div className={`fixed md:relative top-16 md:top-0 right-0 md:right-auto bottom-0 w-full md:w-80 h-[calc(100vh-64px)] md:h-auto bg-background border-l flex flex-col shadow-2xl md:shadow-lg transition-transform duration-300 ease-in-out z-40 ${
-        chatPanelOpen ? 'translate-x-0' : 'translate-x-full md:translate-x-0'
-      } md:translate-x-0`}>
+      <div 
+        ref={chatContainerRef}
+        className={`fixed md:relative top-16 md:top-0 right-0 md:right-auto bottom-0 h-[calc(100vh-64px)] md:h-auto bg-background border-l flex flex-col shadow-2xl md:shadow-lg transition-transform duration-300 ease-in-out z-40 ${
+          chatPanelOpen ? 'translate-x-0' : 'translate-x-full md:translate-x-0'
+        } md:translate-x-0`}
+        style={{ width: `${width}px`, maxWidth: '100%' }}
+      >
         {/* Header */}
         <div className="bg-primary text-primary-foreground p-4 flex items-center justify-between flex-shrink-0 rounded-t-none">
           <div>
@@ -424,6 +475,14 @@ const ChatPanel = () => {
 
       {/* Input Area */}
       <ChatInput onSendMessage={sendMessage} disabled={isLoading} />
+
+      {/* Resize Handle - Only on desktop */}
+      <div 
+        ref={resizeHandleRef}
+        onMouseDown={handleResizeStart}
+        className="hidden md:block absolute top-0 left-0 w-1 h-full cursor-col-resize hover:bg-primary hover:opacity-100 opacity-0 transition-opacity duration-200 group"
+        title="Drag to resize"
+      />
       </div>
     </>
   );
