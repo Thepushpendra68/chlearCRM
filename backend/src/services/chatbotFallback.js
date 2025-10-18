@@ -154,6 +154,7 @@ class ChatbotFallback {
    * Handle list/show leads request
    */
   handleListLeads(message) {
+    const DateParser = require('../utils/dateParser');
     const status = this.extractStatus(message);
 
     // Check if user wants all leads
@@ -165,6 +166,37 @@ class ChatbotFallback {
 
     if (status) {
       parameters.status = status;
+    }
+
+    // Try to extract date ranges
+    const dateKeywords = DateParser.extractDateKeywords(message);
+    if (dateKeywords.length > 0) {
+      // Look for date expressions in the message
+      const dateExprMatch = message.match(/(?:created|since|between|last|this)\s+[^.!?]*/);
+      if (dateExprMatch) {
+        const dateRange = DateParser.parseNaturalDate(dateExprMatch[0]);
+        if (dateRange) {
+          parameters.created_after = dateRange.from;
+          parameters.created_before = dateRange.to;
+        }
+      }
+    }
+
+    // Try to extract deal value ranges
+    const valueKeywords = DateParser.extractValueKeywords(message);
+    if (valueKeywords.includes('deal_value') || valueKeywords.includes('value')) {
+      const valueExprMatch = message.match(/(?:deal value|value|worth)\s+[^.!?]*/i);
+      if (valueExprMatch) {
+        const valueRange = DateParser.parseDealValueRange(valueExprMatch[0]);
+        if (valueRange) {
+          if (valueRange.min !== undefined) {
+            parameters.deal_value_min = valueRange.min;
+          }
+          if (valueRange.max !== undefined) {
+            parameters.deal_value_max = valueRange.max;
+          }
+        }
+      }
     }
 
     return {

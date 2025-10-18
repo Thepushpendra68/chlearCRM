@@ -52,6 +52,24 @@ const getLeads = async (currentUser, page = 1, limit = 20, filters = {}) => {
       query = query.eq('assigned_to', filters.assigned_to);
     }
 
+    // Apply date range filters
+    if (filters.date_from) {
+      query = query.gte('created_at', filters.date_from);
+    }
+
+    if (filters.date_to) {
+      query = query.lte('created_at', filters.date_to);
+    }
+
+    // Apply deal value range filters
+    if (filters.deal_value_min !== undefined && filters.deal_value_min !== null) {
+      query = query.gte('deal_value', filters.deal_value_min);
+    }
+
+    if (filters.deal_value_max !== undefined && filters.deal_value_max !== null) {
+      query = query.lte('deal_value', filters.deal_value_max);
+    }
+
     // Apply sorting
     const sortBy = filters.sort_by || 'created_at';
     const sortOrder = filters.sort_order || 'desc';

@@ -136,6 +136,11 @@ class ChatbotService {
 - priority: low, medium, high
 - notes
 
+**Date/Value Range Filtering:**
+- Natural language dates: "last week", "last 30 days", "this month", "last quarter", "since [date]", "between [date1] and [date2]"
+- Value ranges: "over $50k", "between $10k and $100k", "under $25k", "above $5000"
+- Examples: "Show leads created last week", "Leads with deal value over $50000", "Leads from website created this month"
+
 **IMPORTANT: When user asks for leads with a specific status:**
 - If they ask for "qualified leads" but no qualified leads exist, suggest checking "active" leads instead
 - Always execute the query first, then provide helpful suggestions if no results found
@@ -194,6 +199,35 @@ Response:
     "limit": 50
   },
   "response": "Here are all your leads:",
+  "needsConfirmation": false,
+  "missingFields": []
+}
+
+User: "Show leads created last week"
+Response:
+{
+  "action": "LIST_LEADS",
+  "intent": "List leads created in date range",
+  "parameters": {
+    "limit": 50,
+    "created_after": "2024-12-16",
+    "created_before": "2024-12-23"
+  },
+  "response": "Here are leads created last week:",
+  "needsConfirmation": false,
+  "missingFields": []
+}
+
+User: "Show leads with deal value over 50000"
+Response:
+{
+  "action": "LIST_LEADS",
+  "intent": "List leads filtered by deal value",
+  "parameters": {
+    "limit": 50,
+    "deal_value_min": 50000
+  },
+  "response": "Here are leads with deal value over $50,000:",
   "needsConfirmation": false,
   "missingFields": []
 }
@@ -652,6 +686,7 @@ Analyze the message and respond ONLY with valid JSON. Do not include any markdow
    * List leads with filters
    */
   async listLeads(parameters, currentUser) {
+    const DateParser = require('../utils/dateParser');
     const page = parameters.page || 1;
     const limit = parameters.limit || 10;
 
@@ -662,6 +697,22 @@ Analyze the message and respond ONLY with valid JSON. Do not include any markdow
       sort_by: parameters.sort_by || 'created_at',
       sort_order: parameters.sort_order || 'desc'
     };
+
+    // Handle date range filters
+    if (parameters.created_after) {
+      filters.date_from = parameters.created_after;
+    }
+    if (parameters.created_before) {
+      filters.date_to = parameters.created_before;
+    }
+
+    // Handle deal value range filters
+    if (parameters.deal_value_min) {
+      filters.deal_value_min = parameters.deal_value_min;
+    }
+    if (parameters.deal_value_max) {
+      filters.deal_value_max = parameters.deal_value_max;
+    }
 
     const result = await leadService.getLeads(currentUser, page, limit, filters);
     return {
