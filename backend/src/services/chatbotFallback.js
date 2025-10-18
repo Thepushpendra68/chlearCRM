@@ -51,9 +51,9 @@ class ChatbotFallback {
       return this.handleUpdateTask(message, userMessage);
     }
 
-    // Pattern 8: Log activity
-    if (this.matchesPattern(message, ['log', 'log call', 'log email', 'log meeting']) ||
-        (this.matchesPattern(message, ['call', 'email', 'meeting']) && this.matchesPattern(message, ['with', 'contact']))) {
+    // Pattern 8: Log activity (MUST come before update/add note patterns)
+    if (this.matchesPattern(message, ['log', 'log call', 'log email', 'log meeting', 'had a call', 'had a meeting', 'sent email', 'called', 'called on', 'emailed', 'met with']) ||
+        (this.matchesPattern(message, ['call', 'email', 'meeting']) && (this.matchesPattern(message, ['with', 'contact', 'discussed', 'discussed with', 'talked']) || /\b(call|email|meeting)\s+(with|on|to)\s+/.test(message)))) {
       return this.handleLogActivity(message, userMessage);
     }
 
@@ -70,10 +70,11 @@ class ChatbotFallback {
       return this.handleMyStats(message, userMessage);
     }
 
-    // Pattern 11: Bulk update
+    // Pattern 11: Bulk update (MUST NOT match single lead updates or activities)
     if ((this.matchesPattern(message, ['update', 'bulk', 'all']) ||
          this.matchesPattern(message, ['change']) && this.matchesPattern(message, ['all', 'leads'])) &&
-        !this.matchesPattern(message, ['single', 'one'])) {
+        !this.matchesPattern(message, ['single', 'one']) &&
+        !this.matchesPattern(message, ['call', 'email', 'meeting', 'task', 'activity'])) {
       return this.handleBulkUpdate(message, userMessage);
     }
 
@@ -143,9 +144,9 @@ class ChatbotFallback {
       return this.handleCreateLead(message, userMessage);
     }
 
-    // Pattern 9: Update lead
+    // Pattern 9: Update lead (EXCLUDE activity/task keywords to prevent misrouting)
     if (this.matchesPattern(message, ['update', 'change', 'modify', 'edit']) &&
-        !this.matchesPattern(message, ['stage', 'pipeline'])) {
+        !this.matchesPattern(message, ['stage', 'pipeline', 'call', 'email', 'meeting', 'task', 'activity', 'log', 'scheduled', 'remind'])) {
       return this.handleUpdateLead(message, userMessage);
     }
 
