@@ -212,19 +212,19 @@ const Dashboard = () => {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:gap-4 lg:grid-cols-4 lg:gap-5 mb-8">
         {loading ? (
           // Loading skeleton
           Array.from({ length: 4 }).map((_, index) => (
             <div key={index} className="card animate-pulse">
               <div className="card-body">
-                <div className="flex items-center">
+                <div className="flex items-center gap-3 md:gap-4">
                   <div className="flex-shrink-0">
-                    <div className="h-8 w-8 bg-gray-300 rounded"></div>
+                    <div className="h-6 w-6 md:h-8 md:w-8 bg-gray-300 rounded"></div>
                   </div>
-                  <div className="ml-5 w-0 flex-1">
-                    <div className="h-4 bg-gray-300 rounded mb-2"></div>
-                    <div className="h-6 bg-gray-300 rounded w-16"></div>
+                  <div className="min-w-0 flex-1">
+                    <div className="h-3 md:h-4 bg-gray-300 rounded mb-2"></div>
+                    <div className="h-5 md:h-6 bg-gray-300 rounded w-16"></div>
                   </div>
                 </div>
               </div>
@@ -234,28 +234,28 @@ const Dashboard = () => {
           statsData.map((item) => (
             <div key={item.name} className="card">
               <div className="card-body">
-                <div className="flex items-center">
+                <div className="flex items-center gap-3 md:gap-4">
                   <div className="flex-shrink-0">
-                    <item.icon className="h-8 w-8 text-primary-600" aria-hidden="true" />
+                    <item.icon className="h-6 w-6 md:h-8 md:w-8 text-primary-600 flex-shrink-0" aria-hidden="true" />
                   </div>
-                  <div className="ml-5 w-0 flex-1">
+                  <div className="min-w-0 flex-1">
                     <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">{item.name}</dt>
+                      <dt className="text-xs md:text-sm font-medium text-gray-500 truncate">{item.name}</dt>
                       <dd>
-                        <div className="text-lg font-medium text-gray-900">{item.value}</div>
+                        <div className="text-base md:text-lg font-semibold text-gray-900 mt-1">{item.value}</div>
                       </dd>
                     </dl>
                   </div>
                 </div>
               </div>
               <div className="card-footer">
-                <div className="flex">
-                  <span className={`text-sm font-medium ${
+                <div className="flex flex-col sm:flex-row gap-1 sm:gap-2 text-xs md:text-sm">
+                  <span className={`font-medium whitespace-nowrap ${
                     item.changeType === 'increase' ? 'text-green-600' : 'text-red-600'
                   }`}>
                     {item.change}
                   </span>
-                  <span className="text-sm text-gray-500 ml-2">from last month</span>
+                  <span className="text-gray-500 whitespace-nowrap">from last month</span>
                 </div>
               </div>
             </div>
