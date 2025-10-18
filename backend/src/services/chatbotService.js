@@ -10,7 +10,13 @@ const VALID_ACTIONS = new Set([
   'GET_LEAD',
   'SEARCH_LEADS',
   'LIST_LEADS',
-  'GET_STATS'
+  'GET_STATS',
+  'DELETE_LEAD',
+  'ADD_LEAD_NOTE',
+  'VIEW_LEAD_NOTES',
+  'MOVE_LEAD_STAGE',
+  'ASSIGN_LEAD',
+  'UNASSIGN_LEAD'
 ]);
 
 const DEFAULT_GEMINI_MODELS = [
@@ -110,6 +116,12 @@ class ChatbotService {
 4. SEARCH_LEADS - Search for leads by name, email, company
 5. LIST_LEADS - List leads with filters (status, source)
 6. GET_STATS - Show lead statistics
+7. DELETE_LEAD - Delete a lead (requires confirmation)
+8. ADD_LEAD_NOTE - Add or update notes for a lead
+9. VIEW_LEAD_NOTES - Get notes/activities for a lead
+10. MOVE_LEAD_STAGE - Move lead to different pipeline stage
+11. ASSIGN_LEAD - Assign lead to a team member
+12. UNASSIGN_LEAD - Remove assignment from a lead
 
 **Lead Fields:**
 - first_name, last_name (required for creation)
@@ -199,13 +211,68 @@ Response:
   "missingFields": []
 }
 
+User: "Delete lead john@acme.com"
+Response:
+{
+  "action": "DELETE_LEAD",
+  "intent": "Delete lead",
+  "parameters": {
+    "email": "john@acme.com"
+  },
+  "response": "I'll delete the lead for john@acme.com. This action cannot be undone. Are you sure?",
+  "needsConfirmation": true,
+  "missingFields": []
+}
+
+User: "Add note to John Doe: Called today, very interested"
+Response:
+{
+  "action": "ADD_LEAD_NOTE",
+  "intent": "Add note to lead",
+  "parameters": {
+    "search": "John Doe",
+    "note_content": "Called today, very interested"
+  },
+  "response": "I'll add that note to John Doe's lead. Let me save that for you.",
+  "needsConfirmation": false,
+  "missingFields": []
+}
+
+User: "Move John Doe to proposal stage"
+Response:
+{
+  "action": "MOVE_LEAD_STAGE",
+  "intent": "Move lead to pipeline stage",
+  "parameters": {
+    "search": "John Doe",
+    "stage_name": "proposal"
+  },
+  "response": "I'll move John Doe to the proposal stage.",
+  "needsConfirmation": true,
+  "missingFields": []
+}
+
+User: "Assign john@acme.com to Sarah"
+Response:
+{
+  "action": "ASSIGN_LEAD",
+  "intent": "Assign lead to user",
+  "parameters": {
+    "email": "john@acme.com",
+    "assigned_to": "Sarah"
+  },
+  "response": "I'll assign john@acme.com to Sarah.",
+  "needsConfirmation": true,
+  "missingFields": []
+}
+
 User: "Hello"
 Response:
 {
   "action": "CHAT",
   "intent": "Greeting",
   "parameters": {},
-  "response": "Hello! I'm your CRM assistant. I can help you create leads, search for leads, update lead information, and show you statistics. What would you like to do?",
+  "response": "Hello! I'm your CRM assistant. I can help you create, update, and manage leads, assign them to team members, move them through stages, and more. What would you like to do?",
   "needsConfirmation": false,
   "missingFields": []
 }
@@ -459,6 +526,24 @@ Analyze the message and respond ONLY with valid JSON. Do not include any markdow
         case 'GET_STATS':
           return await this.getStats(currentUser);
 
+        case 'DELETE_LEAD':
+          return await this.deleteLead(parameters, currentUser);
+
+        case 'ADD_LEAD_NOTE':
+          return await this.addLeadNote(parameters, currentUser);
+
+        case 'VIEW_LEAD_NOTES':
+          return await this.viewLeadNotes(parameters, currentUser);
+
+        case 'MOVE_LEAD_STAGE':
+          return await this.moveLeadStage(parameters, currentUser);
+
+        case 'ASSIGN_LEAD':
+          return await this.assignLead(parameters, currentUser);
+
+        case 'UNASSIGN_LEAD':
+          return await this.unassignLead(parameters, currentUser);
+
         default:
           return null;
       }
@@ -604,6 +689,241 @@ Analyze the message and respond ONLY with valid JSON. Do not include any markdow
    */
   async confirmAction(userId, action, parameters, currentUser) {
     return await this.executeAction(action, parameters, currentUser, false);
+  }
+
+  /**
+   * Delete a lead
+   */
+  async deleteLead(parameters, currentUser) {
+    let leadId = parameters.lead_id;
+
+    if (!leadId && parameters.email) {
+      const searchResults = await leadService.searchLeads(parameters.email, 1, currentUser);
+      if (searchResults && searchResults.length > 0) {
+        leadId = searchResults[0].id;
+      }
+    }
+
+    if (!leadId && parameters.search) {
+      const searchResults = await leadService.searchLeads(parameters.search, 1, currentUser);
+      if (searchResults && searchResults.length > 0) {
+        leadId = searchResults[0].id;
+      }
+    }
+
+    if (!leadId) {
+      throw new ApiError('Could not find the lead to delete', 404);
+    }
+
+    const result = await leadService.deleteLead(leadId, currentUser);
+    return { lead: result.deletedLead, action: 'deleted' };
+  }
+
+  /**
+   * Add or update notes for a lead
+   */
+  async addLeadNote(parameters, currentUser) {
+    let leadId = parameters.lead_id;
+    const noteContent = parameters.note_content || parameters.note || '';
+
+    if (!noteContent.trim()) {
+      throw new ApiError('Note content is required', 400);
+    }
+
+    if (!leadId && parameters.email) {
+      const searchResults = await leadService.searchLeads(parameters.email, 1, currentUser);
+      if (searchResults && searchResults.length > 0) {
+        leadId = searchResults[0].id;
+      }
+    }
+
+    if (!leadId && parameters.search) {
+      const searchResults = await leadService.searchLeads(parameters.search, 1, currentUser);
+      if (searchResults && searchResults.length > 0) {
+        leadId = searchResults[0].id;
+      }
+    }
+
+    if (!leadId) {
+      throw new ApiError('Could not find the lead to add note to', 404);
+    }
+
+    const updateData = { notes: noteContent };
+    const leadResult = await leadService.updateLead(leadId, updateData, currentUser);
+
+    return { lead: leadResult.updatedLead, action: 'note_added' };
+  }
+
+  /**
+   * View notes and activities for a lead
+   */
+  async viewLeadNotes(parameters, currentUser) {
+    const activityService = require('./activityService');
+    let leadId = parameters.lead_id;
+
+    if (!leadId && parameters.email) {
+      const searchResults = await leadService.searchLeads(parameters.email, 1, currentUser);
+      if (searchResults && searchResults.length > 0) {
+        leadId = searchResults[0].id;
+      }
+    }
+
+    if (!leadId && parameters.search) {
+      const searchResults = await leadService.searchLeads(parameters.search, 1, currentUser);
+      if (searchResults && searchResults.length > 0) {
+        leadId = searchResults[0].id;
+      }
+    }
+
+    if (!leadId) {
+      throw new ApiError('Could not find the lead', 404);
+    }
+
+    const lead = await leadService.getLeadById(leadId);
+    const activitiesResult = await activityService.getActivities(currentUser, { lead_id: leadId });
+
+    return {
+      lead: { id: lead.id, name: lead.name, notes: lead.notes },
+      activities: activitiesResult.data || [],
+      action: 'viewed'
+    };
+  }
+
+  /**
+   * Move lead to a different pipeline stage
+   */
+  async moveLeadStage(parameters, currentUser) {
+    const pipelineService = require('./pipelineService');
+    let leadId = parameters.lead_id;
+    const stageName = parameters.stage_name || parameters.stage || '';
+
+    if (!stageName.trim()) {
+      throw new ApiError('Stage name is required', 400);
+    }
+
+    if (!leadId && parameters.email) {
+      const searchResults = await leadService.searchLeads(parameters.email, 1, currentUser);
+      if (searchResults && searchResults.length > 0) {
+        leadId = searchResults[0].id;
+      }
+    }
+
+    if (!leadId && parameters.search) {
+      const searchResults = await leadService.searchLeads(parameters.search, 1, currentUser);
+      if (searchResults && searchResults.length > 0) {
+        leadId = searchResults[0].id;
+      }
+    }
+
+    if (!leadId) {
+      throw new ApiError('Could not find the lead to move', 404);
+    }
+
+    const stagesResult = await pipelineService.getAllStages(currentUser);
+    if (!stagesResult.success) {
+      throw new ApiError('Could not fetch pipeline stages', 500);
+    }
+
+    const stages = stagesResult.data || [];
+    const targetStage = stages.find(s => s.name.toLowerCase().includes(stageName.toLowerCase()));
+
+    if (!targetStage) {
+      throw new ApiError(`Pipeline stage '${stageName}' not found`, 404);
+    }
+
+    const updateData = { pipeline_stage_id: targetStage.id };
+    const leadResult = await leadService.updateLead(leadId, updateData, currentUser);
+
+    return { lead: leadResult.updatedLead, stage: targetStage.name, action: 'moved' };
+  }
+
+  /**
+   * Assign lead to a team member
+   */
+  async assignLead(parameters, currentUser) {
+    const { supabaseAdmin } = require('../config/supabase');
+    let leadId = parameters.lead_id;
+    const assignTo = parameters.assigned_to || parameters.assign_to || '';
+
+    if (!assignTo.trim()) {
+      throw new ApiError('Team member name or email is required', 400);
+    }
+
+    if (!leadId && parameters.email) {
+      const searchResults = await leadService.searchLeads(parameters.email, 1, currentUser);
+      if (searchResults && searchResults.length > 0) {
+        leadId = searchResults[0].id;
+      }
+    }
+
+    if (!leadId && parameters.search) {
+      const searchResults = await leadService.searchLeads(parameters.search, 1, currentUser);
+      if (searchResults && searchResults.length > 0) {
+        leadId = searchResults[0].id;
+      }
+    }
+
+    if (!leadId) {
+      throw new ApiError('Could not find the lead to assign', 404);
+    }
+
+    const { data: users, error: usersError } = await supabaseAdmin
+      .from('user_profiles')
+      .select('id, first_name, last_name, email')
+      .eq('company_id', currentUser.company_id);
+
+    if (usersError) {
+      throw new ApiError('Could not fetch team members', 500);
+    }
+
+    const targetUser = users.find(u =>
+      u.first_name.toLowerCase().includes(assignTo.toLowerCase()) ||
+      u.last_name.toLowerCase().includes(assignTo.toLowerCase()) ||
+      u.email.toLowerCase().includes(assignTo.toLowerCase())
+    );
+
+    if (!targetUser) {
+      throw new ApiError(`Team member '${assignTo}' not found`, 404);
+    }
+
+    const updateData = { assigned_to: targetUser.id, assigned_at: new Date().toISOString() };
+    const leadResult = await leadService.updateLead(leadId, updateData, currentUser);
+
+    return {
+      lead: leadResult.updatedLead,
+      assigned_to: `${targetUser.first_name} ${targetUser.last_name}`,
+      action: 'assigned'
+    };
+  }
+
+  /**
+   * Unassign lead from current assignee
+   */
+  async unassignLead(parameters, currentUser) {
+    let leadId = parameters.lead_id;
+
+    if (!leadId && parameters.email) {
+      const searchResults = await leadService.searchLeads(parameters.email, 1, currentUser);
+      if (searchResults && searchResults.length > 0) {
+        leadId = searchResults[0].id;
+      }
+    }
+
+    if (!leadId && parameters.search) {
+      const searchResults = await leadService.searchLeads(parameters.search, 1, currentUser);
+      if (searchResults && searchResults.length > 0) {
+        leadId = searchResults[0].id;
+      }
+    }
+
+    if (!leadId) {
+      throw new ApiError('Could not find the lead to unassign', 404);
+    }
+
+    const updateData = { assigned_to: null };
+    const leadResult = await leadService.updateLead(leadId, updateData, currentUser);
+
+    return { lead: leadResult.updatedLead, action: 'unassigned' };
   }
 }
 

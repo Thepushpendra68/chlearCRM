@@ -12,34 +12,66 @@ class ChatbotFallback {
   parseMessage(userMessage) {
     const message = userMessage.toLowerCase().trim();
 
-    // Pattern 1: List/Show leads with status filter
+    // Pattern 1: Delete lead
+    if (this.matchesPattern(message, ['delete', 'remove', 'drop'])) {
+      return this.handleDeleteLead(message, userMessage);
+    }
+
+    // Pattern 2: Add note
+    if (this.matchesPattern(message, ['add note', 'note', 'add comment'])) {
+      return this.handleAddNote(message, userMessage);
+    }
+
+    // Pattern 3: View notes
+    if (this.matchesPattern(message, ['show note', 'view note', 'notes', 'history', 'activities']) &&
+        this.matchesPattern(message, ['note', 'history', 'activity', 'activities'])) {
+      return this.handleViewNotes(message, userMessage);
+    }
+
+    // Pattern 4: Move lead to stage
+    if (this.matchesPattern(message, ['move', 'stage', 'pipeline'])) {
+      return this.handleMoveStage(message, userMessage);
+    }
+
+    // Pattern 5: Assign lead
+    if (this.matchesPattern(message, ['assign', 'assignee'])) {
+      return this.handleAssignLead(message, userMessage);
+    }
+
+    // Pattern 6: Unassign lead
+    if (this.matchesPattern(message, ['unassign', 'remove assign'])) {
+      return this.handleUnassignLead(message, userMessage);
+    }
+
+    // Pattern 7: List/Show leads with status filter
     if (this.matchesPattern(message, ['show', 'list', 'get', 'find', 'display'])) {
       return this.handleListLeads(message);
     }
 
-    // Pattern 2: Create lead
+    // Pattern 8: Create lead
     if (this.matchesPattern(message, ['create', 'add', 'new']) &&
         this.matchesPattern(message, ['lead'])) {
       return this.handleCreateLead(message, userMessage);
     }
 
-    // Pattern 3: Update lead
-    if (this.matchesPattern(message, ['update', 'change', 'modify', 'edit'])) {
+    // Pattern 9: Update lead
+    if (this.matchesPattern(message, ['update', 'change', 'modify', 'edit']) &&
+        !this.matchesPattern(message, ['stage', 'pipeline'])) {
       return this.handleUpdateLead(message, userMessage);
     }
 
-    // Pattern 4: Search lead
+    // Pattern 10: Search lead
     if (this.matchesPattern(message, ['search', 'find', 'lookup']) &&
         (message.includes('@') || message.includes('email') || /[A-Z][a-z]+/.test(userMessage))) {
       return this.handleSearchLead(message, userMessage);
     }
 
-    // Pattern 5: Statistics
+    // Pattern 11: Statistics
     if (this.matchesPattern(message, ['stat', 'statistics', 'analytics', 'report', 'summary'])) {
       return this.handleStats();
     }
 
-    // Pattern 6: Help/Greeting
+    // Pattern 12: Help/Greeting
     if (this.matchesPattern(message, ['help', 'hello', 'hi', 'hey', 'start'])) {
       return this.handleGreeting();
     }
@@ -287,6 +319,267 @@ class ChatbotFallback {
   }
 
   /**
+   * Handle delete lead request
+   */
+  handleDeleteLead(message, originalMessage) {
+    const email = this.extractEmail(originalMessage);
+    const name = this.extractName(originalMessage);
+
+    let searchQuery = '';
+    if (email) {
+      searchQuery = email;
+    } else if (name) {
+      searchQuery = `${name.first_name} ${name.last_name}`.trim();
+    }
+
+    if (!searchQuery) {
+      return {
+        action: 'CHAT',
+        intent: 'Need lead identifier',
+        parameters: {},
+        response: 'To delete a lead, please provide the name or email. For example: "Delete john@example.com"',
+        needsConfirmation: false,
+        missingFields: ['email']
+      };
+    }
+
+    return {
+      action: 'DELETE_LEAD',
+      intent: 'Delete lead',
+      parameters: email ? { email } : { search: searchQuery },
+      response: `I'll delete the lead "${searchQuery}". This action cannot be undone. Are you sure?`,
+      needsConfirmation: true,
+      missingFields: []
+    };
+  }
+
+  /**
+   * Handle add note request
+   */
+  handleAddNote(message, originalMessage) {
+    const email = this.extractEmail(originalMessage);
+    const name = this.extractName(originalMessage);
+
+    // Try to extract note content - look for content after "note:" or "add note"
+    let noteContent = '';
+    const notePattern = /(?:note:|add note|comment:)\s*(.+?)(?:$|for|to)/i;
+    const noteMatch = originalMessage.match(notePattern);
+    if (noteMatch) {
+      noteContent = noteMatch[1].trim();
+    }
+
+    let searchQuery = '';
+    if (email) {
+      searchQuery = email;
+    } else if (name) {
+      searchQuery = `${name.first_name} ${name.last_name}`.trim();
+    }
+
+    if (!searchQuery) {
+      return {
+        action: 'CHAT',
+        intent: 'Need lead identifier',
+        parameters: {},
+        response: 'To add a note, please provide the lead name or email. For example: "Add note to john@example.com: Called today"',
+        needsConfirmation: false,
+        missingFields: ['email']
+      };
+    }
+
+    if (!noteContent) {
+      return {
+        action: 'CHAT',
+        intent: 'Need note content',
+        parameters: {},
+        response: `To add a note to "${searchQuery}", please provide the note content. For example: "Add note to ${searchQuery}: Called today, very interested"`,
+        needsConfirmation: false,
+        missingFields: ['note_content']
+      };
+    }
+
+    return {
+      action: 'ADD_LEAD_NOTE',
+      intent: 'Add note to lead',
+      parameters: email ? { email, note_content: noteContent } : { search: searchQuery, note_content: noteContent },
+      response: `I'll add the note to "${searchQuery}": "${noteContent}"`,
+      needsConfirmation: false,
+      missingFields: []
+    };
+  }
+
+  /**
+   * Handle view notes request
+   */
+  handleViewNotes(message, originalMessage) {
+    const email = this.extractEmail(originalMessage);
+    const name = this.extractName(originalMessage);
+
+    let searchQuery = '';
+    if (email) {
+      searchQuery = email;
+    } else if (name) {
+      searchQuery = `${name.first_name} ${name.last_name}`.trim();
+    }
+
+    if (!searchQuery) {
+      return {
+        action: 'CHAT',
+        intent: 'Need lead identifier',
+        parameters: {},
+        response: 'To view notes and activities, please provide the lead name or email. For example: "Show notes for john@example.com"',
+        needsConfirmation: false,
+        missingFields: ['email']
+      };
+    }
+
+    return {
+      action: 'VIEW_LEAD_NOTES',
+      intent: 'View lead notes and activities',
+      parameters: email ? { email } : { search: searchQuery },
+      response: `Getting notes and activities for "${searchQuery}"...`,
+      needsConfirmation: false,
+      missingFields: []
+    };
+  }
+
+  /**
+   * Handle move lead to stage request
+   */
+  handleMoveStage(message, originalMessage) {
+    const email = this.extractEmail(originalMessage);
+    const name = this.extractName(originalMessage);
+
+    // Extract stage name - look for "to [stage]" or "move to [stage]"
+    const stagePattern = /(?:to|stage|move to)\s+(\w+)/i;
+    const stageMatch = originalMessage.match(stagePattern);
+    const stageName = stageMatch ? stageMatch[1].toLowerCase() : '';
+
+    let searchQuery = '';
+    if (email) {
+      searchQuery = email;
+    } else if (name) {
+      searchQuery = `${name.first_name} ${name.last_name}`.trim();
+    }
+
+    if (!searchQuery) {
+      return {
+        action: 'CHAT',
+        intent: 'Need lead identifier',
+        parameters: {},
+        response: 'To move a lead, please provide the lead name or email and stage. For example: "Move john@example.com to proposal stage"',
+        needsConfirmation: false,
+        missingFields: ['email']
+      };
+    }
+
+    if (!stageName) {
+      return {
+        action: 'CHAT',
+        intent: 'Need stage name',
+        parameters: {},
+        response: `To move the lead "${searchQuery}", please specify a stage. For example: "Move ${searchQuery} to proposal stage"`,
+        needsConfirmation: false,
+        missingFields: ['stage_name']
+      };
+    }
+
+    return {
+      action: 'MOVE_LEAD_STAGE',
+      intent: 'Move lead to pipeline stage',
+      parameters: email ? { email, stage_name: stageName } : { search: searchQuery, stage_name: stageName },
+      response: `I'll move "${searchQuery}" to the ${stageName} stage.`,
+      needsConfirmation: true,
+      missingFields: []
+    };
+  }
+
+  /**
+   * Handle assign lead request
+   */
+  handleAssignLead(message, originalMessage) {
+    const email = this.extractEmail(originalMessage);
+    const name = this.extractName(originalMessage);
+
+    // Extract assignee name - look for "to [name]" or "assign to [name]"
+    const assigneePattern = /(?:to|assign to)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i;
+    const assigneeMatch = originalMessage.match(assigneePattern);
+    const assigneeName = assigneeMatch ? assigneeMatch[1] : '';
+
+    let searchQuery = '';
+    if (email) {
+      searchQuery = email;
+    } else if (name) {
+      searchQuery = `${name.first_name} ${name.last_name}`.trim();
+    }
+
+    if (!searchQuery) {
+      return {
+        action: 'CHAT',
+        intent: 'Need lead identifier',
+        parameters: {},
+        response: 'To assign a lead, please provide the lead name/email and team member name. For example: "Assign john@example.com to Sarah"',
+        needsConfirmation: false,
+        missingFields: ['email']
+      };
+    }
+
+    if (!assigneeName) {
+      return {
+        action: 'CHAT',
+        intent: 'Need assignee name',
+        parameters: {},
+        response: `To assign the lead "${searchQuery}", please specify who to assign it to. For example: "Assign ${searchQuery} to Sarah"`,
+        needsConfirmation: false,
+        missingFields: ['assigned_to']
+      };
+    }
+
+    return {
+      action: 'ASSIGN_LEAD',
+      intent: 'Assign lead to team member',
+      parameters: email ? { email, assigned_to: assigneeName } : { search: searchQuery, assigned_to: assigneeName },
+      response: `I'll assign "${searchQuery}" to ${assigneeName}.`,
+      needsConfirmation: true,
+      missingFields: []
+    };
+  }
+
+  /**
+   * Handle unassign lead request
+   */
+  handleUnassignLead(message, originalMessage) {
+    const email = this.extractEmail(originalMessage);
+    const name = this.extractName(originalMessage);
+
+    let searchQuery = '';
+    if (email) {
+      searchQuery = email;
+    } else if (name) {
+      searchQuery = `${name.first_name} ${name.last_name}`.trim();
+    }
+
+    if (!searchQuery) {
+      return {
+        action: 'CHAT',
+        intent: 'Need lead identifier',
+        parameters: {},
+        response: 'To unassign a lead, please provide the lead name or email. For example: "Unassign john@example.com"',
+        needsConfirmation: false,
+        missingFields: ['email']
+      };
+    }
+
+    return {
+      action: 'UNASSIGN_LEAD',
+      intent: 'Unassign lead',
+      parameters: email ? { email } : { search: searchQuery },
+      response: `I'll unassign "${searchQuery}" from its current owner.`,
+      needsConfirmation: true,
+      missingFields: []
+    };
+  }
+
+  /**
    * Handle greeting/help
    */
   handleGreeting() {
@@ -294,7 +587,7 @@ class ChatbotFallback {
       action: 'CHAT',
       intent: 'Greeting',
       parameters: {},
-      response: 'Hello! I\'m your CRM assistant. I can help you:\n\n• Create leads: "Create a lead named John Doe, email john@example.com"\n• Show leads: "Show me all active leads"\n• Search: "Find john@example.com"\n• Update: "Update john@example.com status to qualified"\n• Statistics: "Show me lead statistics"\n\nWhat would you like to do?',
+      response: 'Hello! I\'m your CRM assistant. I can help you:\n\n• Create leads: "Create a lead named John Doe, email john@example.com"\n• Show leads: "Show me all active leads"\n• Search: "Find john@example.com"\n• Update: "Update john@example.com status to qualified"\n• Delete: "Delete john@example.com"\n• Add notes: "Add note to john@example.com: Called today"\n• Assign: "Assign john@example.com to Sarah"\n• Move stage: "Move john@example.com to proposal"\n• Statistics: "Show me lead statistics"\n\nWhat would you like to do?',
       needsConfirmation: false,
       missingFields: []
     };
