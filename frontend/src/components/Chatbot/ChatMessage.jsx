@@ -51,14 +51,14 @@ const ChatMessage = ({ message }) => {
 
   // Render single lead card
   const renderSingleLead = (lead) => (
-    <div className="mt-2 p-3 bg-blue-50 rounded border border-blue-200">
-      <div className="flex items-center justify-between mb-2">
-        <h4 className="font-semibold text-gray-900">{lead.name || `${lead.first_name} ${lead.last_name}`}</h4>
-        <span className={`px-2 py-1 text-xs rounded ${getStatusColor(lead.status)}`}>
+    <div className="mt-3 p-4 bg-blue-50 rounded-lg border border-blue-200">
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="font-semibold text-gray-900 text-base">{lead.name || `${lead.first_name} ${lead.last_name}`}</h4>
+        <span className={`px-3 py-1.5 text-xs font-medium rounded-full ${getStatusColor(lead.status)}`}>
           {lead.status}
         </span>
       </div>
-      <div className="space-y-1 text-sm text-gray-700">
+      <div className="space-y-2 text-sm text-gray-700">
         {lead.email && (
           <p className="flex items-center">
             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -91,25 +91,25 @@ const ChatMessage = ({ message }) => {
   const renderLeadList = (leads) => {
     if (leads.length === 0) {
       return (
-        <div className="mt-2 p-3 bg-gray-50 rounded border border-gray-200 text-center text-gray-600">
+        <div className="mt-3 p-4 bg-gray-50 rounded-lg border border-gray-200 text-center text-gray-600">
           No leads found
         </div>
       );
     }
 
     return (
-      <div className="mt-2 space-y-2">
+      <div className="mt-3 space-y-3">
         {leads.slice(0, 5).map((lead, index) => (
-          <div key={index} className="p-2 bg-blue-50 rounded border border-blue-200">
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <p className="font-medium text-sm text-gray-900">
+          <div key={index} className="p-3 bg-blue-50 rounded-lg border border-blue-200 hover:border-blue-300 transition-colors">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-sm text-gray-900 truncate">
                   {lead.name || `${lead.first_name} ${lead.last_name}`}
                 </p>
-                <p className="text-xs text-gray-600">{lead.email}</p>
-                {lead.company && <p className="text-xs text-gray-600">{lead.company}</p>}
+                <p className="text-xs text-gray-600 truncate mt-1">{lead.email}</p>
+                {lead.company && <p className="text-xs text-gray-600 truncate mt-0.5">{lead.company}</p>}
               </div>
-              <span className={`px-2 py-1 text-xs rounded ${getStatusColor(lead.status)}`}>
+              <span className={`px-3 py-1.5 text-xs font-medium rounded-full whitespace-nowrap ${getStatusColor(lead.status)}`}>
                 {lead.status}
               </span>
             </div>
@@ -126,26 +126,26 @@ const ChatMessage = ({ message }) => {
 
   // Render statistics
   const renderStats = (stats) => (
-    <div className="mt-2 p-3 bg-blue-50 rounded border border-blue-200">
-      <h4 className="font-semibold text-gray-900 mb-2">Lead Statistics</h4>
-      <div className="grid grid-cols-2 gap-2 text-sm">
-        <div>
-          <p className="text-gray-600">Total Leads</p>
-          <p className="font-bold text-lg text-blue-600">{stats.total_leads || 0}</p>
+    <div className="mt-3 p-4 bg-blue-50 rounded-lg border border-blue-200">
+      <h4 className="font-semibold text-gray-900 mb-4 text-base">Lead Statistics</h4>
+      <div className="grid grid-cols-2 gap-4 text-sm">
+        <div className="p-3 bg-white rounded border border-blue-100">
+          <p className="text-gray-600 text-xs font-medium">Total Leads</p>
+          <p className="font-bold text-2xl text-blue-600 mt-2">{stats.total_leads || 0}</p>
         </div>
-        <div>
-          <p className="text-gray-600">Recent Leads</p>
-          <p className="font-bold text-lg text-green-600">{stats.recent_leads || 0}</p>
+        <div className="p-3 bg-white rounded border border-green-100">
+          <p className="text-gray-600 text-xs font-medium">Recent Leads</p>
+          <p className="font-bold text-2xl text-green-600 mt-2">{stats.recent_leads || 0}</p>
         </div>
       </div>
       {stats.status_distribution && (
-        <div className="mt-3">
-          <p className="text-gray-600 font-medium mb-1">By Status:</p>
-          <div className="space-y-1">
+        <div className="mt-4 pt-4 border-t border-blue-200">
+          <p className="text-gray-600 font-medium mb-3 text-sm">By Status:</p>
+          <div className="space-y-2">
             {Object.entries(stats.status_distribution).map(([status, count]) => (
-              <div key={status} className="flex justify-between text-sm">
-                <span className="capitalize">{status}</span>
-                <span className="font-medium">{count}</span>
+              <div key={status} className="flex justify-between text-sm items-center">
+                <span className="capitalize text-gray-700">{status}</span>
+                <span className="font-semibold px-2 py-1 bg-white rounded text-gray-900">{count}</span>
               </div>
             ))}
           </div>
@@ -169,27 +169,27 @@ const ChatMessage = ({ message }) => {
   };
 
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} gap-2`}>
+    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} gap-3 mb-2`}>
       {!isUser && (
-        <Avatar className="h-8 w-8 flex-shrink-0">
-          <AvatarFallback className="bg-primary text-primary-foreground text-xs">AI</AvatarFallback>
+        <Avatar className="h-9 w-9 flex-shrink-0">
+          <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">AI</AvatarFallback>
         </Avatar>
       )}
 
       <div className={`max-w-[85%]`}>
-        <div className={`rounded-lg p-3 ${isUser ? 'bg-primary text-primary-foreground' : isError ? 'bg-destructive/10 text-destructive border border-destructive/20' : 'bg-card border'}`}>
-          <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">{message.content}</p>
+        <div className={`rounded-lg p-4 ${isUser ? 'bg-primary text-primary-foreground' : isError ? 'bg-destructive/10 text-destructive border border-destructive/20' : 'bg-card border'}`}>
+          <p className="text-sm whitespace-pre-wrap break-words leading-loose">{message.content}</p>
 
           {/* Render data if available */}
           {!isUser && message.data && renderLeadData(message.data)}
 
           {!isUser && sourceMeta && (
-            <div className="mt-2 flex items-center gap-2 text-xs">
-              <Badge variant="outline" className={sourceMeta.className}>
+            <div className="mt-3 flex items-center gap-2 text-xs">
+              <Badge variant="outline" className={`${sourceMeta.className} font-medium`}>
                 {sourceMeta.label}
               </Badge>
               {message.meta?.model && message.meta.source === 'gemini' && (
-                <span className="text-muted-foreground flex items-center gap-1">
+                <span className="text-muted-foreground flex items-center gap-1 font-medium">
                   <Zap className="h-3 w-3" />
                   {message.meta.model}
                 </span>
@@ -198,20 +198,20 @@ const ChatMessage = ({ message }) => {
           )}
 
           {!isUser && message.missingFields?.length > 0 && (
-            <div className="mt-2 bg-muted border border-muted-foreground/20 text-muted-foreground text-xs rounded p-2 flex items-start gap-2">
-              <AlertCircle className="h-3 w-3 flex-shrink-0 mt-0.5" />
+            <div className="mt-3 bg-muted border border-muted-foreground/20 text-muted-foreground text-xs rounded-lg p-3 flex items-start gap-3">
+              <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
               <span>Missing: {message.missingFields.join(', ')}</span>
             </div>
           )}
 
           {showPendingSummary && (
-            <div className="mt-2 bg-muted border border-input rounded p-2 text-xs">
-              <p className="font-semibold text-foreground mb-1">Details to confirm</p>
-              <ul className="space-y-1">
+            <div className="mt-3 bg-muted border border-input rounded-lg p-4 text-xs">
+              <p className="font-semibold text-foreground mb-3">Details to confirm</p>
+              <ul className="space-y-2">
                 {parameterEntries.map(([key, value]) => (
-                  <li key={key} className="flex justify-between gap-2">
-                    <span className="font-medium flex-shrink-0">{formatKey(key)}</span>
-                    <span className="text-right text-muted-foreground truncate">{String(value)}</span>
+                  <li key={key} className="flex justify-between gap-3 items-center">
+                    <span className="font-medium flex-shrink-0 text-foreground">{formatKey(key)}</span>
+                    <span className="text-right text-muted-foreground truncate text-xs">{String(value)}</span>
                   </li>
                 ))}
               </ul>
@@ -219,15 +219,15 @@ const ChatMessage = ({ message }) => {
           )}
 
           {/* Timestamp */}
-          <p className={`text-xs mt-2 ${isUser ? 'text-primary-foreground/60' : 'text-muted-foreground'}`}>
+          <p className={`text-xs mt-3 ${isUser ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
             {formatDistanceToNow(new Date(message.timestamp), { addSuffix: true })}
           </p>
         </div>
       </div>
 
       {isUser && (
-        <Avatar className="h-8 w-8 flex-shrink-0">
-          <AvatarFallback className="bg-muted text-foreground text-xs">U</AvatarFallback>
+        <Avatar className="h-9 w-9 flex-shrink-0">
+          <AvatarFallback className="bg-muted text-foreground text-xs font-semibold">U</AvatarFallback>
         </Avatar>
       )}
     </div>

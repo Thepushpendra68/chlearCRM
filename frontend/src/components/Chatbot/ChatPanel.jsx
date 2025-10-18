@@ -8,7 +8,7 @@ import { Button } from '../ui/button';
 import { Card, CardHeader, CardContent, CardFooter } from '../ui/card';
 import { ScrollArea } from '../ui/scroll-area';
 import { Separator } from '../ui/separator';
-import { Trash2, X } from 'lucide-react';
+import { Trash2, X, AlertCircle } from 'lucide-react';
 
 const ACTION_LABELS = {
   CREATE_LEAD: 'Create lead',
@@ -353,17 +353,17 @@ const ChatPanel = () => {
         style={{ width: `${width}px`, maxWidth: '100%' }}
       >
         {/* Header */}
-        <div className="bg-primary text-primary-foreground p-4 flex items-center justify-between flex-shrink-0 rounded-t-none">
+        <div className="bg-primary text-primary-foreground p-5 flex items-center justify-between flex-shrink-0 rounded-t-none border-b">
           <div>
-            <h3 className="font-semibold text-sm">CRM Assistant</h3>
-            <p className="text-xs opacity-90">Powered by AI</p>
+            <h3 className="font-semibold text-base">CRM Assistant</h3>
+            <p className="text-xs opacity-90 mt-0.5">Powered by Gemini AI</p>
           </div>
           <div className="flex items-center gap-1">
             <Button
               variant="ghost"
               size="icon"
               onClick={clearConversation}
-              className="h-8 w-8 hover:bg-primary/80"
+              className="h-9 w-9 hover:bg-primary/80 rounded-lg"
               title="Clear conversation"
             >
               <Trash2 className="h-4 w-4" />
@@ -371,11 +371,9 @@ const ChatPanel = () => {
           </div>
         </div>
 
-        <Separator className="m-0" />
-
         {/* Messages Container */}
-        <ScrollArea className="flex-1 p-4">
-          <div className="space-y-4">
+        <ScrollArea className="flex-1 p-6">
+          <div className="space-y-5">
             {messages.map(message => (
               <ChatMessage key={message.id} message={message} />
             ))}
@@ -396,28 +394,27 @@ const ChatPanel = () => {
           </div>
         </ScrollArea>
 
-        <Separator className="m-0" />
-
         {/* Pending Action Confirmation */}
         {pendingAction && (
-          <CardFooter className="flex flex-col gap-3 border-t bg-muted/50 p-3 pt-3">
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground">PENDING ACTION</p>
-              <p className="text-sm font-semibold">
+          <CardFooter className="flex flex-col gap-4 border-t bg-muted/50 p-5 pt-4">
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Pending Action</p>
+              <p className="text-base font-semibold text-foreground">
                 {getActionLabel(pendingAction.action)}
               </p>
               {pendingAction.intent && (
-                <p className="text-xs text-muted-foreground mt-1">{pendingAction.intent}</p>
+                <p className="text-sm text-muted-foreground mt-1">{pendingAction.intent}</p>
               )}
             </div>
 
             {pendingAction.summary?.length > 0 && (
-              <div className="w-full bg-card border rounded-md p-2 text-xs max-h-32 overflow-y-auto">
-                <ul className="space-y-1">
+              <div className="w-full bg-card border rounded-lg p-4 text-xs max-h-40 overflow-y-auto">
+                <p className="text-xs font-semibold text-foreground mb-3">Details to confirm:</p>
+                <ul className="space-y-2.5">
                   {pendingAction.summary.map(item => (
-                    <li key={`${item.label}-${item.value}`} className="flex justify-between gap-2">
-                      <span className="font-medium flex-shrink-0">{item.label}</span>
-                      <span className="text-right text-muted-foreground truncate">{item.value}</span>
+                    <li key={`${item.label}-${item.value}`} className="flex justify-between gap-3 items-center">
+                      <span className="font-medium flex-shrink-0 text-foreground">{item.label}</span>
+                      <span className="text-right text-muted-foreground truncate text-xs">{item.value}</span>
                     </li>
                   ))}
                 </ul>
@@ -425,12 +422,13 @@ const ChatPanel = () => {
             )}
 
             {pendingAction.missingFields?.length > 0 && (
-              <div className="w-full text-xs bg-destructive/10 border border-destructive/20 rounded-md p-2 text-destructive">
-                Missing: {pendingAction.missingFields.join(', ')}
+              <div className="w-full text-sm bg-destructive/10 border border-destructive/20 rounded-lg p-3 text-destructive flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                <span>Missing: {pendingAction.missingFields.join(', ')}</span>
               </div>
             )}
 
-            <div className="flex w-full gap-2">
+            <div className="flex w-full gap-3 pt-2">
               <Button
                 onClick={confirmAction}
                 disabled={isLoading}
