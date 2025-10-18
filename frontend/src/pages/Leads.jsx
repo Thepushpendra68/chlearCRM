@@ -388,8 +388,8 @@ const Leads = () => {
                   </div>
                 )}
               </div>
-              <div className="flex-shrink-0 w-full md:w-auto">
-                <div className="flex flex-col sm:grid sm:grid-cols-2 md:flex md:flex-row gap-2 sm:gap-3">
+              <div className="flex-shrink-0 w-full lg:w-auto">
+                <div className="flex flex-col sm:grid sm:grid-cols-2 md:grid-cols-3 lg:flex lg:flex-row gap-2 sm:gap-2 md:gap-2 lg:gap-3">
                   <button
                     type="button"
                     onClick={() => refreshLeads()}
@@ -467,8 +467,8 @@ const Leads = () => {
 
       {/* Enhanced Search and Filters */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 lg:gap-4">
             <div className="flex-1 max-w-lg">
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -476,12 +476,12 @@ const Leads = () => {
                 </div>
                 <input
                   type="text"
-                  className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200"
+                  className="block w-full pl-10 pr-3 py-2 sm:py-3 border border-gray-300 rounded-lg text-sm leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200"
                   placeholder="Search leads by name, company, or email..."
                 />
               </div>
             </div>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-2 sm:gap-3">
               <select className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200">
                 <option>All Statuses</option>
                 {leadStatuses.map(option => (
@@ -512,10 +512,10 @@ const Leads = () => {
       </div>
 
       {/* Enhanced Leads Table - Responsive */}
-      <ContentWrapper>
+      <ContentWrapper className="px-4 sm:px-6 lg:px-8">
         {/* Mobile View */}
         <MobileOnly>
-          <div className="pb-8">
+          <div className="pb-8 -mx-4 sm:-mx-6 lg:mx-0">
             <LeadsTableMobile
               leads={leads}
               loading={loading}
@@ -552,8 +552,8 @@ const Leads = () => {
                 </div>
               </div>
             ) : (
-              <ResponsiveTableWrapper className="rounded-xl">
-                <table className="min-w-full divide-y divide-gray-200">
+              <ResponsiveTableWrapper className="rounded-xl -mx-4 sm:-mx-6 lg:mx-0">
+                <table className="min-w-full divide-y divide-gray-200 scroll-smooth">
                 <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
                   <tr>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
@@ -692,10 +692,10 @@ const Leads = () => {
         </TabletAndDesktop>
       </ContentWrapper>
 
-      <ContentWrapper className="pb-12">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div className="flex items-center space-x-2">
-            <span className="text-sm text-gray-600">Rows per page:</span>
+      <ContentWrapper className="pb-12 px-4 sm:px-6 lg:px-8">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3 sm:p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-4">
+          <div className="flex items-center space-x-2 text-sm">
+            <span className="text-gray-600 whitespace-nowrap">Rows per page:</span>
             <select
               className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200"
               value={String(itemsPerPage)}
@@ -709,18 +709,16 @@ const Leads = () => {
             </select>
           </div>
 
-          <div className="flex items-center space-x-4 text-sm text-gray-600">
-            <span>
-              Page {currentPage} of {totalPages}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 text-xs sm:text-sm text-gray-600">
+            <span className="whitespace-nowrap">
+              Page <span className="font-medium text-gray-900">{currentPage}</span> of <span className="font-medium text-gray-900">{totalPages}</span>
             </span>
-            <span>
-              <span className="font-medium text-gray-900">{startItemIndex}</span> -{' '}
-              <span className="font-medium text-gray-900">{endItemIndex}</span> of{' '}
-              <span className="font-medium text-gray-900">{totalItems}</span>
+            <span className="whitespace-nowrap">
+              <span className="font-medium text-gray-900">{startItemIndex}</span>–<span className="font-medium text-gray-900">{endItemIndex}</span> of <span className="font-medium text-gray-900">{totalItems}</span>
             </span>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
               <button
-                className={`px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white hover:bg-gray-50 transition-all duration-200 ${
+                className={`flex-1 sm:flex-none px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white hover:bg-gray-50 transition-all duration-200 whitespace-nowrap ${
                   loading || isPageChanging || !hasPrevPage
                     ? 'opacity-50 cursor-not-allowed'
                     : ''
@@ -728,10 +726,10 @@ const Leads = () => {
                 onClick={() => handlePageChange(currentPage - 1)}
                 disabled={loading || isPageChanging || !hasPrevPage}
               >
-                Previous
+                Prev
               </button>
               <button
-                className={`px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white hover:bg-gray-50 transition-all duration-200 ${
+                className={`flex-1 sm:flex-none px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white hover:bg-gray-50 transition-all duration-200 whitespace-nowrap ${
                   loading || isPageChanging || !hasNextPage
                     ? 'opacity-50 cursor-not-allowed'
                     : ''
