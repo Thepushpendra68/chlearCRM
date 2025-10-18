@@ -9,6 +9,8 @@ import pipelineService from '../services/pipelineService'
 import leadService from '../services/leadService'
 import toast from 'react-hot-toast'
 import { usePicklists } from '../context/PicklistContext'
+import { MobileOnly, TabletAndDesktop, ResponsiveContainer, ContentWrapper, ResponsiveTableWrapper } from '../components/ResponsiveUtils'
+import LeadsTableMobile from '../components/Leads/LeadsTableMobile'
 
 const Leads = () => {
   const navigate = useNavigate()
@@ -499,25 +501,49 @@ const Leads = () => {
         </div>
       </div>
 
-      {/* Enhanced Leads Table */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          {loading ? (
-            <div className="p-12">
-              <div className="flex flex-col items-center justify-center">
-                <div className="relative">
-                  <div className="w-16 h-16 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin"></div>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-8 h-8 bg-primary-100 rounded-full animate-pulse"></div>
+      {/* Enhanced Leads Table - Responsive */}
+      <ContentWrapper>
+        {/* Mobile View */}
+        <MobileOnly>
+          <div className="pb-8">
+            <LeadsTableMobile
+              leads={leads}
+              loading={loading}
+              onViewLead={(lead) => navigate(`/app/leads/${lead.id}`)}
+              onEditLead={handleEditLead}
+              onDeleteLead={handleDeleteLead}
+              getStatusLabel={getStatusLabel}
+              getStatusColor={getStatusColor}
+              getStatusIndicatorColor={getStatusIndicatorColor}
+              getSourceLabel={getSourceLabel}
+              getSourceColor={getSourceColor}
+              getStageName={getStageName}
+              getStageColor={getStageColor}
+              selectedLeads={selectedLeads}
+              onSelectLead={handleSelectLead}
+            />
+          </div>
+        </MobileOnly>
+
+        {/* Desktop View - Table */}
+        <TabletAndDesktop>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden pb-8">
+            {loading ? (
+              <div className="p-12">
+                <div className="flex flex-col items-center justify-center">
+                  <div className="relative">
+                    <div className="w-16 h-16 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin"></div>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="w-8 h-8 bg-primary-100 rounded-full animate-pulse"></div>
+                    </div>
                   </div>
+                  <p className="mt-4 text-lg font-medium text-gray-900">Loading leads...</p>
+                  <p className="mt-1 text-sm text-gray-500">Please wait while we fetch your data</p>
                 </div>
-                <p className="mt-4 text-lg font-medium text-gray-900">Loading leads...</p>
-                <p className="mt-1 text-sm text-gray-500">Please wait while we fetch your data</p>
               </div>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
+            ) : (
+              <ResponsiveTableWrapper className="rounded-xl">
+                <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
                   <tr>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
@@ -649,13 +675,14 @@ const Leads = () => {
                     </tr>
                   ))}
                 </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </div>
+                </table>
+              </ResponsiveTableWrapper>
+            )}
+          </div>
+        </TabletAndDesktop>
+      </ContentWrapper>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
+      <ContentWrapper className="pb-12">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="flex items-center space-x-2">
             <span className="text-sm text-gray-600">Rows per page:</span>
@@ -707,11 +734,11 @@ const Leads = () => {
             </div>
           </div>
         </div>
-      </div>
+      </ContentWrapper>
 
       {/* Enhanced Empty State */}
       {!loading && leads.length === 0 && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <ContentWrapper className="py-16">
           <div className="text-center">
             <div className="mx-auto w-24 h-24 bg-gradient-to-br from-primary-100 to-primary-200 rounded-full flex items-center justify-center mb-6">
               <PlusIcon className="h-12 w-12 text-primary-600" />
@@ -768,7 +795,7 @@ const Leads = () => {
               </div>
             </div>
           </div>
-        </div>
+        </ContentWrapper>
       )}
 
       {/* Import/Export Modals */}

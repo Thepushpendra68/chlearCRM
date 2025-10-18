@@ -5,6 +5,8 @@ import TaskList from '../components/Tasks/TaskList';
 import TaskForm from '../components/Tasks/TaskForm';
 import taskService from '../services/taskService';
 import userService from '../services/userService';
+import { MobileOnly, TabletAndDesktop, ContentWrapper } from '../components/ResponsiveUtils';
+import TasksTableMobile from '../components/Tasks/TasksTableMobile';
 
 const Tasks = () => {
   const navigate = useNavigate();
@@ -282,18 +284,33 @@ const Tasks = () => {
         </div>
       </div>
 
-      {/* Task List */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="p-6">
-          <TaskList
-            tasks={tasks}
-            onEdit={handleEditTask}
-            onDelete={handleDeleteTask}
-            onComplete={handleCompleteTask}
-            loading={loading}
-          />
+      {/* Task List - Responsive */}
+      {/* Mobile View */}
+      <MobileOnly className="mb-8">
+        <TasksTableMobile
+          tasks={tasks}
+          loading={loading}
+          onTaskClick={(task) => handleEditTask(task)}
+          onEditTask={handleEditTask}
+          onDeleteTask={handleDeleteTask}
+          onCompleteTask={handleCompleteTask}
+        />
+      </MobileOnly>
+
+      {/* Desktop View */}
+      <TabletAndDesktop>
+        <div className="bg-white rounded-lg shadow">
+          <div className="p-6">
+            <TaskList
+              tasks={tasks}
+              onEdit={handleEditTask}
+              onDelete={handleDeleteTask}
+              onComplete={handleCompleteTask}
+              loading={loading}
+            />
+          </div>
         </div>
-      </div>
+      </TabletAndDesktop>
 
       {/* Task Form Modal */}
       <TaskForm

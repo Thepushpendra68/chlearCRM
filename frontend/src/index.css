@@ -14,7 +14,7 @@
 
 @layer components {
   .btn {
-    @apply inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 transition-all duration-200;
+    @apply inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 transition-all duration-200 min-h-[44px] md:min-h-[auto];
   }
   
   .btn-primary {
@@ -30,7 +30,27 @@
   }
   
   .input {
-    @apply block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200;
+    @apply block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-base md:text-sm;
+  }
+
+  /* Ensure proper touch targets on mobile */
+  @media (max-width: 768px) {
+    .input,
+    select,
+    textarea {
+      font-size: 16px; /* Prevents zoom on iOS when focused */
+    }
+  }
+
+  /* Responsive text sizes */
+  @media (max-width: 640px) {
+    .text-xs {
+      font-size: 0.7rem; /* Slightly larger for mobile */
+    }
+    
+    .text-sm {
+      font-size: 0.875rem;
+    }
   }
   
   .input-error {

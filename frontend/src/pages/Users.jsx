@@ -18,6 +18,8 @@ import userService from '../services/userService';
 import useDebounce from '../hooks/useDebounce';
 import Modal from '../components/Modal';
 import UserForm from '../components/UserForm';
+import { MobileOnly, TabletAndDesktop, ContentWrapper, ResponsiveTableWrapper } from '../components/ResponsiveUtils';
+import UsersTableMobile from '../components/Users/UsersTableMobile';
 
 const ROLE_LABELS = {
   super_admin: 'Super Admin',
@@ -525,9 +527,23 @@ const Users = () => {
         </div>
       )}
 
-      <div className="card overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      {/* Mobile View */}
+      <MobileOnly className="mb-8">
+        <UsersTableMobile
+          users={users}
+          loading={loading}
+          onEdit={openEditModal}
+          onReactivate={handleReactivate}
+          onDeactivate={handleDeactivate}
+          roleLabels={ROLE_LABELS}
+        />
+      </MobileOnly>
+
+      {/* Desktop View */}
+      <TabletAndDesktop className="card overflow-hidden">
+        <ResponsiveTableWrapper>
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
             <tr>
               <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                 User
@@ -750,8 +766,9 @@ const Users = () => {
               </tr>
             )}
           </tbody>
-        </table>
-      </div>
+          </table>
+        </ResponsiveTableWrapper>
+      </TabletAndDesktop>
 
       <div className="mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="text-sm text-gray-600">

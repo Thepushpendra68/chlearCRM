@@ -7,6 +7,7 @@ import ImportWizard from '../Import/ImportWizard';
 import BulkAssignment from '../Assignment/BulkAssignment';
 import StageManager from './StageManager';
 import StageAnalyticsModal from './StageAnalyticsModal';
+import { ContentWrapper } from '../ResponsiveUtils';
 
 const PipelineBoard = forwardRef(({ onLeadClick, onAddLead }, ref) => {
   const [stages, setStages] = useState([]);
@@ -301,7 +302,7 @@ const PipelineBoard = forwardRef(({ onLeadClick, onAddLead }, ref) => {
   }
 
   return (
-    <div className="pipeline-board">
+    <ContentWrapper className="pipeline-board">
       {/* Pipeline Header */}
       <div className="mb-6">
         <div className="flex items-center justify-between">
@@ -320,8 +321,8 @@ const PipelineBoard = forwardRef(({ onLeadClick, onAddLead }, ref) => {
         </div>
       </div>
 
-      {/* Pipeline Columns */}
-      <div className="flex space-x-6 overflow-x-auto pb-4">
+      {/* Pipeline Columns - Responsive Horizontal Scroll */}
+      <div className="flex space-x-6 overflow-x-auto pb-4 -mx-4 sm:-mx-6 lg:mx-0 px-4 sm:px-6 lg:px-0">
         {Array.isArray(stages) && stages.map((stage) => (
           <PipelineColumn
             key={stage.id}
@@ -423,7 +424,7 @@ const PipelineBoard = forwardRef(({ onLeadClick, onAddLead }, ref) => {
           stage={stages.find(s => s.id === selectedStageForAnalytics)}
         />
       )}
-    </div>
+    </ContentWrapper>
   );
 });
 

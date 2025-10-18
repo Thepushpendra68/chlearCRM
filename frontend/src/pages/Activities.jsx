@@ -4,6 +4,8 @@ import ActivityList from '../components/Activities/ActivityList';
 import ActivityForm from '../components/Activities/ActivityForm';
 import ActivityDetail from '../components/Activities/ActivityDetail';
 import activityService from '../services/activityService';
+import { MobileOnly, TabletAndDesktop, ContentWrapper } from '../components/ResponsiveUtils';
+import ActivitiesTableMobile from '../components/Activities/ActivitiesTableMobile';
 
 const Activities = () => {
   const navigate = useNavigate();
@@ -206,28 +208,42 @@ const Activities = () => {
           </div>
         </div>
 
-        {/* Activities List */}
-        <div className="bg-white border border-gray-200 rounded-lg">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-medium text-gray-900">All Activities</h2>
-            <p className="mt-1 text-sm text-gray-600">
-              View and manage all activities across your leads
-            </p>
+        {/* Activities List - Responsive */}
+        {/* Mobile View */}
+        <MobileOnly className="mb-8">
+          <ActivitiesTableMobile
+            activities={activities}
+            loading={activitiesLoading}
+            onActivityClick={handleActivityClick}
+            onEditActivity={handleEditActivity}
+            onDeleteActivity={handleDeleteActivity}
+          />
+        </MobileOnly>
+
+        {/* Desktop View */}
+        <TabletAndDesktop>
+          <div className="bg-white border border-gray-200 rounded-lg">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-medium text-gray-900">All Activities</h2>
+              <p className="mt-1 text-sm text-gray-600">
+                View and manage all activities across your leads
+              </p>
+            </div>
+            
+            <div className="p-6">
+              <ActivityList
+                activities={activities}
+                loading={activitiesLoading}
+                error={activitiesError}
+                onActivityClick={handleActivityClick}
+                onEditActivity={handleEditActivity}
+                onDeleteActivity={handleDeleteActivity}
+                onRefresh={fetchActivities}
+                showFilters={true}
+              />
+            </div>
           </div>
-          
-          <div className="p-6">
-            <ActivityList
-              activities={activities}
-              loading={activitiesLoading}
-              error={activitiesError}
-              onActivityClick={handleActivityClick}
-              onEditActivity={handleEditActivity}
-              onDeleteActivity={handleDeleteActivity}
-              onRefresh={fetchActivities}
-              showFilters={true}
-            />
-          </div>
-        </div>
+        </TabletAndDesktop>
 
         {/* Activity Form Modal */}
         {showActivityForm && (

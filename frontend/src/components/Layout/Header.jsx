@@ -80,11 +80,11 @@ const Header = ({ setSidebarOpen, isCollapsed, currentPath }) => {
         </div>
         
         {/* Right side - Actions and profile */}
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center gap-1 md:gap-2">
           {/* Mobile search button */}
           <button
             type="button"
-            className="md:hidden p-2 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-lg"
+            className="md:hidden p-2.5 min-h-11 min-w-11 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-lg"
             onClick={() => {/* TODO: Open mobile search modal */}}
           >
             <MagnifyingGlassIcon className="h-5 w-5" />
@@ -95,21 +95,21 @@ const Header = ({ setSidebarOpen, isCollapsed, currentPath }) => {
             variant={chatPanelOpen ? "default" : "outline"}
             size="sm"
             onClick={toggleChatPanel}
-            className={`flex items-center gap-2 transition-colors ${
+            className={`flex items-center gap-2 transition-colors min-h-11 px-2 md:px-3 ${
               chatPanelOpen 
                 ? 'bg-blue-600 hover:bg-blue-700 text-white' 
                 : 'border-gray-300 text-gray-700 hover:bg-gray-50'
             }`}
           >
             <SparklesIcon className="h-4 w-4" />
-            <span className="hidden sm:inline">AI Assistant</span>
+            <span className="hidden sm:inline text-xs md:text-sm">AI Assistant</span>
           </Button>
 
           {/* Quick Actions */}
           <Menu as="div" className="relative">
             <Menu.Button
               onClick={() => setShowQuickActions(!showQuickActions)}
-              className="p-2 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-lg transition-colors"
+              className="p-2.5 min-h-11 min-w-11 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-lg transition-colors"
               title="Quick Actions"
             >
               <PlusIcon className="h-5 w-5" />
@@ -148,7 +148,7 @@ const Header = ({ setSidebarOpen, isCollapsed, currentPath }) => {
           {/* Notifications */}
           <button
             type="button"
-            className="relative p-2 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-lg transition-colors"
+            className="relative p-2.5 min-h-11 min-w-11 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-lg transition-colors"
           >
             <span className="sr-only">View notifications</span>
             <BellIcon className="h-5 w-5" />
