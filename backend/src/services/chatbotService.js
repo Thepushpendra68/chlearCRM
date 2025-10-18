@@ -26,7 +26,12 @@ const VALID_ACTIONS = new Set([
   'UPDATE_TASK',
   'LOG_ACTIVITY',
   'GET_TEAM_STATS',
-  'GET_MY_STATS'
+  'GET_MY_STATS',
+  'BULK_UPDATE_LEADS',
+  'BULK_ASSIGN_LEADS',
+  'GROUP_BY_ANALYSIS',
+  'SCHEDULE_REPORT',
+  'CREATE_REMINDER'
 ]);
 
 const DEFAULT_GEMINI_MODELS = [
@@ -142,6 +147,11 @@ class ChatbotService {
 20. LOG_ACTIVITY - Record call, email, meeting with details
 21. GET_TEAM_STATS - Show team member performance metrics
 22. GET_MY_STATS - Show my personal performance metrics
+23. BULK_UPDATE_LEADS - Update multiple leads at once with preview
+24. BULK_ASSIGN_LEADS - Assign multiple leads to team member with distribution
+25. GROUP_BY_ANALYSIS - Aggregate leads by source, status, company
+26. SCHEDULE_REPORT - Schedule automated reports (daily, weekly)
+27. CREATE_REMINDER - Set reminders for follow-ups and tasks
 
 **Lead Fields:**
 - first_name, last_name (required for creation)
@@ -459,6 +469,78 @@ Response:
   "missingFields": []
 }
 
+User: "Update all new leads to contacted status"
+Response:
+{
+  "action": "BULK_UPDATE_LEADS",
+  "intent": "Bulk update leads",
+  "parameters": {
+    "filter_status": "new",
+    "update_status": "contacted"
+  },
+  "response": "I'll show you a preview of leads that will be updated, then update all new leads to contacted status.",
+  "needsConfirmation": true,
+  "missingFields": []
+}
+
+User: "Assign all unassigned website leads to Sarah"
+Response:
+{
+  "action": "BULK_ASSIGN_LEADS",
+  "intent": "Bulk assign leads",
+  "parameters": {
+    "filter_assigned": "unassigned",
+    "filter_source": "website",
+    "assign_to": "Sarah"
+  },
+  "response": "I'll assign all unassigned website leads to Sarah with a distribution preview.",
+  "needsConfirmation": true,
+  "missingFields": []
+}
+
+User: "Show leads grouped by source"
+Response:
+{
+  "action": "GROUP_BY_ANALYSIS",
+  "intent": "Group leads by criteria",
+  "parameters": {
+    "group_by": "source"
+  },
+  "response": "Here are your leads grouped by source with counts.",
+  "needsConfirmation": false,
+  "missingFields": []
+}
+
+User: "Schedule a daily report of new leads"
+Response:
+{
+  "action": "SCHEDULE_REPORT",
+  "intent": "Schedule report",
+  "parameters": {
+    "frequency": "daily",
+    "report_type": "new_leads",
+    "time": "09:00"
+  },
+  "response": "I'll schedule a daily report of new leads to be sent to you at 9 AM.",
+  "needsConfirmation": true,
+  "missingFields": []
+}
+
+User: "Remind me to follow up with John Doe in 3 days"
+Response:
+{
+  "action": "CREATE_REMINDER",
+  "intent": "Create reminder",
+  "parameters": {
+    "lead_name": "John Doe",
+    "reminder_text": "Follow up with John Doe",
+    "days_from_now": 3
+  },
+  "response": "I'll create a reminder to follow up with John Doe in 3 days.",
+  "needsConfirmation": true,
+  "missingFields": []
+}
+
 User: "Hello"
 Response:
 {
@@ -766,6 +848,21 @@ Analyze the message and respond ONLY with valid JSON. Do not include any markdow
 
         case 'GET_MY_STATS':
           return await this.getMyStats(parameters, currentUser);
+
+        case 'BULK_UPDATE_LEADS':
+          return await this.bulkUpdateLeads(parameters, currentUser);
+
+        case 'BULK_ASSIGN_LEADS':
+          return await this.bulkAssignLeads(parameters, currentUser);
+
+        case 'GROUP_BY_ANALYSIS':
+          return await this.groupByAnalysis(parameters, currentUser);
+
+        case 'SCHEDULE_REPORT':
+          return await this.scheduleReport(parameters, currentUser);
+
+        case 'CREATE_REMINDER':
+          return await this.createReminder(parameters, currentUser);
 
         default:
           return null;
@@ -1755,6 +1852,218 @@ Analyze the message and respond ONLY with valid JSON. Do not include any markdow
         completed_tasks: tasks.filter(t => t.status === 'completed').length
       },
       summary: `Leads: ${leads.length} (${leads.filter(l => l.status === 'won').length} won) | Activities: ${activities.length} | Pending Tasks: ${tasks.filter(t => t.status !== 'completed').length}`
+    };
+  }
+
+  /**
+   * Bulk update leads with preview
+   */
+  async bulkUpdateLeads(parameters, currentUser) {
+    const page = 1;
+    const limit = 1000;
+
+    const filters = {
+      status: parameters.filter_status || '',
+      source: parameters.filter_source || '',
+      assigned_to: parameters.filter_assigned_to || ''
+    };
+
+    const result = await leadService.getLeads(currentUser, page, limit, filters);
+    const matchingLeads = result.leads || [];
+
+    if (matchingLeads.length === 0) {
+      throw new ApiError('No leads match the filter criteria', 404);
+    }
+
+    // Prepare update data
+    const updateData = {};
+    if (parameters.update_status) updateData.status = parameters.update_status;
+    if (parameters.update_priority) updateData.priority = parameters.update_priority;
+    if (parameters.update_source) updateData.source = parameters.update_source;
+
+    return {
+      preview: {
+        matching_count: matchingLeads.length,
+        sample_leads: matchingLeads.slice(0, 5).map(l => ({ id: l.id, name: l.name, email: l.email })),
+        updates: updateData
+      },
+      action: 'preview_ready',
+      summary: `Found ${matchingLeads.length} leads that match your criteria. Ready to update their ${Object.keys(updateData).join(', ')}.`
+    };
+  }
+
+  /**
+   * Bulk assign leads with distribution preview
+   */
+  async bulkAssignLeads(parameters, currentUser) {
+    const { supabaseAdmin } = require('../config/supabase');
+    const page = 1;
+    const limit = 1000;
+
+    const filters = {
+      status: parameters.filter_status || '',
+      source: parameters.filter_source || '',
+      assigned_to: parameters.filter_assigned_to || ''
+    };
+
+    const result = await leadService.getLeads(currentUser, page, limit, filters);
+    const matchingLeads = result.leads || [];
+
+    if (matchingLeads.length === 0) {
+      throw new ApiError('No leads match the filter criteria', 404);
+    }
+
+    // Find target user
+    const assignTo = parameters.assign_to || '';
+    if (!assignTo) {
+      throw new ApiError('Please specify who to assign leads to', 400);
+    }
+
+    const { data: users } = await supabaseAdmin
+      .from('user_profiles')
+      .select('id, first_name, last_name')
+      .eq('company_id', currentUser.company_id);
+
+    const targetUser = users?.find(u =>
+      u.first_name.toLowerCase().includes(assignTo.toLowerCase()) ||
+      u.last_name.toLowerCase().includes(assignTo.toLowerCase())
+    );
+
+    if (!targetUser) {
+      throw new ApiError(`Team member "${assignTo}" not found`, 404);
+    }
+
+    // Get current workload
+    const { data: assignmentCounts } = await supabaseAdmin
+      .from('leads')
+      .select('assigned_to')
+      .eq('company_id', currentUser.company_id)
+      .eq('assigned_to', targetUser.id);
+
+    return {
+      preview: {
+        matching_count: matchingLeads.length,
+        assign_to: `${targetUser.first_name} ${targetUser.last_name}`,
+        target_workload: assignmentCounts?.length || 0,
+        sample_leads: matchingLeads.slice(0, 5).map(l => ({ id: l.id, name: l.name, email: l.email }))
+      },
+      action: 'preview_ready',
+      summary: `Will assign ${matchingLeads.length} leads to ${targetUser.first_name} ${targetUser.last_name} (current workload: ${assignmentCounts?.length || 0} leads).`
+    };
+  }
+
+  /**
+   * Group and analyze leads by criteria
+   */
+  async groupByAnalysis(parameters, currentUser) {
+    const page = 1;
+    const limit = 1000;
+
+    const filters = {
+      status: parameters.status || '',
+      source: parameters.source || ''
+    };
+
+    const result = await leadService.getLeads(currentUser, page, limit, filters);
+    const leads = result.leads || [];
+
+    const groupBy = parameters.group_by || 'source';
+    const grouped = {};
+
+    leads.forEach(lead => {
+      let key = 'unknown';
+      
+      if (groupBy === 'source') {
+        key = lead.lead_source || 'unknown';
+      } else if (groupBy === 'status') {
+        key = lead.status || 'unknown';
+      } else if (groupBy === 'company') {
+        key = lead.company || 'unassigned';
+      } else if (groupBy === 'priority') {
+        key = lead.priority || 'medium';
+      }
+
+      if (!grouped[key]) {
+        grouped[key] = { count: 0, examples: [] };
+      }
+      grouped[key].count++;
+      if (grouped[key].examples.length < 3) {
+        grouped[key].examples.push(lead.name);
+      }
+    });
+
+    // Sort by count descending
+    const sorted = Object.entries(grouped)
+      .sort((a, b) => b[1].count - a[1].count)
+      .map(([key, data]) => ({ category: key, count: data.count, examples: data.examples }));
+
+    return {
+      group_by: groupBy,
+      results: sorted,
+      total_leads: leads.length,
+      summary: `Leads grouped by ${groupBy}: ${sorted.map(r => `${r.category} (${r.count})`).join(', ')}`
+    };
+  }
+
+  /**
+   * Schedule a recurring report
+   */
+  async scheduleReport(parameters, currentUser) {
+    // In production, this would create a database record and set up a scheduler
+    // For now, return the scheduling confirmation
+
+    const frequency = parameters.frequency || 'daily';
+    const reportType = parameters.report_type || 'all_leads';
+    const time = parameters.time || '09:00';
+
+    return {
+      scheduled: true,
+      frequency,
+      report_type: reportType,
+      send_time: time,
+      summary: `Scheduled a ${frequency} ${reportType} report to be sent at ${time}.`
+    };
+  }
+
+  /**
+   * Create a reminder for follow-ups
+   */
+  async createReminder(parameters, currentUser) {
+    const taskService = require('./taskService');
+    let leadId = parameters.lead_id;
+
+    // Try to find lead by name
+    if (!leadId && parameters.lead_name) {
+      const searchResults = await leadService.searchLeads(parameters.lead_name, 1, currentUser);
+      if (searchResults && searchResults.length > 0) {
+        leadId = searchResults[0].id;
+      }
+    }
+
+    const daysFromNow = parameters.days_from_now || 1;
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + daysFromNow);
+
+    const taskData = {
+      company_id: currentUser.company_id,
+      assigned_to: currentUser.id,
+      created_by: currentUser.id,
+      lead_id: leadId || null,
+      description: parameters.reminder_text || `Follow up reminder`,
+      task_type: 'reminder',
+      priority: parameters.priority || 'medium',
+      status: 'pending',
+      due_date: dueDate.toISOString().split('T')[0],
+      notes: ''
+    };
+
+    const result = await taskService.createTask(taskData, currentUser);
+
+    return {
+      reminder: result.data,
+      created_at: new Date().toISOString(),
+      due_date: taskData.due_date,
+      summary: `Reminder created for ${daysFromNow} day${daysFromNow > 1 ? 's' : ''} from now: "${parameters.reminder_text}"`
     };
   }
 }

@@ -70,7 +70,38 @@ class ChatbotFallback {
       return this.handleMyStats(message, userMessage);
     }
 
-    // Pattern 11: Delete lead
+    // Pattern 11: Bulk update
+    if ((this.matchesPattern(message, ['update', 'bulk', 'all']) ||
+         this.matchesPattern(message, ['change']) && this.matchesPattern(message, ['all', 'leads'])) &&
+        !this.matchesPattern(message, ['single', 'one'])) {
+      return this.handleBulkUpdate(message, userMessage);
+    }
+
+    // Pattern 12: Bulk assign
+    if (this.matchesPattern(message, ['bulk', 'assign']) ||
+        (this.matchesPattern(message, ['assign']) && this.matchesPattern(message, ['all', 'multiple']))) {
+      return this.handleBulkAssign(message, userMessage);
+    }
+
+    // Pattern 13: Group by analysis
+    if (this.matchesPattern(message, ['group', 'grouped', 'by']) ||
+        this.matchesPattern(message, ['count', 'how many']) && this.matchesPattern(message, ['by'])) {
+      return this.handleGroupByAnalysis(message, userMessage);
+    }
+
+    // Pattern 14: Schedule report
+    if (this.matchesPattern(message, ['schedule', 'report', 'send me']) ||
+        (this.matchesPattern(message, ['daily', 'weekly', 'monthly']) && this.matchesPattern(message, ['report']))) {
+      return this.handleScheduleReport(message, userMessage);
+    }
+
+    // Pattern 15: Create reminder
+    if (this.matchesPattern(message, ['remind', 'reminder', 'remindme']) ||
+        (this.matchesPattern(message, ['in', 'days', 'hours']) && this.matchesPattern(message, ['remind']))) {
+      return this.handleCreateReminder(message, userMessage);
+    }
+
+    // Pattern 16: Delete lead
     if (this.matchesPattern(message, ['delete', 'remove', 'drop'])) {
       return this.handleDeleteLead(message, userMessage);
     }
@@ -1055,6 +1086,211 @@ class ChatbotFallback {
       parameters,
       response: 'Let me pull your performance metrics.',
       needsConfirmation: false,
+      missingFields: []
+    };
+  }
+
+  /**
+   * Handle bulk update request
+   */
+  handleBulkUpdate(message, originalMessage) {
+    // Extract the filter criteria and updates
+    let filterStatus = '';
+    let updateStatus = '';
+
+    // Look for "all [status] leads to [new status]"
+    const bulkPattern = /(?:update|change)\s+all\s+(\w+)\s+leads?\s+(?:to|as)\s+(\w+)/i;
+    const bulkMatch = originalMessage.match(bulkPattern);
+    
+    if (bulkMatch) {
+      filterStatus = bulkMatch[1].toLowerCase();
+      updateStatus = bulkMatch[2].toLowerCase();
+    }
+
+    if (!filterStatus || !updateStatus) {
+      return {
+        action: 'CHAT',
+        intent: 'Need update criteria',
+        parameters: {},
+        response: 'To bulk update leads, please specify which leads and what to update. For example: "Update all new leads to contacted status"',
+        needsConfirmation: false,
+        missingFields: ['filter_status', 'update_status']
+      };
+    }
+
+    return {
+      action: 'BULK_UPDATE_LEADS',
+      intent: 'Bulk update leads',
+      parameters: {
+        filter_status: filterStatus,
+        update_status: updateStatus
+      },
+      response: `I'll show you a preview of ${filterStatus} leads and update them to ${updateStatus}.`,
+      needsConfirmation: true,
+      missingFields: []
+    };
+  }
+
+  /**
+   * Handle bulk assign request
+   */
+  handleBulkAssign(message, originalMessage) {
+    const name = this.extractName(originalMessage);
+    let assignTo = '';
+    if (name) {
+      assignTo = `${name.first_name} ${name.last_name}`.trim();
+    }
+
+    // Extract filter criteria
+    let filterSource = '';
+    let filterStatus = '';
+    
+    if (originalMessage.match(/unassigned/i)) {
+      filterSource = 'unassigned';
+    }
+    if (originalMessage.match(/website/i)) {
+      filterSource = 'website';
+    }
+    const statusMatch = originalMessage.match(/(\w+)\s+leads?/);
+    if (statusMatch) {
+      filterStatus = statusMatch[1].toLowerCase();
+    }
+
+    if (!assignTo) {
+      return {
+        action: 'CHAT',
+        intent: 'Need assignee',
+        parameters: {},
+        response: 'To bulk assign leads, please specify who to assign them to. For example: "Assign all unassigned website leads to Sarah"',
+        needsConfirmation: false,
+        missingFields: ['assign_to']
+      };
+    }
+
+    const parameters = { assign_to: assignTo };
+    if (filterStatus) parameters.filter_status = filterStatus;
+    if (filterSource) parameters.filter_source = filterSource;
+
+    return {
+      action: 'BULK_ASSIGN_LEADS',
+      intent: 'Bulk assign leads',
+      parameters,
+      response: `I'll show you a preview and then assign these leads to ${assignTo}.`,
+      needsConfirmation: true,
+      missingFields: []
+    };
+  }
+
+  /**
+   * Handle group by analysis request
+   */
+  handleGroupByAnalysis(message, originalMessage) {
+    let groupBy = 'source';
+
+    if (originalMessage.match(/by source/i)) groupBy = 'source';
+    else if (originalMessage.match(/by status/i)) groupBy = 'status';
+    else if (originalMessage.match(/by company/i)) groupBy = 'company';
+    else if (originalMessage.match(/by priority/i)) groupBy = 'priority';
+
+    return {
+      action: 'GROUP_BY_ANALYSIS',
+      intent: 'Group and analyze leads',
+      parameters: {
+        group_by: groupBy
+      },
+      response: `Here are your leads grouped by ${groupBy}.`,
+      needsConfirmation: false,
+      missingFields: []
+    };
+  }
+
+  /**
+   * Handle schedule report request
+   */
+  handleScheduleReport(message, originalMessage) {
+    let frequency = 'daily';
+    let reportType = 'all_leads';
+    let time = '09:00';
+
+    if (originalMessage.match(/weekly/i)) frequency = 'weekly';
+    else if (originalMessage.match(/monthly/i)) frequency = 'monthly';
+    
+    if (originalMessage.match(/new leads/i)) reportType = 'new_leads';
+    else if (originalMessage.match(/won leads/i)) reportType = 'won_leads';
+    else if (originalMessage.match(/activity/i)) reportType = 'activities';
+
+    const timeMatch = originalMessage.match(/(\d{1,2}):?(\d{0,2})?/);
+    if (timeMatch) {
+      const hour = timeMatch[1].padStart(2, '0');
+      const minute = timeMatch[2] ? timeMatch[2].padStart(2, '0') : '00';
+      time = `${hour}:${minute}`;
+    }
+
+    return {
+      action: 'SCHEDULE_REPORT',
+      intent: 'Schedule report',
+      parameters: {
+        frequency,
+        report_type: reportType,
+        time
+      },
+      response: `I'll schedule a ${frequency} ${reportType} report to be sent at ${time}.`,
+      needsConfirmation: true,
+      missingFields: []
+    };
+  }
+
+  /**
+   * Handle create reminder request
+   */
+  handleCreateReminder(message, originalMessage) {
+    const name = this.extractName(originalMessage);
+    let reminderText = '';
+    let daysFromNow = 1;
+
+    // Extract days/timing
+    const daysMatch = originalMessage.match(/in\s+(\d+)\s+days?/i);
+    if (daysMatch) {
+      daysFromNow = parseInt(daysMatch[1]);
+    }
+
+    // Extract reminder text
+    const reminderPattern = /(?:remind|reminder)\s*:?\s*(.+?)(?:\s+in\s+\d+|\s*$)/i;
+    const reminderMatch = originalMessage.match(reminderPattern);
+    if (reminderMatch) {
+      reminderText = reminderMatch[1].trim();
+    }
+
+    if (!reminderText && name) {
+      reminderText = `Follow up with ${name.first_name} ${name.last_name}`;
+    }
+
+    if (!reminderText) {
+      return {
+        action: 'CHAT',
+        intent: 'Need reminder text',
+        parameters: {},
+        response: 'To create a reminder, please specify what to remind you about. For example: "Remind me to follow up with John in 3 days"',
+        needsConfirmation: false,
+        missingFields: ['reminder_text']
+      };
+    }
+
+    const parameters = {
+      reminder_text: reminderText,
+      days_from_now: daysFromNow
+    };
+
+    if (name) {
+      parameters.lead_name = `${name.first_name} ${name.last_name}`.trim();
+    }
+
+    return {
+      action: 'CREATE_REMINDER',
+      intent: 'Create reminder',
+      parameters,
+      response: `I'll create a reminder for ${daysFromNow} day${daysFromNow > 1 ? 's' : ''} from now: "${reminderText}".`,
+      needsConfirmation: true,
       missingFields: []
     };
   }
