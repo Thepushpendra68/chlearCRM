@@ -23,6 +23,18 @@ class ChatbotFallback {
       return this.handleExportLeads(message, userMessage);
     }
 
+    // Pattern 3: Assignment suggestions
+    if (this.matchesPattern(message, ['suggest', 'suggest assignment', 'who should', 'assign to']) &&
+        !this.matchesPattern(message, ['export', 'delete', 'update'])) {
+      return this.handleSuggestAssignment(message, userMessage);
+    }
+
+    // Pattern 4: Lead scoring
+    if (this.matchesPattern(message, ['score', 'scoring', 'rank']) &&
+        this.matchesPattern(message, ['lead', 'leads'])) {
+      return this.handleLeadScoring(message, userMessage);
+    }
+
     // Pattern 3: Delete lead
     if (this.matchesPattern(message, ['delete', 'remove', 'drop'])) {
       return this.handleDeleteLead(message, userMessage);
@@ -716,6 +728,70 @@ class ChatbotFallback {
     }
 
     return null;
+  }
+
+  /**
+   * Handle suggest assignment request
+   */
+  handleSuggestAssignment(message, originalMessage) {
+    const email = this.extractEmail(originalMessage);
+    const name = this.extractName(originalMessage);
+
+    let searchQuery = '';
+    if (email) {
+      searchQuery = email;
+    } else if (name) {
+      searchQuery = `${name.first_name} ${name.last_name}`.trim();
+    }
+
+    if (!searchQuery) {
+      return {
+        action: 'CHAT',
+        intent: 'Need lead identifier',
+        parameters: {},
+        response: 'To get assignment suggestions, please provide a lead name or email. For example: "Who should I assign john@example.com to?"',
+        needsConfirmation: false,
+        missingFields: ['email']
+      };
+    }
+
+    return {
+      action: 'SUGGEST_ASSIGNMENT',
+      intent: 'Suggest assignment',
+      parameters: email ? { email } : { search: searchQuery },
+      response: `Let me check assignment rules and team capacity to suggest the best person for this lead.`,
+      needsConfirmation: false,
+      missingFields: []
+    };
+  }
+
+  /**
+   * Handle lead scoring request
+   */
+  handleLeadScoring(message, originalMessage) {
+    const status = this.extractStatus(message);
+    const source = this.extractSource(message);
+
+    const parameters = {
+      limit: 20
+    };
+
+    if (status) {
+      parameters.status = status;
+    }
+
+    if (source) {
+      parameters.lead_source = source;
+    }
+
+    return {
+      action: 'LEAD_SCORING',
+      intent: 'Score leads',
+      parameters,
+      response: `I'll score ${status ? `${status} ` : ''}leads based on engagement and potential.`,
+      needsConfirmation: false,
+      missingFields: []
+    };
   }
 
   /**

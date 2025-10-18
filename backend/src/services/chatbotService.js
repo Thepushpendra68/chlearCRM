@@ -18,7 +18,9 @@ const VALID_ACTIONS = new Set([
   'ASSIGN_LEAD',
   'UNASSIGN_LEAD',
   'DETECT_DUPLICATES',
-  'EXPORT_LEADS'
+  'EXPORT_LEADS',
+  'SUGGEST_ASSIGNMENT',
+  'LEAD_SCORING'
 ]);
 
 const DEFAULT_GEMINI_MODELS = [
@@ -126,6 +128,8 @@ class ChatbotService {
 12. UNASSIGN_LEAD - Remove assignment from a lead
 13. DETECT_DUPLICATES - Find duplicate leads by email, phone, or company
 14. EXPORT_LEADS - Export leads to CSV file
+15. SUGGEST_ASSIGNMENT - Get assignment suggestions for a lead
+16. LEAD_SCORING - Score leads by engagement and potential
 
 **Lead Fields:**
 - first_name, last_name (required for creation)
@@ -327,6 +331,32 @@ Response:
     "format": "csv"
   },
   "response": "I'll export all qualified leads to CSV for you.",
+  "needsConfirmation": false,
+  "missingFields": []
+}
+
+User: "Who should I assign john@acme.com to?"
+Response:
+{
+  "action": "SUGGEST_ASSIGNMENT",
+  "intent": "Suggest assignment",
+  "parameters": {
+    "email": "john@acme.com"
+  },
+  "response": "Let me check assignment rules and team capacity to suggest the best person for this lead.",
+  "needsConfirmation": false,
+  "missingFields": []
+}
+
+User: "Score all qualified leads"
+Response:
+{
+  "action": "LEAD_SCORING",
+  "intent": "Score leads",
+  "parameters": {
+    "status": "qualified"
+  },
+  "response": "I'll score qualified leads based on engagement and potential.",
   "needsConfirmation": false,
   "missingFields": []
 }
@@ -614,6 +644,12 @@ Analyze the message and respond ONLY with valid JSON. Do not include any markdow
 
         case 'EXPORT_LEADS':
           return await this.exportLeads(parameters, currentUser);
+
+        case 'SUGGEST_ASSIGNMENT':
+          return await this.suggestAssignment(parameters, currentUser);
+
+        case 'LEAD_SCORING':
+          return await this.scoreLeads(parameters, currentUser);
 
         default:
           return null;
@@ -1162,6 +1198,198 @@ Analyze the message and respond ONLY with valid JSON. Do not include any markdow
       }
       throw new ApiError('Failed to export leads', 500);
     }
+  }
+
+  /**
+   * Suggest assignment for a lead
+   */
+  async suggestAssignment(parameters, currentUser) {
+    const { supabaseAdmin } = require('../config/supabase');
+    let leadId = parameters.lead_id;
+
+    if (!leadId && parameters.email) {
+      const searchResults = await leadService.searchLeads(parameters.email, 1, currentUser);
+      if (searchResults && searchResults.length > 0) {
+        leadId = searchResults[0].id;
+      }
+    }
+
+    if (!leadId && parameters.search) {
+      const searchResults = await leadService.searchLeads(parameters.search, 1, currentUser);
+      if (searchResults && searchResults.length > 0) {
+        leadId = searchResults[0].id;
+      }
+    }
+
+    if (!leadId) {
+      throw new ApiError('Could not find the lead', 404);
+    }
+
+    const lead = await leadService.getLeadById(leadId);
+
+    // Get all active users
+    const { data: users } = await supabaseAdmin
+      .from('user_profiles')
+      .select('id, first_name, last_name, role')
+      .eq('company_id', currentUser.company_id)
+      .eq('status', 'active');
+
+    // Get team member workload (number of assigned leads)
+    const { data: assignmentCounts } = await supabaseAdmin
+      .from('leads')
+      .select('assigned_to', { count: 'exact' })
+      .eq('company_id', currentUser.company_id)
+      .eq('status', 'active');
+
+    const workloadMap = {};
+    assignmentCounts?.forEach(assignment => {
+      if (assignment.assigned_to) {
+        workloadMap[assignment.assigned_to] = (workloadMap[assignment.assigned_to] || 0) + 1;
+      }
+    });
+
+    // Score users based on role and workload
+    const suggestions = users
+      ?.filter(u => u.role === 'sales_rep' || u.role === 'manager')
+      .map(u => ({
+        user_id: u.id,
+        name: `${u.first_name} ${u.last_name}`,
+        role: u.role,
+        workload: workloadMap[u.id] || 0,
+        score: this.calculateAssignmentScore(workloadMap[u.id] || 0, u.role)
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3) || [];
+
+    return {
+      lead: { id: lead.id, name: lead.name, email: lead.email },
+      suggestions,
+      top_suggestion: suggestions[0] || null,
+      summary: suggestions.length > 0
+        ? `Recommended: ${suggestions[0].name}`
+        : 'No available team members'
+    };
+  }
+
+  /**
+   * Calculate assignment score based on workload and role
+   */
+  calculateAssignmentScore(workload, role) {
+    const roleWeight = role === 'manager' ? 1.2 : 1.0;
+    const workloadPenalty = workload * 0.5;
+    return (10 - workloadPenalty) * roleWeight;
+  }
+
+  /**
+   * Score leads by engagement and potential
+   */
+  async scoreLeads(parameters, currentUser) {
+    const page = parameters.page || 1;
+    const limit = parameters.limit || 20;
+
+    const filters = {
+      status: parameters.status || '',
+      source: parameters.source || parameters.lead_source || '',
+      assigned_to: parameters.assigned_to || '',
+      date_from: parameters.created_after || '',
+      date_to: parameters.created_before || ''
+    };
+
+    try {
+      const result = await leadService.getLeads(currentUser, page, limit, filters);
+
+      if (!result.leads || result.leads.length === 0) {
+        throw new ApiError('No leads found to score', 404);
+      }
+
+      // Score each lead
+      const scoredLeads = result.leads.map(lead => ({
+        id: lead.id,
+        name: lead.name,
+        email: lead.email,
+        score: this.calculateLeadScore(lead),
+        factors: {
+          status_value: this.getStatusValue(lead.status),
+          has_deal_value: lead.deal_value ? true : false,
+          deal_value_amount: lead.deal_value || 0,
+          recency_days: this.daysSinceCreated(lead.created_at)
+        }
+      }));
+
+      // Sort by score descending
+      scoredLeads.sort((a, b) => b.score - a.score);
+
+      return {
+        scored_leads: scoredLeads,
+        count: scoredLeads.length,
+        average_score: (scoredLeads.reduce((sum, l) => sum + l.score, 0) / scoredLeads.length).toFixed(1),
+        summary: `Scored ${scoredLeads.length} leads. Average score: ${(scoredLeads.reduce((sum, l) => sum + l.score, 0) / scoredLeads.length).toFixed(1)}/100`
+      };
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      throw new ApiError('Failed to score leads', 500);
+    }
+  }
+
+  /**
+   * Calculate lead score (0-100)
+   */
+  calculateLeadScore(lead) {
+    let score = 50; // Base score
+
+    // Status scoring (0-30 points)
+    const statusValue = this.getStatusValue(lead.status);
+    score += statusValue * 3; // Up to 30 points
+
+    // Deal value scoring (0-25 points)
+    if (lead.deal_value) {
+      const dealScore = Math.min(25, (lead.deal_value / 100000) * 25);
+      score += dealScore;
+    }
+
+    // Recency scoring (0-20 points)
+    const daysSince = this.daysSinceCreated(lead.created_at);
+    const recencyScore = Math.max(0, 20 - (daysSince / 7)); // Newer = better
+    score += recencyScore;
+
+    // Priority bonus (0-5 points)
+    if (lead.priority === 'high') {
+      score += 5;
+    } else if (lead.priority === 'medium') {
+      score += 2.5;
+    }
+
+    return Math.min(100, Math.max(0, score));
+  }
+
+  /**
+   * Get numeric value for status
+   */
+  getStatusValue(status) {
+    const statusMap = {
+      'new': 2,
+      'contacted': 4,
+      'qualified': 8,
+      'proposal': 9,
+      'negotiation': 9.5,
+      'won': 10,
+      'lost': 0,
+      'inactive': 1,
+      'active': 5
+    };
+    return statusMap[status] || 5;
+  }
+
+  /**
+   * Calculate days since lead was created
+   */
+  daysSinceCreated(createdAt) {
+    if (!createdAt) return 0;
+    const created = new Date(createdAt);
+    const now = new Date();
+    return Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
   }
 }
 
