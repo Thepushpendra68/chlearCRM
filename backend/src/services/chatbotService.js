@@ -16,7 +16,9 @@ const VALID_ACTIONS = new Set([
   'VIEW_LEAD_NOTES',
   'MOVE_LEAD_STAGE',
   'ASSIGN_LEAD',
-  'UNASSIGN_LEAD'
+  'UNASSIGN_LEAD',
+  'DETECT_DUPLICATES',
+  'EXPORT_LEADS'
 ]);
 
 const DEFAULT_GEMINI_MODELS = [
@@ -122,6 +124,8 @@ class ChatbotService {
 10. MOVE_LEAD_STAGE - Move lead to different pipeline stage
 11. ASSIGN_LEAD - Assign lead to a team member
 12. UNASSIGN_LEAD - Remove assignment from a lead
+13. DETECT_DUPLICATES - Find duplicate leads by email, phone, or company
+14. EXPORT_LEADS - Export leads to CSV file
 
 **Lead Fields:**
 - first_name, last_name (required for creation)
@@ -297,6 +301,33 @@ Response:
   },
   "response": "I'll assign john@acme.com to Sarah.",
   "needsConfirmation": true,
+  "missingFields": []
+}
+
+User: "Check for duplicate john@acme.com"
+Response:
+{
+  "action": "DETECT_DUPLICATES",
+  "intent": "Detect duplicate leads",
+  "parameters": {
+    "email": "john@acme.com"
+  },
+  "response": "I'll check for duplicates matching john@acme.com.",
+  "needsConfirmation": false,
+  "missingFields": []
+}
+
+User: "Export all qualified leads to CSV"
+Response:
+{
+  "action": "EXPORT_LEADS",
+  "intent": "Export leads to CSV",
+  "parameters": {
+    "status": "qualified",
+    "format": "csv"
+  },
+  "response": "I'll export all qualified leads to CSV for you.",
+  "needsConfirmation": false,
   "missingFields": []
 }
 
@@ -577,6 +608,12 @@ Analyze the message and respond ONLY with valid JSON. Do not include any markdow
 
         case 'UNASSIGN_LEAD':
           return await this.unassignLead(parameters, currentUser);
+
+        case 'DETECT_DUPLICATES':
+          return await this.detectDuplicates(parameters, currentUser);
+
+        case 'EXPORT_LEADS':
+          return await this.exportLeads(parameters, currentUser);
 
         default:
           return null;
@@ -975,6 +1012,156 @@ Analyze the message and respond ONLY with valid JSON. Do not include any markdow
     const leadResult = await leadService.updateLead(leadId, updateData, currentUser);
 
     return { lead: leadResult.updatedLead, action: 'unassigned' };
+  }
+
+  /**
+   * Detect duplicate leads
+   */
+  async detectDuplicates(parameters, currentUser) {
+    const { supabaseAdmin } = require('../config/supabase');
+
+    let searchEmail = parameters.email;
+    let searchPhone = parameters.phone;
+    let searchCompany = parameters.company;
+    let searchName = parameters.search;
+
+    // Try to extract from lead if searching by ID
+    if (parameters.lead_id && !searchEmail && !searchPhone) {
+      const lead = await leadService.getLeadById(parameters.lead_id);
+      searchEmail = lead.email;
+      searchPhone = lead.phone;
+      searchCompany = lead.company;
+      searchName = lead.name;
+    }
+
+    if (!searchEmail && !searchPhone && !searchCompany && !searchName) {
+      throw new ApiError('Please provide email, phone, company, or lead name to check for duplicates', 400);
+    }
+
+    let query = supabaseAdmin
+      .from('leads')
+      .select('id, name, email, phone, company, status, created_at')
+      .eq('company_id', currentUser.company_id);
+
+    const duplicates = [];
+
+    // Check for email duplicates
+    if (searchEmail) {
+      const { data: emailMatches } = await query
+        .ilike('email', `%${searchEmail}%`)
+        .limit(10);
+
+      if (emailMatches && emailMatches.length > 1) {
+        duplicates.push({
+          type: 'email',
+          value: searchEmail,
+          matches: emailMatches.slice(0, 5)
+        });
+      }
+    }
+
+    // Check for phone duplicates
+    if (searchPhone) {
+      const { data: phoneMatches } = await supabaseAdmin
+        .from('leads')
+        .select('id, name, email, phone, company, status')
+        .eq('company_id', currentUser.company_id)
+        .ilike('phone', `%${searchPhone}%`)
+        .limit(10);
+
+      if (phoneMatches && phoneMatches.length > 1) {
+        duplicates.push({
+          type: 'phone',
+          value: searchPhone,
+          matches: phoneMatches.slice(0, 5)
+        });
+      }
+    }
+
+    // Check for company duplicates
+    if (searchCompany) {
+      const { data: companyMatches } = await supabaseAdmin
+        .from('leads')
+        .select('id, name, email, phone, company, status')
+        .eq('company_id', currentUser.company_id)
+        .ilike('company', `%${searchCompany}%`)
+        .limit(10);
+
+      if (companyMatches && companyMatches.length > 1) {
+        duplicates.push({
+          type: 'company',
+          value: searchCompany,
+          matches: companyMatches.slice(0, 5)
+        });
+      }
+    }
+
+    return {
+      found: duplicates.length > 0,
+      duplicates,
+      summary: duplicates.length === 0
+        ? 'No duplicates found'
+        : `Found ${duplicates.length} potential duplicate${duplicates.length > 1 ? 's' : ''}`
+    };
+  }
+
+  /**
+   * Export leads to CSV or Excel
+   */
+  async exportLeads(parameters, currentUser) {
+    const importController = require('../controllers/importController');
+    const page = parameters.page || 1;
+    const limit = parameters.limit || 1000;
+
+    const filters = {
+      status: parameters.status || '',
+      source: parameters.source || parameters.lead_source || '',
+      assigned_to: parameters.assigned_to || '',
+      date_from: parameters.created_after || '',
+      date_to: parameters.created_before || '',
+      deal_value_min: parameters.deal_value_min || '',
+      deal_value_max: parameters.deal_value_max || ''
+    };
+
+    try {
+      const result = await leadService.getLeads(currentUser, page, limit, filters);
+
+      if (!result.leads || result.leads.length === 0) {
+        throw new ApiError('No leads found to export', 404);
+      }
+
+      const format = (parameters.format || 'csv').toLowerCase();
+
+      // Prepare leads data for export
+      const leadsForExport = result.leads.map(lead => ({
+        'First Name': lead.first_name || '',
+        'Last Name': lead.last_name || '',
+        'Email': lead.email || '',
+        'Phone': lead.phone || '',
+        'Company': lead.company || '',
+        'Job Title': lead.job_title || '',
+        'Source': lead.lead_source || '',
+        'Status': lead.status || '',
+        'Deal Value': lead.deal_value || '',
+        'Expected Close Date': lead.expected_close_date || '',
+        'Priority': lead.priority || '',
+        'Notes': lead.notes || '',
+        'Created At': lead.created_at || ''
+      }));
+
+      return {
+        success: true,
+        data: leadsForExport,
+        count: leadsForExport.length,
+        format,
+        message: `Exported ${leadsForExport.length} lead${leadsForExport.length > 1 ? 's' : ''} in ${format.toUpperCase()} format`
+      };
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      throw new ApiError('Failed to export leads', 500);
+    }
   }
 }
 

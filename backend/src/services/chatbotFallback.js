@@ -12,7 +12,18 @@ class ChatbotFallback {
   parseMessage(userMessage) {
     const message = userMessage.toLowerCase().trim();
 
-    // Pattern 1: Delete lead
+    // Pattern 1: Detect duplicates
+    if (this.matchesPattern(message, ['duplicate', 'check duplicate', 'find duplicate'])) {
+      return this.handleDetectDuplicates(message, userMessage);
+    }
+
+    // Pattern 2: Export leads
+    if (this.matchesPattern(message, ['export', 'download']) &&
+        this.matchesPattern(message, ['lead', 'csv', 'excel'])) {
+      return this.handleExportLeads(message, userMessage);
+    }
+
+    // Pattern 3: Delete lead
     if (this.matchesPattern(message, ['delete', 'remove', 'drop'])) {
       return this.handleDeleteLead(message, userMessage);
     }
@@ -612,6 +623,102 @@ class ChatbotFallback {
   }
 
   /**
+   * Handle detect duplicates request
+   */
+  handleDetectDuplicates(message, originalMessage) {
+    const email = this.extractEmail(originalMessage);
+    const name = this.extractName(originalMessage);
+
+    // Try to extract phone - look for phone patterns
+    let phone = '';
+    const phonePattern = /(?:phone|number|tel)\s*:?\s*([\d\s\-\(\)]+)/i;
+    const phoneMatch = originalMessage.match(phonePattern);
+    if (phoneMatch) {
+      phone = phoneMatch[1].trim();
+    }
+
+    let searchQuery = '';
+    if (email) {
+      searchQuery = email;
+    } else if (phone) {
+      searchQuery = phone;
+    } else if (name) {
+      searchQuery = `${name.first_name} ${name.last_name}`.trim();
+    }
+
+    if (!searchQuery) {
+      return {
+        action: 'CHAT',
+        intent: 'Need lead identifier',
+        parameters: {},
+        response: 'To check for duplicates, please provide an email, phone, or name. For example: "Check for duplicate john@example.com"',
+        needsConfirmation: false,
+        missingFields: ['email']
+      };
+    }
+
+    return {
+      action: 'DETECT_DUPLICATES',
+      intent: 'Detect duplicate leads',
+      parameters: email ? { email } : phone ? { phone } : { search: searchQuery },
+      response: `I'll check for duplicates matching "${searchQuery}".`,
+      needsConfirmation: false,
+      missingFields: []
+    };
+  }
+
+  /**
+   * Handle export leads request
+   */
+  handleExportLeads(message, originalMessage) {
+    const status = this.extractStatus(message);
+    const source = this.extractSource(message);
+
+    const parameters = {
+      format: message.includes('excel') ? 'excel' : 'csv'
+    };
+
+    if (status) {
+      parameters.status = status;
+    }
+
+    if (source) {
+      parameters.lead_source = source;
+    }
+
+    return {
+      action: 'EXPORT_LEADS',
+      intent: 'Export leads',
+      parameters,
+      response: `I'll export ${status ? `${status} ` : ''}leads to ${parameters.format.toUpperCase()}.`,
+      needsConfirmation: false,
+      missingFields: []
+    };
+  }
+
+  /**
+   * Extract lead source/channel from message
+   */
+  extractSource(message) {
+    const sourceKeywords = {
+      'website': ['website'],
+      'referral': ['referral', 'referred'],
+      'social_media': ['social', 'instagram', 'facebook', 'linkedin', 'twitter'],
+      'cold_call': ['cold call', 'call', 'phone call'],
+      'event': ['event', 'conference', 'webinar', 'trade show'],
+      'other': ['other']
+    };
+
+    for (const [source, keywords] of Object.entries(sourceKeywords)) {
+      if (keywords.some(keyword => message.includes(keyword))) {
+        return source;
+      }
+    }
+
+    return null;
+  }
+
+  /**
    * Handle greeting/help
    */
   handleGreeting() {
@@ -619,7 +726,7 @@ class ChatbotFallback {
       action: 'CHAT',
       intent: 'Greeting',
       parameters: {},
-      response: 'Hello! I\'m your CRM assistant. I can help you:\n\n• Create leads: "Create a lead named John Doe, email john@example.com"\n• Show leads: "Show me all active leads"\n• Search: "Find john@example.com"\n• Update: "Update john@example.com status to qualified"\n• Delete: "Delete john@example.com"\n• Add notes: "Add note to john@example.com: Called today"\n• Assign: "Assign john@example.com to Sarah"\n• Move stage: "Move john@example.com to proposal"\n• Statistics: "Show me lead statistics"\n\nWhat would you like to do?',
+      response: 'Hello! I\'m your CRM assistant. I can help you:\n\n• Create leads: "Create a lead named John Doe, email john@example.com"\n• Show leads: "Show me all active leads"\n• Search: "Find john@example.com"\n• Update: "Update john@example.com status to qualified"\n• Delete: "Delete john@example.com"\n• Add notes: "Add note to john@example.com: Called today"\n• Assign: "Assign john@example.com to Sarah"\n• Move stage: "Move john@example.com to proposal"\n• Check duplicates: "Check for duplicate john@example.com"\n• Export: "Export all qualified leads to CSV"\n• Statistics: "Show me lead statistics"\n\nWhat would you like to do?',
       needsConfirmation: false,
       missingFields: []
     };
