@@ -20,7 +20,13 @@ const VALID_ACTIONS = new Set([
   'DETECT_DUPLICATES',
   'EXPORT_LEADS',
   'SUGGEST_ASSIGNMENT',
-  'LEAD_SCORING'
+  'LEAD_SCORING',
+  'CREATE_TASK',
+  'LIST_MY_TASKS',
+  'UPDATE_TASK',
+  'LOG_ACTIVITY',
+  'GET_TEAM_STATS',
+  'GET_MY_STATS'
 ]);
 
 const DEFAULT_GEMINI_MODELS = [
@@ -130,6 +136,12 @@ class ChatbotService {
 14. EXPORT_LEADS - Export leads to CSV file
 15. SUGGEST_ASSIGNMENT - Get assignment suggestions for a lead
 16. LEAD_SCORING - Score leads by engagement and potential
+17. CREATE_TASK - Create new task or follow-up
+18. LIST_MY_TASKS - Show my tasks with filters (overdue, completed, etc)
+19. UPDATE_TASK - Mark task complete or change priority
+20. LOG_ACTIVITY - Record call, email, meeting with details
+21. GET_TEAM_STATS - Show team member performance metrics
+22. GET_MY_STATS - Show my personal performance metrics
 
 **Lead Fields:**
 - first_name, last_name (required for creation)
@@ -357,6 +369,92 @@ Response:
     "status": "qualified"
   },
   "response": "I'll score qualified leads based on engagement and potential.",
+  "needsConfirmation": false,
+  "missingFields": []
+}
+
+User: "Create task: Follow up with John Doe tomorrow at 2pm"
+Response:
+{
+  "action": "CREATE_TASK",
+  "intent": "Create task",
+  "parameters": {
+    "description": "Follow up with John Doe",
+    "due_date": "2024-12-24",
+    "due_time": "14:00",
+    "priority": "medium",
+    "lead_name": "John Doe"
+  },
+  "response": "I'll create a task to follow up with John Doe tomorrow at 2pm.",
+  "needsConfirmation": true,
+  "missingFields": []
+}
+
+User: "Show my overdue tasks"
+Response:
+{
+  "action": "LIST_MY_TASKS",
+  "intent": "List my tasks",
+  "parameters": {
+    "overdue": true
+  },
+  "response": "Here are your overdue tasks:",
+  "needsConfirmation": false,
+  "missingFields": []
+}
+
+User: "Mark task #5 as done"
+Response:
+{
+  "action": "UPDATE_TASK",
+  "intent": "Complete task",
+  "parameters": {
+    "task_id": "5",
+    "status": "completed"
+  },
+  "response": "I'll mark that task as completed.",
+  "needsConfirmation": false,
+  "missingFields": []
+}
+
+User: "Log call with John Doe, discussed pricing and timeline"
+Response:
+{
+  "action": "LOG_ACTIVITY",
+  "intent": "Log activity",
+  "parameters": {
+    "lead_name": "John Doe",
+    "activity_type": "call",
+    "description": "Discussed pricing and timeline"
+  },
+  "response": "I'll log a call with John Doe mentioning the discussion about pricing and timeline.",
+  "needsConfirmation": true,
+  "missingFields": []
+}
+
+User: "Show Sarah's stats this month"
+Response:
+{
+  "action": "GET_TEAM_STATS",
+  "intent": "Get team stats",
+  "parameters": {
+    "user_name": "Sarah",
+    "period": "this_month"
+  },
+  "response": "Let me get Sarah's performance metrics for this month.",
+  "needsConfirmation": false,
+  "missingFields": []
+}
+
+User: "How am I doing this month?"
+Response:
+{
+  "action": "GET_MY_STATS",
+  "intent": "Get my stats",
+  "parameters": {
+    "period": "this_month"
+  },
+  "response": "Let me pull your performance metrics for this month.",
   "needsConfirmation": false,
   "missingFields": []
 }
@@ -650,6 +748,24 @@ Analyze the message and respond ONLY with valid JSON. Do not include any markdow
 
         case 'LEAD_SCORING':
           return await this.scoreLeads(parameters, currentUser);
+
+        case 'CREATE_TASK':
+          return await this.createTask(parameters, currentUser);
+
+        case 'LIST_MY_TASKS':
+          return await this.listMyTasks(parameters, currentUser);
+
+        case 'UPDATE_TASK':
+          return await this.updateTask(parameters, currentUser);
+
+        case 'LOG_ACTIVITY':
+          return await this.logActivity(parameters, currentUser);
+
+        case 'GET_TEAM_STATS':
+          return await this.getTeamStats(parameters, currentUser);
+
+        case 'GET_MY_STATS':
+          return await this.getMyStats(parameters, currentUser);
 
         default:
           return null;
@@ -1390,6 +1506,256 @@ Analyze the message and respond ONLY with valid JSON. Do not include any markdow
     const created = new Date(createdAt);
     const now = new Date();
     return Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
+  }
+
+  /**
+   * Create a new task
+   */
+  async createTask(parameters, currentUser) {
+    const taskService = require('./taskService');
+    const { supabaseAdmin } = require('../config/supabase');
+
+    let leadId = parameters.lead_id;
+
+    // Try to find lead by name or email if not provided
+    if (!leadId && parameters.lead_name) {
+      const searchResults = await leadService.searchLeads(parameters.lead_name, 1, currentUser);
+      if (searchResults && searchResults.length > 0) {
+        leadId = searchResults[0].id;
+      }
+    }
+
+    const taskData = {
+      company_id: currentUser.company_id,
+      assigned_to: currentUser.id,
+      created_by: currentUser.id,
+      lead_id: leadId || null,
+      description: parameters.description || '',
+      task_type: parameters.task_type || 'follow_up',
+      priority: parameters.priority || 'medium',
+      status: 'pending',
+      due_date: parameters.due_date || null,
+      notes: parameters.notes || ''
+    };
+
+    const result = await taskService.createTask(taskData, currentUser);
+    return {
+      task: result.data,
+      action: 'created',
+      summary: `Task created: "${taskData.description}"`
+    };
+  }
+
+  /**
+   * List my tasks with filters
+   */
+  async listMyTasks(parameters, currentUser) {
+    const taskService = require('./taskService');
+
+    const filters = {
+      assigned_to: currentUser.id,
+      status: parameters.status || '',
+      priority: parameters.priority || '',
+      overdue: parameters.overdue === true ? true : false
+    };
+
+    const tasks = await taskService.getTasks(currentUser, filters);
+
+    return {
+      tasks,
+      count: tasks.length,
+      summary: `You have ${tasks.length} task${tasks.length !== 1 ? 's' : ''}`,
+      action: 'listed'
+    };
+  }
+
+  /**
+   * Update task status or properties
+   */
+  async updateTask(parameters, currentUser) {
+    const taskService = require('./taskService');
+
+    let taskId = parameters.task_id;
+
+    if (!taskId) {
+      throw new ApiError('Task ID is required', 400);
+    }
+
+    const updateData = {};
+
+    if (parameters.status) {
+      updateData.status = parameters.status;
+      if (parameters.status === 'completed') {
+        updateData.completed_at = new Date().toISOString();
+      }
+    }
+
+    if (parameters.priority) {
+      updateData.priority = parameters.priority;
+    }
+
+    if (parameters.description) {
+      updateData.description = parameters.description;
+    }
+
+    const result = await taskService.updateTask(taskId, updateData, currentUser);
+
+    return {
+      task: result,
+      action: 'updated',
+      summary: `Task ${parameters.status === 'completed' ? 'marked as complete' : 'updated'}`
+    };
+  }
+
+  /**
+   * Log activity (call, email, meeting)
+   */
+  async logActivity(parameters, currentUser) {
+    const activityService = require('./activityService');
+    let leadId = parameters.lead_id;
+
+    // Try to find lead by name or email
+    if (!leadId && parameters.lead_name) {
+      const searchResults = await leadService.searchLeads(parameters.lead_name, 1, currentUser);
+      if (searchResults && searchResults.length > 0) {
+        leadId = searchResults[0].id;
+      }
+    }
+
+    if (!leadId) {
+      throw new ApiError('Could not find the lead to log activity for', 404);
+    }
+
+    const activityData = {
+      lead_id: leadId,
+      user_id: currentUser.id,
+      activity_type: parameters.activity_type || 'call',
+      subject: parameters.subject || `${parameters.activity_type || 'Call'} with lead`,
+      description: parameters.description || '',
+      duration_minutes: parameters.duration_minutes || null
+    };
+
+    const result = await activityService.createActivity(activityData, currentUser);
+
+    return {
+      activity: result.data,
+      action: 'logged',
+      summary: `Logged ${activityData.activity_type} activity`
+    };
+  }
+
+  /**
+   * Get team member statistics
+   */
+  async getTeamStats(parameters, currentUser) {
+    const { supabaseAdmin } = require('../config/supabase');
+
+    // Only managers and admins can view team stats
+    if (!['company_admin', 'super_admin', 'manager'].includes(currentUser.role)) {
+      throw new ApiError('Access denied. Only managers can view team statistics.', 403);
+    }
+
+    let userName = parameters.user_name || parameters.team_member || '';
+
+    // Find the user
+    let { data: users } = await supabaseAdmin
+      .from('user_profiles')
+      .select('id, first_name, last_name, role')
+      .eq('company_id', currentUser.company_id);
+
+    let targetUser = users?.find(u =>
+      u.first_name.toLowerCase().includes(userName.toLowerCase()) ||
+      u.last_name.toLowerCase().includes(userName.toLowerCase())
+    );
+
+    if (!targetUser && userName) {
+      throw new ApiError(`Team member "${userName}" not found`, 404);
+    }
+
+    if (!targetUser) {
+      throw new ApiError('Please specify a team member name', 400);
+    }
+
+    // Get stats for the user
+    const { data: leadsData } = await supabaseAdmin
+      .from('leads')
+      .select('*')
+      .eq('company_id', currentUser.company_id)
+      .eq('assigned_to', targetUser.id);
+
+    const { data: activitiesData } = await supabaseAdmin
+      .from('activities')
+      .select('*')
+      .eq('company_id', currentUser.company_id)
+      .eq('user_id', targetUser.id);
+
+    const { data: tasksData } = await supabaseAdmin
+      .from('tasks')
+      .select('*')
+      .eq('company_id', currentUser.company_id)
+      .eq('assigned_to', targetUser.id);
+
+    const leads = leadsData || [];
+    const activities = activitiesData || [];
+    const tasks = tasksData || [];
+
+    return {
+      user: `${targetUser.first_name} ${targetUser.last_name}`,
+      stats: {
+        total_leads: leads.length,
+        active_leads: leads.filter(l => l.status !== 'won' && l.status !== 'lost').length,
+        won_leads: leads.filter(l => l.status === 'won').length,
+        total_activities: activities.length,
+        pending_tasks: tasks.filter(t => t.status !== 'completed').length,
+        completed_tasks: tasks.filter(t => t.status === 'completed').length
+      }
+    };
+  }
+
+  /**
+   * Get my personal statistics
+   */
+  async getMyStats(parameters, currentUser) {
+    const { supabaseAdmin } = require('../config/supabase');
+
+    // Get stats for current user
+    const { data: leadsData } = await supabaseAdmin
+      .from('leads')
+      .select('*')
+      .eq('company_id', currentUser.company_id)
+      .eq('assigned_to', currentUser.id);
+
+    const { data: activitiesData } = await supabaseAdmin
+      .from('activities')
+      .select('*')
+      .eq('company_id', currentUser.company_id)
+      .eq('user_id', currentUser.id);
+
+    const { data: tasksData } = await supabaseAdmin
+      .from('tasks')
+      .select('*')
+      .eq('company_id', currentUser.company_id)
+      .eq('assigned_to', currentUser.id);
+
+    const leads = leadsData || [];
+    const activities = activitiesData || [];
+    const tasks = tasksData || [];
+
+    return {
+      stats: {
+        total_leads: leads.length,
+        active_leads: leads.filter(l => l.status !== 'won' && l.status !== 'lost').length,
+        won_leads: leads.filter(l => l.status === 'won').length,
+        lost_leads: leads.filter(l => l.status === 'lost').length,
+        total_activities: activities.length,
+        calls_logged: activities.filter(a => a.activity_type === 'call').length,
+        emails_logged: activities.filter(a => a.activity_type === 'email').length,
+        meetings_logged: activities.filter(a => a.activity_type === 'meeting').length,
+        pending_tasks: tasks.filter(t => t.status !== 'completed').length,
+        completed_tasks: tasks.filter(t => t.status === 'completed').length
+      },
+      summary: `Leads: ${leads.length} (${leads.filter(l => l.status === 'won').length} won) | Activities: ${activities.length} | Pending Tasks: ${tasks.filter(t => t.status !== 'completed').length}`
+    };
   }
 }
 

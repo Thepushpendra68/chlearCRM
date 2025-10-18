@@ -35,7 +35,42 @@ class ChatbotFallback {
       return this.handleLeadScoring(message, userMessage);
     }
 
-    // Pattern 3: Delete lead
+    // Pattern 5: Create task
+    if (this.matchesPattern(message, ['create task', 'new task', 'add task', 'schedule'])) {
+      return this.handleCreateTask(message, userMessage);
+    }
+
+    // Pattern 6: List tasks
+    if (this.matchesPattern(message, ['show task', 'list task', 'my task']) ||
+        (this.matchesPattern(message, ['task']) && this.matchesPattern(message, ['overdue', 'pending', 'todo']))) {
+      return this.handleListMyTasks(message, userMessage);
+    }
+
+    // Pattern 7: Update/complete task
+    if (this.matchesPattern(message, ['complete task', 'finish task', 'mark done', 'done'])) {
+      return this.handleUpdateTask(message, userMessage);
+    }
+
+    // Pattern 8: Log activity
+    if (this.matchesPattern(message, ['log', 'log call', 'log email', 'log meeting']) ||
+        (this.matchesPattern(message, ['call', 'email', 'meeting']) && this.matchesPattern(message, ['with', 'contact']))) {
+      return this.handleLogActivity(message, userMessage);
+    }
+
+    // Pattern 9: Team stats
+    if (this.matchesPattern(message, ['team', 'stats']) ||
+        (this.matchesPattern(message, ['stats', 'performance']) && this.matchesPattern(message, ['name', 'member']))) {
+      return this.handleTeamStats(message, userMessage);
+    }
+
+    // Pattern 10: My stats
+    if ((this.matchesPattern(message, ['my stats', 'how am i', 'my performance']) ||
+         this.matchesPattern(message, ['stats', 'performance'])) &&
+        !this.matchesPattern(message, ['team', 'member', 'name'])) {
+      return this.handleMyStats(message, userMessage);
+    }
+
+    // Pattern 11: Delete lead
     if (this.matchesPattern(message, ['delete', 'remove', 'drop'])) {
       return this.handleDeleteLead(message, userMessage);
     }
@@ -789,6 +824,236 @@ class ChatbotFallback {
       intent: 'Score leads',
       parameters,
       response: `I'll score ${status ? `${status} ` : ''}leads based on engagement and potential.`,
+      needsConfirmation: false,
+      missingFields: []
+    };
+  }
+
+  /**
+   * Handle create task request
+   */
+  handleCreateTask(message, originalMessage) {
+    // Extract description - typically everything after "create task" or "add task"
+    let description = '';
+    const taskPattern = /(?:create|add|new|schedule)\s+task\s*:?\s*(.+?)(?:\s+(?:tomorrow|today|next|in|by|due|for|at)\s|\s*$)/i;
+    const taskMatch = originalMessage.match(taskPattern);
+    if (taskMatch) {
+      description = taskMatch[1].trim();
+    }
+
+    if (!description) {
+      return {
+        action: 'CHAT',
+        intent: 'Need task description',
+        parameters: {},
+        response: 'To create a task, please provide a description. For example: "Create task: Follow up with John Doe tomorrow"',
+        needsConfirmation: false,
+        missingFields: ['description']
+      };
+    }
+
+    const parameters = {
+      description
+    };
+
+    // Try to extract due date
+    if (originalMessage.match(/tomorrow/i)) {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      parameters.due_date = tomorrow.toISOString().split('T')[0];
+    }
+
+    return {
+      action: 'CREATE_TASK',
+      intent: 'Create task',
+      parameters,
+      response: `I'll create a task: "${description}"`,
+      needsConfirmation: true,
+      missingFields: []
+    };
+  }
+
+  /**
+   * Handle list my tasks request
+   */
+  handleListMyTasks(message, originalMessage) {
+    const parameters = {};
+
+    if (originalMessage.match(/overdue/i)) {
+      parameters.overdue = true;
+    }
+    if (originalMessage.match(/completed|done/i)) {
+      parameters.status = 'completed';
+    }
+    if (originalMessage.match(/pending|todo/i)) {
+      parameters.status = 'pending';
+    }
+
+    return {
+      action: 'LIST_MY_TASKS',
+      intent: 'List my tasks',
+      parameters,
+      response: parameters.overdue ? 'Here are your overdue tasks:' : 'Here are your tasks:',
+      needsConfirmation: false,
+      missingFields: []
+    };
+  }
+
+  /**
+   * Handle update task request
+   */
+  handleUpdateTask(message, originalMessage) {
+    // Try to extract task ID
+    let taskId = '';
+    const taskIdMatch = originalMessage.match(/#?(\d+)/);
+    if (taskIdMatch) {
+      taskId = taskIdMatch[1];
+    }
+
+    if (!taskId) {
+      return {
+        action: 'CHAT',
+        intent: 'Need task ID',
+        parameters: {},
+        response: 'To update a task, please provide the task ID. For example: "Mark task #5 as done"',
+        needsConfirmation: false,
+        missingFields: ['task_id']
+      };
+    }
+
+    return {
+      action: 'UPDATE_TASK',
+      intent: 'Complete task',
+      parameters: {
+        task_id: taskId,
+        status: 'completed'
+      },
+      response: `I'll mark task #${taskId} as completed.`,
+      needsConfirmation: false,
+      missingFields: []
+    };
+  }
+
+  /**
+   * Handle log activity request
+   */
+  handleLogActivity(message, originalMessage) {
+    const name = this.extractName(originalMessage);
+    const email = this.extractEmail(originalMessage);
+
+    let searchQuery = '';
+    if (email) {
+      searchQuery = email;
+    } else if (name) {
+      searchQuery = `${name.first_name} ${name.last_name}`.trim();
+    }
+
+    let activityType = 'call';
+    if (originalMessage.match(/email/i)) {
+      activityType = 'email';
+    } else if (originalMessage.match(/meeting/i)) {
+      activityType = 'meeting';
+    } else if (originalMessage.match(/call|phone/i)) {
+      activityType = 'call';
+    }
+
+    // Extract description - content after "discussed", "about", or the activity type
+    let description = '';
+    const descPattern = /(?:discussed|about|regarding|re:|subject:)\s+(.+?)(?:\s*$)/i;
+    const descMatch = originalMessage.match(descPattern);
+    if (descMatch) {
+      description = descMatch[1].trim();
+    }
+
+    if (!searchQuery) {
+      return {
+        action: 'CHAT',
+        intent: 'Need lead identifier',
+        parameters: {},
+        response: `To log a ${activityType}, please provide a lead name or email. For example: "Log call with john@example.com, discussed pricing"`,
+        needsConfirmation: false,
+        missingFields: ['lead_name']
+      };
+    }
+
+    return {
+      action: 'LOG_ACTIVITY',
+      intent: 'Log activity',
+      parameters: email ? { lead_name: email, activity_type: activityType, description } : { lead_name: searchQuery, activity_type: activityType, description },
+      response: `I'll log a ${activityType} with ${searchQuery}${description ? ` about "${description}"` : ''}.`,
+      needsConfirmation: true,
+      missingFields: []
+    };
+  }
+
+  /**
+   * Handle team stats request
+   */
+  handleTeamStats(message, originalMessage) {
+    // Try to extract team member name
+    const name = this.extractName(originalMessage);
+
+    let userName = '';
+    if (name) {
+      userName = `${name.first_name} ${name.last_name}`.trim();
+    }
+
+    if (!userName) {
+      return {
+        action: 'CHAT',
+        intent: 'Need team member name',
+        parameters: {},
+        response: 'To see team stats, please provide a team member name. For example: "Show Sarah\'s stats this month"',
+        needsConfirmation: false,
+        missingFields: ['user_name']
+      };
+    }
+
+    const parameters = {
+      user_name: userName
+    };
+
+    // Extract period if available
+    if (originalMessage.match(/this month/i)) {
+      parameters.period = 'this_month';
+    } else if (originalMessage.match(/this week/i)) {
+      parameters.period = 'this_week';
+    } else if (originalMessage.match(/last month/i)) {
+      parameters.period = 'last_month';
+    }
+
+    return {
+      action: 'GET_TEAM_STATS',
+      intent: 'Get team stats',
+      parameters,
+      response: `Let me get ${userName}'s performance metrics.`,
+      needsConfirmation: false,
+      missingFields: []
+    };
+  }
+
+  /**
+   * Handle my stats request
+   */
+  handleMyStats(message, originalMessage) {
+    const parameters = {};
+
+    // Extract period if available
+    if (originalMessage.match(/this month/i)) {
+      parameters.period = 'this_month';
+    } else if (originalMessage.match(/this week/i)) {
+      parameters.period = 'this_week';
+    } else if (originalMessage.match(/last month/i)) {
+      parameters.period = 'last_month';
+    } else if (originalMessage.match(/today/i)) {
+      parameters.period = 'today';
+    }
+
+    return {
+      action: 'GET_MY_STATS',
+      intent: 'Get my stats',
+      parameters,
+      response: 'Let me pull your performance metrics.',
       needsConfirmation: false,
       missingFields: []
     };
