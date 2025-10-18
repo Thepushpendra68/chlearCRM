@@ -70,6 +70,11 @@ const authReducer = (state, action) => {
         originalUser: null,
         isImpersonating: false
       }
+    case 'TOGGLE_CHAT_PANEL':
+      return {
+        ...state,
+        chatPanelOpen: !state.chatPanelOpen
+      }
     case 'CLEAR_ERROR':
       return {
         ...state,
@@ -85,20 +90,20 @@ const authReducer = (state, action) => {
   }
 }
 
-// Initial state
-const initialState = {
+const getInitialState = () => ({
   isAuthenticated: false,
   user: null,
   session: null,
-  loading: true, // Start with loading true
+  loading: true,
   error: null,
   impersonatedUser: null,
   originalUser: null,
-  isImpersonating: false
-}
+  isImpersonating: false,
+  chatPanelOpen: false
+})
 
 export const AuthProvider = ({ children }) => {
-  const [state, dispatch] = useReducer(authReducer, initialState)
+  const [state, dispatch] = useReducer(authReducer, null, getInitialState)
   const initializedRef = useRef(false)
 
   // Initialize auth state on mount
@@ -371,6 +376,11 @@ export const AuthProvider = ({ children }) => {
     dispatch({ type: 'CLEAR_ERROR' })
   }
 
+  // Toggle chat panel
+  const toggleChatPanel = () => {
+    dispatch({ type: 'TOGGLE_CHAT_PANEL' })
+  }
+
   // Start impersonation
   const startImpersonation = async (userId, targetUser) => {
     try {
@@ -482,6 +492,7 @@ export const AuthProvider = ({ children }) => {
     applyUserPatch,
     uploadAvatar,
     clearError,
+    toggleChatPanel,
     startImpersonation,
     endImpersonation
   }

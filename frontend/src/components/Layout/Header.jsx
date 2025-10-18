@@ -7,7 +7,8 @@ import {
   MagnifyingGlassIcon,
   PlusIcon,
   Cog6ToothIcon,
-  XMarkIcon
+  XMarkIcon,
+  ChatBubbleLeftIcon
 } from '@heroicons/react/24/outline'
 import { useAuth } from '../../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
@@ -15,7 +16,7 @@ import Breadcrumbs from './Breadcrumbs'
 import GlobalSearch from '../Search/GlobalSearch'
 
 const Header = ({ setSidebarOpen, isCollapsed, currentPath }) => {
-  const { user, logout } = useAuth()
+  const { user, logout, chatPanelOpen, toggleChatPanel } = useAuth()
   const navigate = useNavigate()
   const [showQuickActions, setShowQuickActions] = useState(false)
 
@@ -86,6 +87,20 @@ const Header = ({ setSidebarOpen, isCollapsed, currentPath }) => {
             onClick={() => {/* TODO: Open mobile search modal */}}
           >
             <MagnifyingGlassIcon className="h-5 w-5" />
+          </button>
+
+          {/* Chat Panel Toggle */}
+          <button
+            type="button"
+            className={`p-2 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-lg transition-colors ${
+              chatPanelOpen 
+                ? 'text-blue-600 bg-blue-50' 
+                : 'text-gray-400 hover:text-gray-500'
+            }`}
+            onClick={toggleChatPanel}
+            title="Toggle AI Assistant"
+          >
+            <ChatBubbleLeftIcon className="h-5 w-5" />
           </button>
 
           {/* Quick Actions */}

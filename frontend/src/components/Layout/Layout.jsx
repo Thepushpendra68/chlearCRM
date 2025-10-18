@@ -6,10 +6,10 @@ import ImpersonationBanner from '../Platform/ImpersonationBanner'
 import { useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 
-const ChatbotWidget = lazy(() => import('../Chatbot/ChatbotWidget'))
+const ChatPanel = lazy(() => import('../Chatbot/ChatPanel'))
 
 const Layout = () => {
-  const { isImpersonating, impersonatedUser, endImpersonation } = useAuth()
+  const { isImpersonating, impersonatedUser, endImpersonation, chatPanelOpen } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(true)
   const location = useLocation()
@@ -24,9 +24,9 @@ const Layout = () => {
         setIsCollapsed={setIsCollapsed}
       />
 
-      {/* Main content area - Flexible width, no overlap with sidebar */}
+      {/* Main content area with optional chat panel - Split layout */}
       <div className="flex flex-col flex-1 overflow-hidden">
-        {/* Header - Only spans content area, never overlaps sidebar */}
+        {/* Header */}
         <Header
           setSidebarOpen={setSidebarOpen}
           isCollapsed={isCollapsed}
@@ -41,20 +41,25 @@ const Layout = () => {
           />
         )}
 
-        {/* Page content */}
-        <main className="flex-1 relative overflow-y-auto focus:outline-none bg-white">
-          <div className="py-6">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
-              <Outlet />
+        {/* Content and Chat Panel Container */}
+        <div className="flex flex-1 overflow-hidden">
+          {/* Page content - Takes remaining space */}
+          <main className="flex-1 overflow-y-auto focus:outline-none bg-white">
+            <div className="py-6">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+                <Outlet />
+              </div>
             </div>
-          </div>
-        </main>
-      </div>
+          </main>
 
-      {/* Chatbot Widget */}
-      <Suspense fallback={null}>
-        <ChatbotWidget />
-      </Suspense>
+          {/* Chat Panel - Appears on right side on desktop */}
+          <Suspense fallback={null}>
+            {chatPanelOpen && (
+              <ChatPanel />
+            )}
+          </Suspense>
+        </div>
+      </div>
     </div>
   )
 }

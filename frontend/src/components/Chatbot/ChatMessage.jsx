@@ -1,4 +1,8 @@
 import { formatDistanceToNow } from 'date-fns';
+import { Card, CardContent } from '../ui/card';
+import { Badge } from '../ui/badge';
+import { Avatar, AvatarImage, AvatarFallback } from '../ui/avatar';
+import { AlertCircle, Zap } from 'lucide-react';
 
 const ChatMessage = ({ message }) => {
   const isUser = message.role === 'user';
@@ -165,64 +169,66 @@ const ChatMessage = ({ message }) => {
   };
 
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} items-start space-x-2`}>
+    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} gap-2`}>
       {!isUser && (
-        <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
-          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-          </svg>
-        </div>
+        <Avatar className="h-8 w-8 flex-shrink-0">
+          <AvatarFallback className="bg-primary text-primary-foreground text-xs">AI</AvatarFallback>
+        </Avatar>
       )}
 
-      <div className={`max-w-[80%] ${isUser ? 'bg-blue-600 text-white' : isError ? 'bg-red-50 text-red-800 border border-red-200' : 'bg-white text-gray-800'} rounded-lg p-3 shadow-sm`}>
-        <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
+      <div className={`max-w-[85%]`}>
+        <div className={`rounded-lg p-3 ${isUser ? 'bg-primary text-primary-foreground' : isError ? 'bg-destructive/10 text-destructive border border-destructive/20' : 'bg-card border'}`}>
+          <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">{message.content}</p>
 
-        {/* Render data if available */}
-        {!isUser && message.data && renderLeadData(message.data)}
+          {/* Render data if available */}
+          {!isUser && message.data && renderLeadData(message.data)}
 
-        {!isUser && sourceMeta && (
-          <div className="mt-2 text-xs text-gray-500 flex items-center space-x-2">
-            <span className={`px-2 py-0.5 rounded-full font-medium ${sourceMeta.className}`}>
-              {sourceMeta.label}
-            </span>
-            {message.meta?.model && message.meta.source === 'gemini' && (
-              <span>Model: {message.meta.model}</span>
-            )}
-          </div>
-        )}
+          {!isUser && sourceMeta && (
+            <div className="mt-2 flex items-center gap-2 text-xs">
+              <Badge variant="outline" className={sourceMeta.className}>
+                {sourceMeta.label}
+              </Badge>
+              {message.meta?.model && message.meta.source === 'gemini' && (
+                <span className="text-muted-foreground flex items-center gap-1">
+                  <Zap className="h-3 w-3" />
+                  {message.meta.model}
+                </span>
+              )}
+            </div>
+          )}
 
-        {!isUser && message.missingFields?.length > 0 && (
-          <div className="mt-2 bg-yellow-100 border border-yellow-200 text-yellow-900 text-xs rounded p-2">
-            Missing information needed: {message.missingFields.join(', ')}
-          </div>
-        )}
+          {!isUser && message.missingFields?.length > 0 && (
+            <div className="mt-2 bg-muted border border-muted-foreground/20 text-muted-foreground text-xs rounded p-2 flex items-start gap-2">
+              <AlertCircle className="h-3 w-3 flex-shrink-0 mt-0.5" />
+              <span>Missing: {message.missingFields.join(', ')}</span>
+            </div>
+          )}
 
-        {showPendingSummary && (
-          <div className="mt-2 bg-white border border-yellow-200 rounded p-2 text-xs text-gray-700">
-            <p className="font-medium text-yellow-700 mb-1">Details to confirm</p>
-            <ul className="space-y-1">
-              {parameterEntries.map(([key, value]) => (
-                <li key={key} className="flex justify-between">
-                  <span className="font-medium">{formatKey(key)}</span>
-                  <span className="ml-3 text-right">{String(value)}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+          {showPendingSummary && (
+            <div className="mt-2 bg-muted border border-input rounded p-2 text-xs">
+              <p className="font-semibold text-foreground mb-1">Details to confirm</p>
+              <ul className="space-y-1">
+                {parameterEntries.map(([key, value]) => (
+                  <li key={key} className="flex justify-between gap-2">
+                    <span className="font-medium flex-shrink-0">{formatKey(key)}</span>
+                    <span className="text-right text-muted-foreground truncate">{String(value)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
-        {/* Timestamp */}
-        <p className={`text-xs mt-1 ${isUser ? 'text-blue-100' : 'text-gray-500'}`}>
-          {formatDistanceToNow(new Date(message.timestamp), { addSuffix: true })}
-        </p>
+          {/* Timestamp */}
+          <p className={`text-xs mt-2 ${isUser ? 'text-primary-foreground/60' : 'text-muted-foreground'}`}>
+            {formatDistanceToNow(new Date(message.timestamp), { addSuffix: true })}
+          </p>
+        </div>
       </div>
 
       {isUser && (
-        <div className="w-8 h-8 bg-gray-400 rounded-full flex items-center justify-center flex-shrink-0">
-          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-          </svg>
-        </div>
+        <Avatar className="h-8 w-8 flex-shrink-0">
+          <AvatarFallback className="bg-muted text-foreground text-xs">U</AvatarFallback>
+        </Avatar>
       )}
     </div>
   );
