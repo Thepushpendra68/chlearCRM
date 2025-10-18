@@ -8,12 +8,13 @@ import {
   PlusIcon,
   Cog6ToothIcon,
   XMarkIcon,
-  ChatBubbleLeftIcon
+  SparklesIcon
 } from '@heroicons/react/24/outline'
 import { useAuth } from '../../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import Breadcrumbs from './Breadcrumbs'
 import GlobalSearch from '../Search/GlobalSearch'
+import { Button } from '../ui/button'
 
 const Header = ({ setSidebarOpen, isCollapsed, currentPath }) => {
   const { user, logout, chatPanelOpen, toggleChatPanel } = useAuth()
@@ -89,19 +90,20 @@ const Header = ({ setSidebarOpen, isCollapsed, currentPath }) => {
             <MagnifyingGlassIcon className="h-5 w-5" />
           </button>
 
-          {/* Chat Panel Toggle */}
-          <button
-            type="button"
-            className={`p-2 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-lg transition-colors ${
-              chatPanelOpen 
-                ? 'text-blue-600 bg-blue-50' 
-                : 'text-gray-400 hover:text-gray-500'
-            }`}
+          {/* AI Assistant Toggle */}
+          <Button
+            variant={chatPanelOpen ? "default" : "outline"}
+            size="sm"
             onClick={toggleChatPanel}
-            title="Toggle AI Assistant"
+            className={`flex items-center gap-2 transition-colors ${
+              chatPanelOpen 
+                ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+            }`}
           >
-            <ChatBubbleLeftIcon className="h-5 w-5" />
-          </button>
+            <SparklesIcon className="h-4 w-4" />
+            <span className="hidden sm:inline">AI Assistant</span>
+          </Button>
 
           {/* Quick Actions */}
           <Menu as="div" className="relative">
