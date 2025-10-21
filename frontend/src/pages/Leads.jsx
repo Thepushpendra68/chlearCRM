@@ -366,7 +366,7 @@ const Leads = () => {
                   </div>
                 </div>
                 {(pagination?.total_items > 0 || leads.length > 0) && (
-                  <div className="mt-3 md:mt-4 flex flex-col sm:flex-row gap-3 sm:gap-6 text-xs sm:text-sm text-gray-500">
+                  <div className="mt-3 md:mt-4 flex flex-wrap gap-3 sm:gap-6 text-xs sm:text-sm text-gray-500">
                     <span className="flex items-center">
                       <div className="hidden sm:block w-2 h-2 bg-green-400 rounded-full mr-2"></div>
                       <span className="sm:hidden text-gray-900 font-medium">Total:</span>
@@ -388,45 +388,41 @@ const Leads = () => {
                   </div>
                 )}
               </div>
-              <div className="flex-shrink-0 w-full lg:w-auto">
-                <div className="flex flex-col sm:grid sm:grid-cols-2 md:grid-cols-3 lg:flex lg:flex-row gap-2 sm:gap-2 md:gap-2 lg:gap-3">
+              <div className="flex-shrink-0 w-full">
+                <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={() => refreshLeads()}
-                    className="flex-1 inline-flex items-center justify-center md:justify-start px-3 sm:px-4 py-2 border border-gray-300 shadow-sm text-xs sm:text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all duration-200"
+                    className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all duration-200 whitespace-nowrap"
                   >
-                    <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="h-4 w-4 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
-                    <span className="hidden sm:inline">Refresh</span>
-                    <span className="sm:hidden">Refresh</span>
+                    Refresh
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowImportWizard(true)}
-                    className="flex-1 inline-flex items-center justify-center md:justify-start px-3 sm:px-4 py-2 border border-gray-300 shadow-sm text-xs sm:text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all duration-200"
+                    className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all duration-200 whitespace-nowrap"
                   >
-                    <ArrowUpTrayIcon className="h-4 w-4 mr-2" />
-                    <span className="hidden sm:inline">Import</span>
-                    <span className="sm:hidden">Import</span>
+                    <ArrowUpTrayIcon className="h-4 w-4 mr-2 flex-shrink-0" />
+                    Import
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowExportModal(true)}
-                    className="flex-1 inline-flex items-center justify-center md:justify-start px-3 sm:px-4 py-2 border border-gray-300 shadow-sm text-xs sm:text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all duration-200"
+                    className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all duration-200 whitespace-nowrap"
                   >
-                    <ArrowDownTrayIcon className="h-4 w-4 mr-2" />
-                    <span className="hidden sm:inline">Export</span>
-                    <span className="sm:hidden">Export</span>
+                    <ArrowDownTrayIcon className="h-4 w-4 mr-2 flex-shrink-0" />
+                    Export
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowAddLeadForm(true)}
-                    className="flex-1 inline-flex items-center justify-center md:justify-start px-4 sm:px-6 py-2 border border-transparent text-xs sm:text-sm font-medium rounded-lg shadow-sm text-white bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all duration-200"
+                    className="inline-flex items-center justify-center px-6 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all duration-200 whitespace-nowrap"
                   >
-                    <PlusIcon className="h-4 w-4 mr-2" />
-                    <span className="hidden sm:inline">Add Lead</span>
-                    <span className="sm:hidden">Add</span>
+                    <PlusIcon className="h-4 w-4 mr-2 flex-shrink-0" />
+                    Add Lead
                   </button>
                 </div>
               </div>

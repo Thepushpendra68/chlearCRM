@@ -212,7 +212,7 @@ const Dashboard = () => {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 md:gap-4 lg:grid-cols-4 lg:gap-5 mb-8">
+      <div className="grid gap-3 md:gap-4 lg:gap-5 mb-8" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
         {loading ? (
           // Loading skeleton
           Array.from({ length: 4 }).map((_, index) => (
@@ -264,7 +264,7 @@ const Dashboard = () => {
       </div>
 
       {/* Recent Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid gap-8" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))' }}>
         <div className="card">
           <div className="card-header">
             <h3 className="text-lg font-medium text-gray-900">Recent Leads</h3>
@@ -286,7 +286,7 @@ const Dashboard = () => {
             ) : recentLeads.length > 0 ? (
               <div className="space-y-4">
                 {recentLeads.map((lead) => (
-                  <div key={lead.id} className="flex items-center">
+                  <div key={lead.id} className="flex items-center gap-3">
                     <div className="flex-shrink-0">
                       <div className="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center">
                         <span className="text-sm font-medium text-primary-600">
@@ -294,14 +294,14 @@ const Dashboard = () => {
                         </span>
                       </div>
                     </div>
-                    <div className="ml-4 flex-1">
-                      <div className="text-sm font-medium text-gray-900">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-gray-900 truncate">
                         {lead.first_name} {lead.last_name}
                       </div>
-                      <div className="text-sm text-gray-500">{lead.email}</div>
+                      <div className="text-sm text-gray-500 truncate" title={lead.email}>{lead.email}</div>
                     </div>
-                    <div className="ml-auto">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    <div className="flex-shrink-0">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${
                         lead.status === 'new' ? 'bg-green-100 text-green-800' :
                         lead.status === 'contacted' ? 'bg-blue-100 text-blue-800' :
                         lead.status === 'qualified' ? 'bg-yellow-100 text-yellow-800' :
