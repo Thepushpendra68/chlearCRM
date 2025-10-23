@@ -109,11 +109,30 @@ const ChatPanel = () => {
   const { chatPanelOpen, toggleChatPanel, chatMessages, addChatMessage, clearChatMessages, setChatPanelSize, chatPanelSize } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [pendingAction, setPendingAction] = useState(null);
-  const [width, setWidth] = useState(chatPanelSize?.width || 400);
   const [isResizing, setIsResizing] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const messagesEndRef = useRef(null);
   const chatContainerRef = useRef(null);
   const resizeHandleRef = useRef(null);
+
+  // Calculate width as percentage of viewport (20% default, 30% max)
+  const getDefaultWidth = () => {
+    const vw = window.innerWidth;
+    return Math.min(vw * 0.2, vw * 0.3); // 20% default, capped at 30%
+  };
+
+  const [widthPercent, setWidthPercent] = useState(chatPanelSize?.widthPercent || 20);
+
+  // Track mobile viewport and update width
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Initialize messages from context
   const messages = chatMessages.length > 0 ? chatMessages : [
@@ -136,20 +155,19 @@ const ChatPanel = () => {
     if (!isResizing) return;
 
     const handleMouseMove = (e) => {
-      const container = chatContainerRef.current;
-      if (!container) return;
-
-      const rect = container.getBoundingClientRect();
-      const newWidth = rect.right - e.clientX;
-
-      // Enforce min/max width
-      const constrainedWidth = Math.max(300, Math.min(600, newWidth));
-      setWidth(constrainedWidth);
+      const vw = window.innerWidth;
+      const newWidth = vw - e.clientX;
+      
+      // Calculate as percentage: min 15%, max 30%
+      const newPercent = (newWidth / vw) * 100;
+      const constrainedPercent = Math.max(15, Math.min(30, newPercent));
+      
+      setWidthPercent(constrainedPercent);
     };
 
     const handleMouseUp = () => {
       setIsResizing(false);
-      setChatPanelSize({ width });
+      setChatPanelSize({ widthPercent });
     };
 
     document.addEventListener('mousemove', handleMouseMove);
@@ -159,12 +177,12 @@ const ChatPanel = () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isResizing, width, setChatPanelSize]);
+  }, [isResizing, widthPercent, setChatPanelSize]);
 
   // Update width from context
   useEffect(() => {
-    if (chatPanelSize?.width) {
-      setWidth(chatPanelSize.width);
+    if (chatPanelSize?.widthPercent) {
+      setWidthPercent(chatPanelSize.widthPercent);
     }
   }, [chatPanelSize]);
 
@@ -344,47 +362,51 @@ const ChatPanel = () => {
         />
       )}
       
-      {/* Chat Panel - Desktop sidebar / Mobile overlay */}
+      {/* Chat Panel - Desktop integrated sidebar / Mobile overlay */}
       <div 
         ref={chatContainerRef}
-        className={`fixed md:relative top-16 md:top-0 right-0 md:right-auto bottom-0 h-[calc(100vh-64px)] md:h-auto bg-background border-l flex flex-col shadow-2xl md:shadow-lg transition-transform duration-300 ease-in-out z-40 ${
+        className={`fixed md:relative top-16 md:top-0 right-0 md:right-auto bottom-0 h-[calc(100vh-64px)] md:h-full bg-background border-l flex flex-col shadow-2xl md:shadow-lg transition-all duration-300 ease-in-out z-40 ${
           chatPanelOpen ? 'translate-x-0' : 'translate-x-full md:translate-x-0'
         } md:translate-x-0`}
-        style={{ width: `${width}px`, maxWidth: '100%' }}
+        style={{ 
+          width: isMobile ? '90vw' : `${widthPercent}vw`,
+          minWidth: isMobile ? undefined : '280px',
+          maxWidth: isMobile ? undefined : '30vw'
+        }}
       >
         {/* Header */}
-        <div className="bg-primary text-primary-foreground p-5 flex items-center justify-between flex-shrink-0 rounded-t-none border-b">
+        <div className="bg-primary text-primary-foreground p-3 flex items-center justify-between flex-shrink-0 rounded-t-none border-b">
           <div>
-            <h3 className="font-semibold text-base">CRM Assistant</h3>
-            <p className="text-xs opacity-90 mt-0.5">Powered by Gemini AI</p>
+            <h3 className="font-semibold text-sm">CRM Assistant</h3>
+            <p className="text-[10px] opacity-90 mt-0.5">Powered by Gemini AI</p>
           </div>
           <div className="flex items-center gap-1">
             <Button
               variant="ghost"
               size="icon"
               onClick={clearConversation}
-              className="h-9 w-9 hover:bg-primary/80 rounded-lg"
+              className="h-7 w-7 hover:bg-primary/80 rounded"
               title="Clear conversation"
             >
-              <Trash2 className="h-4 w-4" />
+              <Trash2 className="h-3.5 w-3.5" />
             </Button>
           </div>
         </div>
 
         {/* Messages Container */}
-        <ScrollArea className="flex-1 p-6">
-          <div className="space-y-5">
+        <ScrollArea className="flex-1 p-3">
+          <div className="space-y-2.5">
             {messages.map(message => (
               <ChatMessage key={message.id} message={message} />
             ))}
 
             {isLoading && (
               <div className="flex items-start gap-2">
-                <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                  <div className="flex space-x-1">
-                    <div className="w-1.5 h-1.5 bg-primary-foreground rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                    <div className="w-1.5 h-1.5 bg-primary-foreground rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                    <div className="w-1.5 h-1.5 bg-primary-foreground rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                <div className="w-7 h-7 bg-primary rounded-full flex items-center justify-center flex-shrink-0">
+                  <div className="flex space-x-0.5">
+                    <div className="w-1 h-1 bg-primary-foreground rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                    <div className="w-1 h-1 bg-primary-foreground rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                    <div className="w-1 h-1 bg-primary-foreground rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                   </div>
                 </div>
               </div>
@@ -396,25 +418,25 @@ const ChatPanel = () => {
 
         {/* Pending Action Confirmation */}
         {pendingAction && (
-          <CardFooter className="flex flex-col gap-4 border-t bg-muted/50 p-5 pt-4">
-            <div className="space-y-2">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Pending Action</p>
-              <p className="text-base font-semibold text-foreground">
+          <CardFooter className="flex flex-col gap-2 border-t bg-muted/50 p-3">
+            <div className="space-y-1">
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Pending Action</p>
+              <p className="text-xs font-semibold text-foreground">
                 {getActionLabel(pendingAction.action)}
               </p>
               {pendingAction.intent && (
-                <p className="text-sm text-muted-foreground mt-1">{pendingAction.intent}</p>
+                <p className="text-[10px] text-muted-foreground">{pendingAction.intent}</p>
               )}
             </div>
 
             {pendingAction.summary?.length > 0 && (
-              <div className="w-full bg-card border rounded-lg p-4 text-xs max-h-40 overflow-y-auto">
-                <p className="text-xs font-semibold text-foreground mb-3">Details to confirm:</p>
-                <ul className="space-y-2.5">
+              <div className="w-full bg-card border rounded p-2 text-[10px] max-h-32 overflow-y-auto">
+                <p className="text-[10px] font-semibold text-foreground mb-1.5">Details to confirm:</p>
+                <ul className="space-y-1">
                   {pendingAction.summary.map(item => (
-                    <li key={`${item.label}-${item.value}`} className="flex justify-between gap-3 items-center">
+                    <li key={`${item.label}-${item.value}`} className="flex justify-between gap-2 items-center">
                       <span className="font-medium flex-shrink-0 text-foreground">{item.label}</span>
-                      <span className="text-right text-muted-foreground truncate text-xs">{item.value}</span>
+                      <span className="text-right text-muted-foreground truncate">{item.value}</span>
                     </li>
                   ))}
                 </ul>
@@ -422,18 +444,18 @@ const ChatPanel = () => {
             )}
 
             {pendingAction.missingFields?.length > 0 && (
-              <div className="w-full text-sm bg-destructive/10 border border-destructive/20 rounded-lg p-3 text-destructive flex items-start gap-2">
-                <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+              <div className="w-full text-[10px] bg-destructive/10 border border-destructive/20 rounded p-2 text-destructive flex items-start gap-1.5">
+                <AlertCircle className="h-3 w-3 flex-shrink-0 mt-0.5" />
                 <span>Missing: {pendingAction.missingFields.join(', ')}</span>
               </div>
             )}
 
-            <div className="flex w-full gap-3 pt-2">
+            <div className="flex w-full gap-2 pt-1">
               <Button
                 onClick={confirmAction}
                 disabled={isLoading}
                 size="sm"
-                className="flex-1"
+                className="flex-1 h-7 text-xs"
               >
                 Confirm
               </Button>
@@ -442,7 +464,7 @@ const ChatPanel = () => {
                 disabled={isLoading}
                 variant="outline"
                 size="sm"
-                className="flex-1"
+                className="flex-1 h-7 text-xs"
               >
                 Cancel
               </Button>
@@ -452,9 +474,9 @@ const ChatPanel = () => {
 
         {/* Quick Actions */}
         {!pendingAction && messages.length === 1 && (
-          <div className="border-t p-3 bg-card flex-shrink-0">
-            <p className="text-xs font-semibold text-muted-foreground mb-2">QUICK ACTIONS</p>
-            <div className="grid grid-cols-2 gap-2">
+          <div className="border-t p-2 bg-card flex-shrink-0">
+            <p className="text-[10px] font-semibold text-muted-foreground mb-1.5">QUICK ACTIONS</p>
+            <div className="grid grid-cols-2 gap-1.5">
               {quickActions.map((action, index) => (
                 <Button
                   key={index}
@@ -462,7 +484,7 @@ const ChatPanel = () => {
                   disabled={isLoading}
                   variant="outline"
                   size="sm"
-                  className="text-xs h-auto py-2"
+                  className="text-[10px] h-auto py-1.5"
                 >
                   {action.label}
                 </Button>

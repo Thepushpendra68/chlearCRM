@@ -2,8 +2,6 @@ import { Fragment, useState, useRef, useEffect } from 'react'
 import { Dialog, Transition, Menu } from '@headlessui/react'
 import {
   XMarkIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
   Cog6ToothIcon,
   UserCircleIcon,
   SunIcon,
@@ -299,6 +297,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, isCollapsed, setIsCollapsed }) =
       </Transition.Root>
 
       {/* Desktop sidebar */}
+      {/* Desktop sidebar - always w-60 container, but nav inside can hide/show text */}
       <div
         className={`hidden md:flex md:flex-shrink-0 transition-all duration-300 ${
           (isCollapsed && !isHovered) ? 'md:w-16' : 'md:w-60'
@@ -307,36 +306,18 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, isCollapsed, setIsCollapsed }) =
         onMouseLeave={() => setIsHovered(false)}
       >
         <div className="flex flex-col w-full bg-gray-50 border-r border-gray-200">
-          <div className="flex flex-col h-0 flex-1">
-            {/* Header */}
-            <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200">
-              {(!isCollapsed || isHovered) && (
-                <div className="flex items-center">
-                  <div className="flex-shrink-0 w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
-                    <span className="text-white font-bold text-sm">S</span>
-                  </div>
-                  <span className="ml-3 text-xl font-bold text-gray-900">Sakha</span>
-                </div>
-              )}
-              {(isCollapsed && !isHovered) && (
-                <div className="flex-shrink-0 w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center mx-auto">
-                  <span className="text-white font-bold text-sm">S</span>
-                </div>
-              )}
-              <button
-                onClick={() => setIsCollapsed(!isCollapsed)}
-                className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
-                title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              >
-                {isCollapsed ? (
-                  <ChevronRightIcon className="h-4 w-4 text-gray-500" />
-                ) : (
-                  <ChevronLeftIcon className="h-4 w-4 text-gray-500" />
-                )}
-              </button>
+          {/* Header - Always shows full logo and text */}
+          <div className="flex-shrink-0 flex items-center px-4 py-4 border-b border-gray-200 min-w-0">
+            <div className="flex-shrink-0 w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold text-sm">S</span>
             </div>
+            <span className={`ml-3 text-lg font-bold text-gray-900 transition-opacity duration-300 ${
+              (isCollapsed && !isHovered) ? 'opacity-0 w-0' : 'opacity-100'
+            }`}>Sakha</span>
+          </div>
 
-
+          {/* Scrollable Content */}
+          <div className="flex flex-col h-0 flex-1">
             {/* Navigation */}
             <div className="flex-1 overflow-y-auto py-4">
               {/* Main Navigation */}

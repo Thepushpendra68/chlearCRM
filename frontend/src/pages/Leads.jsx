@@ -345,95 +345,95 @@ const Leads = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+    <div className="overflow-y-auto h-full bg-gradient-to-br from-gray-50 to-gray-100">
       {/* Enhanced Header Section */}
       <div className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="py-6 md:py-8">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-              <div className="flex-1">
-                <div className="flex flex-col md:flex-row md:items-center md:space-x-3">
-                  <div className="hidden md:flex p-2 bg-primary-100 rounded-lg flex-shrink-0">
-                    <svg className="h-6 w-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Leads</h1>
-                    <p className="mt-1 text-sm text-gray-600">
-                      Manage your leads and track their progress through the sales pipeline
-                    </p>
-                  </div>
-                </div>
-                {(pagination?.total_items > 0 || leads.length > 0) && (
-                  <div className="mt-3 md:mt-4 flex flex-wrap gap-3 sm:gap-6 text-xs sm:text-sm text-gray-500">
-                    <span className="flex items-center">
-                      <div className="hidden sm:block w-2 h-2 bg-green-400 rounded-full mr-2"></div>
-                      <span className="sm:hidden text-gray-900 font-medium">Total:</span>
-                      <span className="sm:hidden mx-2">•</span>
-                      {pagination?.total_items || leads.length} total leads
-                    </span>
-                    <span className="flex items-center">
-                      <div className="hidden sm:block w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
-                      <span className="sm:hidden text-gray-900 font-medium">New:</span>
-                      <span className="sm:hidden mx-2">•</span>
-                      {leads.filter(lead => lead.status === 'new').length} new
-                    </span>
-                    <span className="flex items-center">
-                      <div className="hidden sm:block w-2 h-2 bg-yellow-400 rounded-full mr-2"></div>
-                      <span className="sm:hidden text-gray-900 font-medium">Qualified:</span>
-                      <span className="sm:hidden mx-2">•</span>
-                      {leads.filter(lead => lead.status === 'qualified').length} qualified
-                    </span>
-                  </div>
-                )}
+          <div className="py-4 md:py-6 lg:py-8">
+            {/* Title and Description Row */}
+            <div className="flex items-start gap-3 mb-4">
+              <div className="hidden md:flex p-2 bg-primary-100 rounded-lg flex-shrink-0">
+                <svg className="h-6 w-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
               </div>
-              <div className="flex-shrink-0 w-full">
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => refreshLeads()}
-                    className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all duration-200 whitespace-nowrap"
-                  >
-                    <svg className="h-4 w-4 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    Refresh
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowImportWizard(true)}
-                    className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all duration-200 whitespace-nowrap"
-                  >
-                    <ArrowUpTrayIcon className="h-4 w-4 mr-2 flex-shrink-0" />
-                    Import
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowExportModal(true)}
-                    className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all duration-200 whitespace-nowrap"
-                  >
-                    <ArrowDownTrayIcon className="h-4 w-4 mr-2 flex-shrink-0" />
-                    Export
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowAddLeadForm(true)}
-                    className="inline-flex items-center justify-center px-6 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all duration-200 whitespace-nowrap"
-                  >
-                    <PlusIcon className="h-4 w-4 mr-2 flex-shrink-0" />
-                    Add Lead
-                  </button>
+              <div className="flex-1 min-w-0">
+                <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-gray-900">Leads</h1>
+                <p className="mt-1 text-xs md:text-sm text-gray-600">
+                  Manage your leads and track their progress through the sales pipeline
+                </p>
+              </div>
+            </div>
+
+            {/* Stats and Actions Section */}
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+              {/* Stats - Stacked on mobile, inline on larger screens */}
+              {(pagination?.total_items > 0 || leads.length > 0) && (
+                <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:gap-4 lg:gap-6 text-xs sm:text-sm">
+                  <span className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-green-400 rounded-full flex-shrink-0"></div>
+                    <span className="text-gray-900 font-medium">{pagination?.total_items || leads.length}</span>
+                    <span className="text-gray-500">total leads</span>
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-blue-400 rounded-full flex-shrink-0"></div>
+                    <span className="text-gray-900 font-medium">{leads.filter(lead => lead.status === 'new').length}</span>
+                    <span className="text-gray-500">new</span>
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-yellow-400 rounded-full flex-shrink-0"></div>
+                    <span className="text-gray-900 font-medium">{leads.filter(lead => lead.status === 'qualified').length}</span>
+                    <span className="text-gray-500">qualified</span>
+                  </span>
                 </div>
+              )}
+
+              {/* Actions - Grid layout for better mobile wrapping */}
+              <div className="grid grid-cols-2 sm:flex sm:flex-wrap lg:flex-nowrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => refreshLeads()}
+                  className="inline-flex items-center justify-center px-3 md:px-4 py-2 border border-gray-300 shadow-sm text-xs md:text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all duration-200"
+                >
+                  <svg className="h-4 w-4 md:mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span className="hidden md:inline">Refresh</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowImportWizard(true)}
+                  className="inline-flex items-center justify-center px-3 md:px-4 py-2 border border-gray-300 shadow-sm text-xs md:text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all duration-200"
+                >
+                  <ArrowUpTrayIcon className="h-4 w-4 md:mr-2 flex-shrink-0" />
+                  <span className="hidden md:inline">Import</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowExportModal(true)}
+                  className="inline-flex items-center justify-center px-3 md:px-4 py-2 border border-gray-300 shadow-sm text-xs md:text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all duration-200"
+                >
+                  <ArrowDownTrayIcon className="h-4 w-4 md:mr-2 flex-shrink-0" />
+                  <span className="hidden md:inline">Export</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAddLeadForm(true)}
+                  className="col-span-2 sm:col-span-1 inline-flex items-center justify-center px-4 md:px-6 py-2 border border-transparent text-xs md:text-sm font-medium rounded-lg shadow-sm text-white bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all duration-200"
+                >
+                  <PlusIcon className="h-4 w-4 mr-2 flex-shrink-0" />
+                  Add Lead
+                </button>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Bulk Actions Bar */}
-      {showBulkActions && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+
+        {/* Bulk Actions Bar */}
+        {showBulkActions && (
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
@@ -457,12 +457,12 @@ const Leads = () => {
                 </button>
               </div>
             </div>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Enhanced Search and Filters */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Enhanced Search and Filters */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 lg:gap-4">
             <div className="flex-1 max-w-lg">
@@ -504,11 +504,11 @@ const Leads = () => {
               </select>
             </div>
           </div>
+          </div>
         </div>
-      </div>
 
-      {/* Enhanced Leads Table - Responsive */}
-      <ContentWrapper className="px-4 sm:px-6 lg:px-8">
+        {/* Enhanced Leads Table - Responsive */}
+        <ContentWrapper className="px-4 sm:px-6 lg:px-8">
         {/* Mobile View */}
         <MobileOnly>
           <div className="pb-8 -mx-4 sm:-mx-6 lg:mx-0">
@@ -685,10 +685,10 @@ const Leads = () => {
               </ResponsiveTableWrapper>
             )}
           </div>
-        </TabletAndDesktop>
-      </ContentWrapper>
+          </TabletAndDesktop>
+        </ContentWrapper>
 
-      <ContentWrapper className="pb-12 px-4 sm:px-6 lg:px-8">
+        <ContentWrapper className="pb-12 px-4 sm:px-6 lg:px-8">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3 sm:p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-4">
           <div className="flex items-center space-x-2 text-sm">
             <span className="text-gray-600 whitespace-nowrap">Rows per page:</span>
@@ -736,12 +736,12 @@ const Leads = () => {
                 Next
               </button>
             </div>
+            </div>
           </div>
-        </div>
-      </ContentWrapper>
+        </ContentWrapper>
 
-      {/* Enhanced Empty State */}
-      {!loading && leads.length === 0 && (
+        {/* Enhanced Empty State */}
+        {!loading && leads.length === 0 && (
         <ContentWrapper className="py-16">
           <div className="text-center">
             <div className="mx-auto w-24 h-24 bg-gradient-to-br from-primary-100 to-primary-200 rounded-full flex items-center justify-center mb-6">
@@ -797,9 +797,9 @@ const Leads = () => {
                 <h4 className="text-sm font-semibold text-gray-900 mb-2">Boost Sales</h4>
                 <p className="text-sm text-gray-600">Convert more leads into paying customers</p>
               </div>
+              </div>
             </div>
-          </div>
-        </ContentWrapper>
+          </ContentWrapper>
       )}
 
       {/* Import/Export Modals */}

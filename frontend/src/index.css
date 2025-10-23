@@ -7,6 +7,17 @@
     font-family: 'Inter', system-ui, sans-serif;
   }
   
+  /* Hide scrollbars but keep scrolling functionality */
+  /* Chrome, Safari, Edge */
+  ::-webkit-scrollbar {
+    display: none;
+  }
+  
+  html, body {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+  }
+  
   body {
     @apply bg-gray-50 text-gray-900;
   }
