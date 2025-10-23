@@ -125,7 +125,22 @@ const normalizeEmail = (value) => {
 const normalizePhone = (value) => {
   const normalized = normalizeString(value);
   if (!normalized) return null;
-  return normalized.replace(/[\s\-()]/g, '');
+
+  let phone = normalized.replace(/\u00A0/g, ' ').trim();
+  let prefix = '';
+
+  if (phone.startsWith('+')) {
+    prefix = '+';
+    phone = phone.slice(1);
+  }
+
+  phone = phone.replace(/\D/g, '');
+
+  if (!phone) {
+    return null;
+  }
+
+  return prefix + phone;
 };
 
 class ImportValidationEngine {
@@ -237,7 +252,7 @@ class ImportValidationEngine {
       if (!this.isValidPhone(phone)) {
         errors.push('Invalid phone format');
       } else {
-        normalized.phone = row.phone.trim();
+        normalized.phone = phone;
         if (context.duplicates.inFile.phones.has(phone)) {
           errors.push('Duplicate phone found in import file');
         } else if (context.duplicates.inDb.phones.has(phone)) {
@@ -522,7 +537,7 @@ class ImportValidationEngine {
 
   isValidPhone(phone) {
     if (!phone) return false;
-    const phoneRegex = /^[+]?[1-9][\d]{0,15}$/;
+    const phoneRegex = /^\+?\d{6,16}$/;
     return phoneRegex.test(phone);
   }
 }

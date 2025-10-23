@@ -9,16 +9,50 @@ jest.mock('../config/supabase', () => ({
   }
 }));
 
+const mockImportConfig = {
+  requiredFields: ['first_name', 'last_name'],
+  enums: {
+    status: ['new', 'contacted', 'qualified'],
+    lead_source: ['website', 'referral', 'import'],
+    priority: ['low', 'medium', 'high']
+  },
+  numericRanges: {
+    deal_value: { min: 0 },
+    probability: { min: 0, max: 100 }
+  },
+  fuzzyMatchData: null
+};
+
+jest.mock('../services/importConfigService', () => ({
+  getCompanyConfig: jest.fn().mockResolvedValue(mockImportConfig),
+  invalidateCache: jest.fn()
+}));
+
+jest.mock('../services/importTelemetryService', () => ({
+  recordDryRun: jest.fn(),
+  recordImport: jest.fn()
+}));
+
 const importService = require('../services/importService');
 const { supabaseAdmin } = require('../config/supabase');
 
 const createLeadLookupBuilder = (result) => {
-  const builder = {};
-  builder.select = jest.fn(() => builder);
-  builder.eq = jest.fn(() => builder);
-  builder.maybeSingle = jest.fn().mockResolvedValue(result);
+  const execute = () => Promise.resolve(result);
+  const builder = {
+    select: jest.fn(() => builder),
+    eq: jest.fn(() => builder),
+    in: jest.fn(() => execute()),
+    maybeSingle: jest.fn(() => execute()),
+    single: jest.fn(() => execute()),
+    order: jest.fn(() => builder),
+    limit: jest.fn(() => builder),
+    then: jest.fn((resolve) => execute().then(resolve))
+  };
+
   return { builder, eqMock: builder.eq };
 };
+
+const createDefaultBuilder = () => createLeadLookupBuilder({ data: [], error: null }).builder;
 
 describe('importService.validateLeads', () => {
   beforeEach(() => {
@@ -27,11 +61,22 @@ describe('importService.validateLeads', () => {
 
   it('flags duplicate emails within the same company', async () => {
     const { builder, eqMock } = createLeadLookupBuilder({
-      data: { id: 'existing-lead' },
+      data: [
+        {
+          id: 'existing-lead',
+          email: 'dupe@example.com',
+          phone: '+123456789'
+        }
+      ],
       error: null
     });
 
-    supabaseAdmin.from.mockReturnValueOnce(builder);
+    supabaseAdmin.from.mockImplementation((table) => {
+      if (table === 'leads') {
+        return builder;
+      }
+      return createDefaultBuilder();
+    });
 
     const result = await importService.validateLeads(
       [
@@ -45,10 +90,8 @@ describe('importService.validateLeads', () => {
       'company-1'
     );
 
-    expect(eqMock.mock.calls).toEqual([
-      ['company_id', 'company-1'],
-      ['email', 'dupe@example.com']
-    ]);
+    expect(eqMock).toHaveBeenCalledWith('company_id', 'company-1');
+    expect(eqMock).toHaveBeenCalledWith('email', 'dupe@example.com');
     expect(result.errors).toHaveLength(1);
     expect(result.errors[0].errors).toContain('Email already exists');
     expect(result.validatedLeads).toHaveLength(0);
@@ -56,11 +99,16 @@ describe('importService.validateLeads', () => {
 
   it('accepts unique emails and normalizes casing', async () => {
     const { builder } = createLeadLookupBuilder({
-      data: null,
+      data: [],
       error: null
     });
 
-    supabaseAdmin.from.mockReturnValueOnce(builder);
+    supabaseAdmin.from.mockImplementation((table) => {
+      if (table === 'leads') {
+        return builder;
+      }
+      return createDefaultBuilder();
+    });
 
     const result = await importService.validateLeads(
       [

@@ -125,4 +125,51 @@ describe('ImportValidationEngine', () => {
       expect(engineWithPicklists.normalizeEnumValue('Walk-In', 'lead_source')).toBe('event');
     });
   });
+
+  describe('phone validation', () => {
+    const createContext = () => ({
+      duplicates: {
+        inFile: {
+          emails: new Set(),
+          phones: new Set()
+        },
+        inDb: {
+          emails: new Set(),
+          phones: new Set()
+        }
+      }
+    });
+
+    test('accepts +91 country code format', () => {
+      const context = createContext();
+      const result = engine.validateRow(
+        {
+          first_name: 'A',
+          last_name: 'B',
+          phone: '+91 98765 43210'
+        },
+        0,
+        context
+      );
+
+      expect(result.errors).toHaveLength(0);
+      expect(result.normalized.phone).toBe('+919876543210');
+    });
+
+    test('normalizes phone numbers by stripping formatting characters', () => {
+      const context = createContext();
+      const result = engine.validateRow(
+        {
+          first_name: 'C',
+          last_name: 'D',
+          phone: '91-987 654-3210'
+        },
+        0,
+        context
+      );
+
+      expect(result.errors).toHaveLength(0);
+      expect(result.normalized.phone).toBe('919876543210');
+    });
+  });
 });

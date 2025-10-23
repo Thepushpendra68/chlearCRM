@@ -167,15 +167,38 @@ class ImportController {
   exportLeads = async (req, res, next) => {
     try {
       const { format = 'csv', ...filters } = req.query;
+      const user = req.user;
+      const isSuperAdmin = user?.role === 'super_admin';
+
+      let companyId = null;
+
+      if (isSuperAdmin) {
+        companyId = filters.company_id || req.query.company_id || null;
+        if (!companyId) {
+          throw new ApiError('company_id is required when exporting as super admin', 400);
+        }
+        delete filters.company_id;
+      } else {
+        companyId = user?.company_id;
+        if (!companyId) {
+          throw new ApiError('Unable to determine company for export', 400);
+        }
+        if (filters.company_id) {
+          delete filters.company_id;
+        }
+      }
       
-      console.log('Export request received:', { format, filters, user: req.user?.id });
+      console.log('Export request received:', { format, filters, user: req.user?.id, companyId });
       
       // Validate format
       if (!['csv', 'excel'].includes(format)) {
         throw new ApiError('Invalid export format. Supported formats: csv, excel', 400);
       }
       
-      const exportData = await importService.exportLeads(filters, format);
+      const exportData = await importService.exportLeads(filters, format, companyId, {
+        isSuperAdmin,
+        userId: user?.id
+      });
       console.log('Export data retrieved:', exportData.length, 'records');
       
       if (exportData.length === 0) {
@@ -210,7 +233,7 @@ class ImportController {
             action: AuditActions.EXPORT_GENERATED,
             resourceType: 'lead_export',
             resourceName: `leads_export_${new Date().toISOString().split('T')[0]}.csv`,
-            companyId: req.user.company_id,
+            companyId,
             details: {
               format,
               record_count: 0
@@ -227,7 +250,7 @@ class ImportController {
             action: AuditActions.EXPORT_GENERATED,
             resourceType: 'lead_export',
             resourceName: `leads_export_${new Date().toISOString().split('T')[0]}.xlsx`,
-            companyId: req.user.company_id,
+            companyId,
             details: {
               format,
               record_count: 0
@@ -248,7 +271,7 @@ class ImportController {
           action: AuditActions.EXPORT_GENERATED,
           resourceType: 'lead_export',
           resourceName: `leads_export_${new Date().toISOString().split('T')[0]}.csv`,
-          companyId: req.user.company_id,
+          companyId,
           details: {
             format,
             record_count: exportData.length
@@ -267,7 +290,7 @@ class ImportController {
           action: AuditActions.EXPORT_GENERATED,
           resourceType: 'lead_export',
           resourceName: `leads_export_${new Date().toISOString().split('T')[0]}.xlsx`,
-          companyId: req.user.company_id,
+          companyId,
           details: {
             format,
             record_count: exportData.length
@@ -279,7 +302,7 @@ class ImportController {
           action: AuditActions.EXPORT_GENERATED,
           resourceType: 'lead_export',
           resourceName: `leads_export_${new Date().toISOString().split('T')[0]}.${format}`,
-          companyId: req.user.company_id,
+          companyId,
           details: {
             format,
             record_count: exportData.length

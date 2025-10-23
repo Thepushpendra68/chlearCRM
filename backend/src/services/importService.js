@@ -97,16 +97,34 @@ class ImportService {
       return [];
     }
 
+    if (typeof supabaseAdmin?.from !== 'function') {
+      console.warn('[IMPORT] Supabase admin client unavailable. Skipping duplicate lookup for column:', column);
+      return [];
+    }
+
     const chunks = chunkArray(sanitizedValues, 500);
     const results = [];
 
     for (const chunk of chunks) {
       try {
-        const { data, error } = await supabaseAdmin
-          .from('leads')
+        const queryBuilder = supabaseAdmin.from('leads');
+
+        if (!queryBuilder || typeof queryBuilder.select !== 'function') {
+          console.warn('[IMPORT] Supabase query builder unavailable. Skipping duplicate lookup for column:', column);
+          return [];
+        }
+
+        let query = queryBuilder
           .select('id, email, phone')
-          .eq('company_id', companyId)
-          .in(column, chunk);
+          .eq('company_id', companyId);
+
+        if (chunk.length === 1) {
+          query = query.eq(column, chunk[0]);
+        } else {
+          query = query.in(column, chunk);
+        }
+
+        const { data, error } = await query;
 
         if (error) {
           if (error.code === '42P01') {
@@ -596,9 +614,13 @@ class ImportService {
   /**
    * Export leads to various formats
    */
-  async exportLeads(filters = {}, format = 'csv') {
+  async exportLeads(filters = {}, format = 'csv', companyId = null, context = {}) {
     try {
-      console.log('Starting export with filters:', filters, 'format:', format);
+      console.log('Starting export with filters:', filters, 'format:', format, 'companyId:', companyId, 'context:', context);
+
+      if (!companyId) {
+        throw new ApiError('Company context is required for exporting leads', 400);
+      }
 
       let query = supabaseAdmin
         .from('leads')
@@ -608,6 +630,8 @@ class ImportService {
           created_user:user_profiles!leads_created_by_fkey(first_name, last_name),
           pipeline_stages(name)
         `);
+
+      query = query.eq('company_id', companyId);
 
       // Apply filters
       if (filters.status) {
