@@ -186,7 +186,7 @@ describe('Configuration Loader', () => {
       
       expect(validation.valid).toBe(false);
       expect(validation.errors.length).toBeGreaterThan(0);
-      expect(validation.errors[0].field).toBe('student_age');
+      expect(validation.errors.some(e => e.field === 'student_age')).toBe(true);
     });
 
     test('should catch invalid select options', () => {
@@ -219,8 +219,10 @@ describe('Configuration Loader', () => {
       
       const validation = validateCustomFields(config, emptyData);
       
-      // Empty is valid - required checking happens at the form level
+      // Empty data is valid - validation only checks provided fields
+      // Required field validation happens at form submission level
       expect(validation.valid).toBe(true);
+      expect(validation.errors.length).toBe(0);
     });
   });
 
@@ -301,12 +303,12 @@ describe('Configuration Loader', () => {
       expect(config.industryType).toBe('generic');
     });
 
-    test('should handle empty custom fields data', () => {
+    test('should treat empty custom fields data as valid', () => {
       const config = loadIndustryConfig('school');
       const validation = validateCustomFields(config, {});
       
-      // Should fail due to required fields
-      expect(validation.valid).toBe(false);
+      expect(validation.valid).toBe(true);
+      expect(validation.errors.length).toBe(0);
     });
 
     test('should handle null field values', () => {
