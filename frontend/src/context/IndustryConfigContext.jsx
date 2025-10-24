@@ -29,13 +29,19 @@ export const IndustryConfigProvider = ({ children }) => {
         // Fetch configuration from backend
         const response = await api.get('/config/industry');
         
+        console.log('📋 [CONFIG] API Response received:', response.data);
+        
         if (response.data && response.data.success) {
+          console.log('✅ [CONFIG] Configuration loaded successfully');
+          console.log('📋 [CONFIG] Industry Type:', response.data.data?.config?.industryType);
+          console.log('📋 [CONFIG] Core Fields:', Object.keys(response.data.data?.config?.coreFields || {}));
+          console.log('📋 [CONFIG] Form Layout Sections:', response.data.data?.config?.formLayout?.sections?.map(s => s.id));
           setConfig(response.data.data);
         } else {
           throw new Error('Invalid configuration response');
         }
       } catch (err) {
-        console.error('Failed to load industry configuration:', err);
+        console.error('❌ [CONFIG] Failed to load industry configuration:', err);
         setError(err.message || 'Failed to load configuration');
         
         // Set fallback configuration
@@ -95,11 +101,12 @@ export const IndustryConfigProvider = ({ children }) => {
     const cfg = config.config;
 
     // Add core fields
-    if (cfg.coreFields) {
+    if (cfg.coreFields && typeof cfg.coreFields === 'object') {
       Object.keys(cfg.coreFields).forEach(key => {
         const fieldDef = cfg.coreFields[key];
         fields.push({
-          id: fieldDef.name || key,
+          id: key, // Use the camelCase key as ID for form binding
+          name: fieldDef.name || key, // Database column name (snake_case)
           ...fieldDef,
           isCustomField: false,
           fieldKey: key,
@@ -108,11 +115,12 @@ export const IndustryConfigProvider = ({ children }) => {
     }
 
     // Add custom fields
-    if (cfg.customFields) {
+    if (cfg.customFields && typeof cfg.customFields === 'object') {
       Object.keys(cfg.customFields).forEach(key => {
         const fieldDef = cfg.customFields[key];
         fields.push({
-          id: fieldDef.name || key,
+          id: key, // Use the camelCase key as ID for form binding
+          name: fieldDef.name || key, // Database column name (snake_case)
           ...fieldDef,
           isCustomField: true,
           fieldKey: key,

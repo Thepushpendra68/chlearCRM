@@ -35,7 +35,7 @@ const DynamicLeadForm = ({ lead = null, onClose, onSuccess, initialStageId = nul
           // Custom fields come from lead.custom_fields
           initialData[field.id] = lead.custom_fields?.[field.name] ?? field.defaultValue ?? '';
         } else {
-          // Core fields come from lead directly
+          // Core fields come from lead directly, using the database column name
           initialData[field.id] = lead[field.name] ?? field.defaultValue ?? '';
         }
       } else {
@@ -46,7 +46,11 @@ const DynamicLeadForm = ({ lead = null, onClose, onSuccess, initialStageId = nul
 
     // Set initial pipeline stage if provided
     if (initialStageId && !isEditMode) {
-      initialData.pipeline_stage_id = initialStageId;
+      // Find the field ID for pipeline_stage_id
+      const pipelineField = allFields.find(f => f.name === 'pipeline_stage_id');
+      if (pipelineField) {
+        initialData[pipelineField.id] = initialStageId;
+      }
     }
 
     setFormData(initialData);
@@ -154,13 +158,14 @@ const DynamicLeadForm = ({ lead = null, onClose, onSuccess, initialStageId = nul
       const customFieldsData = {};
 
       allFields.forEach(field => {
-        const value = formData[field.id];
+        const value = formData[field.id]; // Form data is keyed by field.id (camelCase)
         
         // Skip empty values for optional fields
         if (!field.required && (value === '' || value === null || value === undefined)) {
           return;
         }
 
+        // Use field.name for database column mapping (snake_case)
         if (field.isCustomField) {
           customFieldsData[field.name] = value;
         } else {
@@ -218,6 +223,7 @@ const DynamicLeadForm = ({ lead = null, onClose, onSuccess, initialStageId = nul
 
   // Show loading state while configuration loads
   if (configLoading) {
+    console.log('📋 [FORM] Configuration is loading...');
     return (
       <Modal isOpen={true} onClose={onClose} title="Loading..." size="lg">
         <div className="flex items-center justify-center py-12">
@@ -230,10 +236,12 @@ const DynamicLeadForm = ({ lead = null, onClose, onSuccess, initialStageId = nul
 
   // Show error if configuration not available
   if (!config || !formLayout) {
+    console.error('❌ [FORM] Configuration not available:', { config, formLayout });
     return (
       <Modal isOpen={true} onClose={onClose} title="Error" size="lg">
         <div className="text-center py-12">
           <p className="text-red-600">Unable to load form configuration</p>
+          <p className="text-sm text-gray-600 mt-2">Check browser console for details</p>
           <button
             onClick={onClose}
             className="mt-4 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
@@ -243,6 +251,11 @@ const DynamicLeadForm = ({ lead = null, onClose, onSuccess, initialStageId = nul
         </div>
       </Modal>
     );
+  }
+
+  // Log form rendering info
+  if (formLayout?.sections) {
+    console.log('✅ [FORM] Rendering form with sections:', formLayout.sections.map(s => ({ id: s.id, title: s.title, fieldCount: s.fields?.length })));
   }
 
   const modalTitle = isEditMode 
