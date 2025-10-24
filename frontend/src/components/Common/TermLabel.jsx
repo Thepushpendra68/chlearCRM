@@ -25,7 +25,7 @@ const TermLabel = ({
   className = '',
   fallback = null
 }) => {
-  const { getTerm, loading } = useIndustryConfig();
+  const { getTerminology, loading } = useIndustryConfig();
 
   // While configuration is loading, show the term key or fallback
   if (loading) {
@@ -34,7 +34,9 @@ const TermLabel = ({
   }
 
   // Get the industry-specific term
-  const label = getTerm(term, plural);
+  // If plural is requested, try to get the plural form first, otherwise append 's'
+  const termKey = plural ? `${term}s` : term;
+  const label = getTerminology(termKey, fallback);
 
   return (
     <span className={className}>

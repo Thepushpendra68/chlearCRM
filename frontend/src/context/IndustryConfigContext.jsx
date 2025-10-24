@@ -1,206 +1,189 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
+import { useAuth } from './AuthContext';
 import api from '../services/api';
 
-const IndustryConfigContext = createContext(null);
+const IndustryConfigContext = createContext();
 
 /**
- * Industry Configuration Provider
- * Loads and provides industry-specific configuration to all components
+ * IndustryConfigProvider - Loads and provides industry configuration to all components
+ * Fetches configuration from backend API based on user's company
  */
 export const IndustryConfigProvider = ({ children }) => {
+  const { user } = useAuth();
   const [config, setConfig] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetchConfig();
-  }, []);
+    const loadConfig = async () => {
+      // Don't load config until user is authenticated
+      if (!user) {
+        setLoading(false);
+        return;
+      }
 
-  const fetchConfig = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Fetch configuration from backend
+        const response = await api.get('/config/industry');
+        
+        if (response.data && response.data.success) {
+          setConfig(response.data.data);
+        } else {
+          throw new Error('Invalid configuration response');
+        }
+      } catch (err) {
+        console.error('Failed to load industry configuration:', err);
+        setError(err.message || 'Failed to load configuration');
+        
+        // Set fallback configuration
+        setConfig({
+          config: {
+            industryType: 'generic',
+            industryName: 'Generic CRM',
+            terminology: {
+              lead: 'Lead',
+              leads: 'Leads',
+              contact: 'Contact',
+              contacts: 'Contacts',
+              company: 'Company',
+              companies: 'Companies',
+              deal: 'Deal',
+              deals: 'Deals',
+              pipeline: 'Pipeline',
+              stage: 'Stage',
+              stages: 'Stages',
+              activity: 'Activity',
+              activities: 'Activities',
+            },
+            coreFields: {},
+            customFields: {},
+            formLayout: { sections: [] },
+          }
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadConfig();
+  }, [user]);
+
+  /**
+   * Get terminology label for a given key
+   * @param {string} key - Terminology key (e.g., 'lead', 'leads', 'pipeline')
+   * @param {string} fallback - Fallback value if key not found
+   * @returns {string} Terminology label
+   */
+  const getTerminology = (key, fallback = null) => {
+    if (!config || !config.config || !config.config.terminology) {
+      return fallback || key;
+    }
+    return config.config.terminology[key] || fallback || key;
+  };
+
+  /**
+   * Get all fields (core + custom) as an array
+   * @returns {array} Array of field definitions
+   */
+  const getFields = () => {
+    if (!config || !config.config) return [];
+    
+    const fields = [];
+    const cfg = config.config;
+
+    // Add core fields
+    if (cfg.coreFields) {
+      Object.keys(cfg.coreFields).forEach(key => {
+        const fieldDef = cfg.coreFields[key];
+        fields.push({
+          id: fieldDef.name || key,
+          ...fieldDef,
+          isCustomField: false,
+          fieldKey: key,
+        });
+      });
+    }
+
+    // Add custom fields
+    if (cfg.customFields) {
+      Object.keys(cfg.customFields).forEach(key => {
+        const fieldDef = cfg.customFields[key];
+        fields.push({
+          id: fieldDef.name || key,
+          ...fieldDef,
+          isCustomField: true,
+          fieldKey: key,
+        });
+      });
+    }
+
+    return fields;
+  };
+
+  /**
+   * Get field definition by ID
+   * @param {string} fieldId - Field identifier
+   * @returns {object|null} Field definition or null
+   */
+  const getFieldById = (fieldId) => {
+    const allFields = getFields();
+    return allFields.find(f => f.id === fieldId) || null;
+  };
+
+  /**
+   * Get fields for a specific section
+   * @param {string} sectionId - Section identifier
+   * @returns {array} Array of field definitions for the section
+   */
+  const getSectionFields = (sectionId) => {
+    if (!config || !config.config || !config.config.formLayout) return [];
+    
+    const section = config.config.formLayout.sections?.find(s => s.id === sectionId);
+    if (!section) return [];
+
+    return section.fields.map(fieldId => getFieldById(fieldId)).filter(Boolean);
+  };
+
+  /**
+   * Reload configuration from server
+   */
+  const refetchConfig = async () => {
     try {
       setLoading(true);
-      setError(null);
-
-      console.log('[CONFIG] Fetching industry configuration...');
       const response = await api.get('/config/industry');
-
-      console.log('[CONFIG] Configuration loaded successfully:', response.data.data);
-      setConfig(response.data.data);
+      
+      if (response.data && response.data.success) {
+        setConfig(response.data.data);
+        setError(null);
+      }
     } catch (err) {
-      console.error('[CONFIG] Failed to load configuration:', err);
-      setError(err.message || 'Failed to load configuration');
+      console.error('Failed to reload configuration:', err);
+      setError(err.message || 'Failed to reload configuration');
     } finally {
       setLoading(false);
     }
   };
 
-  /**
-   * Get industry-specific terminology
-   * @param {string} key - The term key (e.g., 'lead', 'contact', 'deal')
-   * @param {boolean} plural - Whether to return plural form
-   * @returns {string} The industry-specific term
-   */
-  const getTerm = (key, plural = false) => {
-    if (!config?.config?.terminology) {
-      // Fallback to key if config not loaded
-      return plural ? `${key}s` : key;
-    }
-
-    const terminology = config.config.terminology;
-
-    // Try to get the exact term
-    let term = terminology[key];
-
-    // If plural requested, try plural key first, then add 's'
-    if (plural) {
-      const pluralKey = `${key}s`;
-      term = terminology[pluralKey] || (term ? `${term}s` : `${key}s`);
-    }
-
-    return term || key;
-  };
-
-  /**
-   * Get field definition by field name
-   * @param {string} fieldName - The field name (e.g., 'firstName', 'studentAge')
-   * @returns {object|null} Field definition or null
-   */
-  const getFieldDefinition = (fieldName) => {
-    if (!config?.config) return null;
-
-    // Check core fields first
-    if (config.config.coreFields?.[fieldName]) {
-      return {
-        ...config.config.coreFields[fieldName],
-        fieldName,
-        isCustom: false,
-        category: 'core'
-      };
-    }
-
-    // Check custom fields
-    if (config.config.customFields?.[fieldName]) {
-      return {
-        ...config.config.customFields[fieldName],
-        fieldName,
-        isCustom: true,
-        category: config.config.customFields[fieldName].category || 'custom'
-      };
-    }
-
-    return null;
-  };
-
-  /**
-   * Get all field definitions (core + custom)
-   * @returns {object} Object with all field definitions
-   */
-  const getAllFields = () => {
-    if (!config?.config) return {};
-
-    const allFields = {};
-
-    // Add core fields
-    if (config.config.coreFields) {
-      Object.keys(config.config.coreFields).forEach(key => {
-        allFields[key] = {
-          ...config.config.coreFields[key],
-          fieldName: key,
-          isCustom: false,
-          category: 'core'
-        };
-      });
-    }
-
-    // Add custom fields
-    if (config.config.customFields) {
-      Object.keys(config.config.customFields).forEach(key => {
-        allFields[key] = {
-          ...config.config.customFields[key],
-          fieldName: key,
-          isCustom: true,
-          category: config.config.customFields[key].category || 'custom'
-        };
-      });
-    }
-
-    return allFields;
-  };
-
-  /**
-   * Get form layout sections
-   * @returns {array} Array of form sections with field definitions
-   */
-  const getFormLayout = () => {
-    if (!config?.config?.formLayout?.sections) {
-      return [];
-    }
-
-    const allFields = getAllFields();
-
-    return config.config.formLayout.sections.map(section => ({
-      ...section,
-      fields: section.fields.map(fieldName => {
-        const field = allFields[fieldName];
-        if (!field) {
-          console.warn(`[CONFIG] Field ${fieldName} referenced in section ${section.id} but not defined`);
-          return null;
-        }
-        return field;
-      }).filter(Boolean) // Remove null fields
-    }));
-  };
-
-  /**
-   * Get pipeline configuration
-   * @returns {object} Pipeline configuration
-   */
-  const getPipelineConfig = () => {
-    return config?.config?.pipeline || null;
-  };
-
-  /**
-   * Get list view configuration
-   * @returns {object} List view configuration
-   */
-  const getListViewConfig = () => {
-    return config?.config?.listView || null;
-  };
-
-  /**
-   * Check if a feature is enabled
-   * @param {string} feature - Feature name
-   * @returns {boolean} Whether feature is enabled
-   */
-  const isFeatureEnabled = (feature) => {
-    switch (feature) {
-      case 'pipeline':
-        return config?.config?.pipeline?.enabled !== false;
-      case 'customFields':
-        return Object.keys(config?.config?.customFields || {}).length > 0;
-      default:
-        return false;
-    }
-  };
-
   const value = {
-    // State
-    config: config?.config,
-    company: config?.company,
+    config: config?.config || null,
+    company: config?.company || null,
     loading,
     error,
-
-    // Actions
-    refetch: fetchConfig,
-
+    refetchConfig,
+    
     // Helper functions
-    getTerm,
-    getFieldDefinition,
-    getAllFields,
-    getFormLayout,
-    getPipelineConfig,
-    getListViewConfig,
-    isFeatureEnabled
+    getTerminology,
+    getFields,
+    getFieldById,
+    getSectionFields,
+    
+    // Shortcuts
+    industryType: config?.config?.industryType || 'generic',
+    terminology: config?.config?.terminology || {},
+    formLayout: config?.config?.formLayout || null,
   };
 
   return (
@@ -211,16 +194,14 @@ export const IndustryConfigProvider = ({ children }) => {
 };
 
 /**
- * Hook to access industry configuration
- * Must be used within IndustryConfigProvider
+ * Hook to use industry configuration
+ * @returns {object} Industry configuration context
  */
 export const useIndustryConfig = () => {
   const context = useContext(IndustryConfigContext);
-
   if (!context) {
     throw new Error('useIndustryConfig must be used within IndustryConfigProvider');
   }
-
   return context;
 };
 
