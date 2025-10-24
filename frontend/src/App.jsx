@@ -2,6 +2,7 @@ import { Suspense, lazy } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { AuthProvider } from './context/AuthContext'
+import { IndustryConfigProvider } from './context/IndustryConfigContext'
 import { LeadProvider } from './context/LeadContext'
 import { PicklistProvider } from './context/PicklistContext'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -42,9 +43,10 @@ function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <PicklistProvider>
-        <LeadProvider>
-          <div className="min-h-screen bg-gray-50">
+        <IndustryConfigProvider>
+          <PicklistProvider>
+          <LeadProvider>
+            <div className="min-h-screen bg-gray-50">
           <Suspense fallback={<RouteLoadingFallback />}><Routes>
             {/* Public routes */}
             <Route path="/" element={<Homepage />} />
@@ -130,9 +132,10 @@ function App() {
               },
             }}
           />
-          </div>
-        </LeadProvider>
-        </PicklistProvider>
+            </div>
+          </LeadProvider>
+          </PicklistProvider>
+        </IndustryConfigProvider>
       </AuthProvider>
     </ErrorBoundary>
   )
