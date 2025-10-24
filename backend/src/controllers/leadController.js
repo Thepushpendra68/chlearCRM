@@ -152,7 +152,8 @@ const createLead = async (req, res, next) => {
       company_id: req.user.company_id
     };
 
-    const lead = await leadService.createLead(leadData);
+    // Pass industry config from middleware to service
+    const lead = await leadService.createLead(leadData, req.industryConfig);
 
     await logAuditEvent(req, {
       action: AuditActions.LEAD_CREATED,
@@ -214,7 +215,8 @@ const updateLead = async (req, res, next) => {
     const { id } = req.params;
     const leadData = req.body;
 
-    const leadResult = await leadService.updateLead(id, leadData, req.user);
+    // Pass industry config from middleware to service
+    const leadResult = await leadService.updateLead(id, leadData, req.user, req.industryConfig);
 
     if (!leadResult) {
       throw new ApiError('Lead not found', 404);

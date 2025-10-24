@@ -192,23 +192,25 @@ const getLeadById = async (id) => {
 /**
  * Create new lead
  */
-const createLead = async (leadData) => {
+const createLead = async (leadData, industryConfig = null) => {
   try {
     const { supabaseAdmin } = require('../config/supabase');
 
-    // Get company to load industry configuration
-    const { data: company, error: companyError } = await supabaseAdmin
-      .from('companies')
-      .select('industry_type')
-      .eq('id', leadData.company_id)
-      .single();
+    // Use injected industry config from middleware, or load as fallback
+    if (!industryConfig) {
+      console.warn('⚠️ No industry config provided, loading from company');
+      const { data: company, error: companyError } = await supabaseAdmin
+        .from('companies')
+        .select('industry_type')
+        .eq('id', leadData.company_id)
+        .single();
 
-    if (companyError) {
-      console.warn('⚠️ Could not load company configuration, using base config');
+      if (companyError) {
+        console.warn('⚠️ Could not load company configuration, using base config');
+      }
+
+      industryConfig = configLoader.getConfigForCompany(company);
     }
-
-    // Load industry configuration for validation
-    const industryConfig = configLoader.getConfigForCompany(company);
 
     // Transform frontend field names to database column names
     const normalizedEmail = normalizeEmail(leadData.email);
@@ -311,7 +313,7 @@ const createLead = async (leadData) => {
 /**
  * Update lead
  */
-const updateLead = async (id, leadData, currentUser) => {
+const updateLead = async (id, leadData, currentUser, industryConfig = null) => {
   try {
     const { supabaseAdmin } = require('../config/supabase');
 
@@ -331,19 +333,21 @@ const updateLead = async (id, leadData, currentUser) => {
       throw new ApiError('Access denied', 403);
     }
 
-    // Get company to load industry configuration
-    const { data: company, error: companyError } = await supabaseAdmin
-      .from('companies')
-      .select('industry_type')
-      .eq('id', existingLead.company_id)
-      .single();
+    // Use injected industry config from middleware, or load as fallback
+    if (!industryConfig) {
+      console.warn('⚠️ No industry config provided, loading from company');
+      const { data: company, error: companyError } = await supabaseAdmin
+        .from('companies')
+        .select('industry_type')
+        .eq('id', existingLead.company_id)
+        .single();
 
-    if (companyError) {
-      console.warn('⚠️ Could not load company configuration, using base config');
+      if (companyError) {
+        console.warn('⚠️ Could not load company configuration, using base config');
+      }
+
+      industryConfig = configLoader.getConfigForCompany(company);
     }
-
-    // Load industry configuration for validation
-    const industryConfig = configLoader.getConfigForCompany(company);
 
     // Transform frontend field names to database column names
     const transformedData = {};

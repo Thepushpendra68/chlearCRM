@@ -1,5 +1,6 @@
 const express = require('express');
 const { authenticate } = require('../middleware/authMiddleware');
+const { injectIndustryConfig } = require('../middleware/industryConfig.middleware');
 const { validateLead } = require('../validators/leadValidators');
 const { loadLeadPicklists } = require('../middleware/picklistMiddleware');
 const {
@@ -17,6 +18,9 @@ const router = express.Router();
 
 // All lead routes require authentication
 router.use(authenticate);
+
+// Inject industry configuration for all lead routes
+router.use(injectIndustryConfig);
 
 /**
  * @route   GET /api/leads
