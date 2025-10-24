@@ -1,5 +1,6 @@
 const { supabaseAdmin } = require('../config/supabase');
 const ApiError = require('../utils/ApiError');
+const configLoader = require('../config/industry/configLoader');
 
 const normalizeEmail = (email) => {
   if (typeof email !== 'string') {
@@ -24,7 +25,7 @@ const getLeads = async (currentUser, page = 1, limit = 20, filters = {}) => {
         id, name, first_name, last_name, email, phone, company, title,
         status, source, deal_value, expected_close_date, notes,
         priority, created_at, updated_at, assigned_at,
-        assigned_to, created_by, pipeline_stage_id,
+        assigned_to, created_by, pipeline_stage_id, custom_fields,
         user_profiles!assigned_to(id, first_name, last_name)
       `)
       .eq('company_id', currentUser.company_id);
@@ -128,6 +129,7 @@ const getLeads = async (currentUser, page = 1, limit = 20, filters = {}) => {
         assigned_to: lead.assigned_to,
         created_by: lead.created_by,
         pipeline_stage_id: lead.pipeline_stage_id,
+        custom_fields: lead.custom_fields || {},
         assigned_user_first_name: lead.user_profiles?.first_name || null,
         assigned_user_last_name: lead.user_profiles?.last_name || null
       };
@@ -194,6 +196,20 @@ const createLead = async (leadData) => {
   try {
     const { supabaseAdmin } = require('../config/supabase');
 
+    // Get company to load industry configuration
+    const { data: company, error: companyError } = await supabaseAdmin
+      .from('companies')
+      .select('industry_type')
+      .eq('id', leadData.company_id)
+      .single();
+
+    if (companyError) {
+      console.warn('⚠️ Could not load company configuration, using base config');
+    }
+
+    // Load industry configuration for validation
+    const industryConfig = configLoader.getConfigForCompany(company);
+
     // Transform frontend field names to database column names
     const normalizedEmail = normalizeEmail(leadData.email);
 
@@ -216,6 +232,21 @@ const createLead = async (leadData) => {
       pipeline_stage_id: leadData.pipeline_stage_id,
       created_by: leadData.created_by
     };
+
+    // Process custom fields if provided
+    if (leadData.custom_fields && typeof leadData.custom_fields === 'object') {
+      // Validate custom fields against configuration
+      const validation = configLoader.validateCustomFields(industryConfig, leadData.custom_fields);
+
+      if (!validation.valid) {
+        console.warn('⚠️ Custom field validation warnings:', validation.errors);
+        // Log warnings but don't block - allow flexibility
+      }
+
+      transformedData.custom_fields = leadData.custom_fields;
+    } else {
+      transformedData.custom_fields = {};
+    }
 
     // Clean up empty strings for UUID and date fields
     const cleanedData = { ...transformedData };
@@ -300,6 +331,20 @@ const updateLead = async (id, leadData, currentUser) => {
       throw new ApiError('Access denied', 403);
     }
 
+    // Get company to load industry configuration
+    const { data: company, error: companyError } = await supabaseAdmin
+      .from('companies')
+      .select('industry_type')
+      .eq('id', existingLead.company_id)
+      .single();
+
+    if (companyError) {
+      console.warn('⚠️ Could not load company configuration, using base config');
+    }
+
+    // Load industry configuration for validation
+    const industryConfig = configLoader.getConfigForCompany(company);
+
     // Transform frontend field names to database column names
     const transformedData = {};
     if (leadData.first_name !== undefined) transformedData.first_name = leadData.first_name;
@@ -320,6 +365,27 @@ const updateLead = async (id, leadData, currentUser) => {
     if (leadData.priority !== undefined) transformedData.priority = leadData.priority;
     if (leadData.assigned_to !== undefined) transformedData.assigned_to = leadData.assigned_to;
     if (leadData.pipeline_stage_id !== undefined) transformedData.pipeline_stage_id = leadData.pipeline_stage_id;
+
+    // Process custom fields if provided
+    if (leadData.custom_fields !== undefined) {
+      if (leadData.custom_fields && typeof leadData.custom_fields === 'object') {
+        // Validate custom fields against configuration
+        const validation = configLoader.validateCustomFields(industryConfig, leadData.custom_fields);
+
+        if (!validation.valid) {
+          console.warn('⚠️ Custom field validation warnings:', validation.errors);
+          // Log warnings but don't block - allow flexibility
+        }
+
+        // Merge with existing custom fields to preserve unmodified fields
+        transformedData.custom_fields = {
+          ...(existingLead.custom_fields || {}),
+          ...leadData.custom_fields
+        };
+      } else {
+        transformedData.custom_fields = {};
+      }
+    }
 
     // Clean up empty strings for UUID and date fields
     const cleanedData = { ...transformedData };
