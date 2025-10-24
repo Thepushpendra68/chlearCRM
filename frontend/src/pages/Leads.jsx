@@ -3,12 +3,14 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { PlusIcon, MagnifyingGlassIcon, ArrowDownTrayIcon, ArrowUpTrayIcon, TrashIcon } from '@heroicons/react/24/outline'
 import ImportWizard from '../components/Import/ImportWizard'
 import ExportModal from '../components/Export/ExportModal'
-import LeadForm from '../components/LeadForm'
+import { DynamicLeadForm } from '../components/DynamicForm'
+import TermLabel from '../components/Common/TermLabel'
 import { useLeads } from '../context/LeadContext'
 import pipelineService from '../services/pipelineService'
 import leadService from '../services/leadService'
 import toast from 'react-hot-toast'
 import { usePicklists } from '../context/PicklistContext'
+import { useIndustryConfig } from '../context/IndustryConfigContext'
 import { MobileOnly, TabletAndDesktop, ResponsiveContainer, ContentWrapper, ResponsiveTableWrapper } from '../components/ResponsiveUtils'
 import LeadsTableMobile from '../components/Leads/LeadsTableMobile'
 
@@ -25,6 +27,9 @@ const Leads = () => {
   const [pipelineStages, setPipelineStages] = useState([])
   const [isPageChanging, setIsPageChanging] = useState(false)
   const { leadSources, leadStatuses } = usePicklists()
+  const { config } = useIndustryConfig()
+  const leadLabel = config?.terminology?.lead || 'Lead'
+  const leadsLabel = config?.terminology?.leads || 'Leads'
 
   const formatPicklistValue = (value, fallback = 'Unknown') => {
     if (!value) return fallback
@@ -358,9 +363,11 @@ const Leads = () => {
                 </svg>
               </div>
               <div className="flex-1 min-w-0">
-                <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-gray-900">Leads</h1>
+                <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-gray-900">
+                  <TermLabel term="leads" />
+                </h1>
                 <p className="mt-1 text-xs md:text-sm text-gray-600">
-                  Manage your leads and track their progress through the sales pipeline
+                  Manage your <TermLabel term="leads" /> and track their progress through the sales pipeline
                 </p>
               </div>
             </div>
@@ -422,7 +429,7 @@ const Leads = () => {
                   className="col-span-2 sm:col-span-1 inline-flex items-center justify-center px-4 md:px-6 py-2 border border-transparent text-xs md:text-sm font-medium rounded-lg shadow-sm text-white bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all duration-200"
                 >
                   <PlusIcon className="h-4 w-4 mr-2 flex-shrink-0" />
-                  Add Lead
+                  Add {leadLabel}
                 </button>
               </div>
             </div>
@@ -819,7 +826,7 @@ const Leads = () => {
 
       {/* Add Lead Modal */}
       {showAddLeadForm && (
-        <LeadForm
+        <DynamicLeadForm
           onClose={() => setShowAddLeadForm(false)}
           onSuccess={handleLeadSaved}
         />
@@ -827,7 +834,7 @@ const Leads = () => {
 
       {/* Edit Lead Modal */}
       {showEditLeadForm && editingLead && (
-        <LeadForm
+        <DynamicLeadForm
           lead={editingLead}
           onClose={() => {
             setShowEditLeadForm(false)
