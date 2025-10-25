@@ -56,7 +56,7 @@ class ActivityService {
       const offset = Number.isInteger(filters.offset)
         ? Math.max(filters.offset, 0)
         : (page - 1) * sanitizedLimit;
-      const fetchEnd = offset + sanitizedLimit;
+      const fetchEnd = offset + sanitizedLimit - 1;
 
       const { data: activities, error } = await query.range(offset, fetchEnd);
 

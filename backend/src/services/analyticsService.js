@@ -162,9 +162,10 @@ const getDashboardStatsWithComparison = async (currentUser, thirtyDaysAgo, sixty
       : currentConvertedLeadsCount > 0 ? '100.0' : '0.0';
 
     // Calculate total leads change (comparing current period vs previous period)
-    const totalLeadsChange = previousNewLeadsCount > 0
-      ? ((currentNewLeadsCount - previousNewLeadsCount) / previousNewLeadsCount * 100).toFixed(1)
-      : currentNewLeadsCount > 0 ? '100.0' : '0.0';
+    const previousTotalLeadsCount = totalLeadsCount - currentNewLeadsCount;
+    const totalLeadsChangePercent = previousTotalLeadsCount > 0
+      ? ((totalLeadsCount - previousTotalLeadsCount) / previousTotalLeadsCount * 100).toFixed(1)
+      : totalLeadsCount > 0 ? '100.0' : '0.0';
 
     // Calculate conversion rate change
     const previousConversionRate = totalLeadsCount > 0 ? (previousConvertedLeadsCount / totalLeadsCount * 100) : 0;
@@ -178,7 +179,7 @@ const getDashboardStatsWithComparison = async (currentUser, thirtyDaysAgo, sixty
       converted_leads: currentConvertedLeadsCount,
       conversion_rate: `${conversionRate}%`,
       // Include percentage changes for frontend
-      total_leads_change: `${totalLeadsChange >= 0 ? '+' : ''}${totalLeadsChange}%`,
+      total_leads_change: `${totalLeadsChangePercent >= 0 ? '+' : ''}${totalLeadsChangePercent}%`,
       new_leads_change: `${newLeadsChange >= 0 ? '+' : ''}${newLeadsChange}%`,
       converted_leads_change: `${convertedLeadsChange >= 0 ? '+' : ''}${convertedLeadsChange}%`,
       conversion_rate_change: `${conversionRateChange >= 0 ? '+' : ''}${conversionRateChange}%`

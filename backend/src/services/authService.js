@@ -15,6 +15,10 @@ class AuthService {
   async register(userData) {
     const { email, password, first_name, last_name, role = 'sales_rep', company_id } = userData;
 
+    if (!company_id) {
+      throw ApiError.badRequest('Company selection is required to complete registration', 'COMPANY_REQUIRED');
+    }
+
     // Check if user already exists in auth.users
     const { data: existingAuthUser } = await supabaseAdmin.auth.admin.listUsers();
     const userExists = existingAuthUser.users.some(user => user.email === email);
@@ -22,10 +26,6 @@ class AuthService {
     if (userExists) {
       throw ApiError.conflict('User with this email already exists');
     }
-
-    // For now, create user with a default company_id if not provided
-    // In production, this should be handled by a company creation flow
-    const defaultCompanyId = company_id || '00000000-0000-0000-0000-000000000000';
 
     try {
       // Create user in Supabase Auth
@@ -37,7 +37,7 @@ class AuthService {
           first_name,
           last_name,
           role,
-          company_id: defaultCompanyId
+          company_id
         }
       });
 
@@ -50,7 +50,7 @@ class AuthService {
         .from('user_profiles')
         .insert({
           id: authUser.user.id,
-          company_id: defaultCompanyId,
+          company_id,
           role,
           first_name,
           last_name,
