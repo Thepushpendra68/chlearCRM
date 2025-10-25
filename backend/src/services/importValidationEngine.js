@@ -29,15 +29,26 @@ const parseDateFlexible = (value) => {
   if (!dateStr) return null;
 
   // Try parsing as Excel serial number (common in CSV exports)
-  // Excel stores dates as days since 1900-01-01
-  if (/^\d+$/.test(dateStr)) {
-    const excelDate = parseInt(dateStr, 10);
-    if (excelDate > 0 && excelDate < 100000) {
-      // Excel serial date conversion
-      // Excel epoch is 1900-01-01, but has a leap year bug (1900 is not a leap year but Excel treats it as one)
-      const date = new Date((excelDate - 25569) * 86400 * 1000);
+  // Excel stores dates as days since 1900-01-01 (with an artificial leap day at 1900-02-29)
+  if (/^\d+$/.test(dateStr) && dateStr.length >= 5) {
+    const excelSerial = parseInt(dateStr, 10);
+
+    if (excelSerial >= 1 && excelSerial <= 600000) {
+      let adjustedSerial = excelSerial;
+
+      if (adjustedSerial >= 60) {
+        adjustedSerial -= 1;
+      }
+
+      const excelEpoch = Date.UTC(1899, 11, 30);
+      const milliseconds = excelEpoch + adjustedSerial * 86400 * 1000;
+      const date = new Date(milliseconds);
+
       if (!Number.isNaN(date.getTime())) {
-        return date;
+        const year = date.getUTCFullYear();
+        if (year >= 1900 && year <= 2100) {
+          return date;
+        }
       }
     }
   }

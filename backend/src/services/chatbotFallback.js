@@ -52,8 +52,7 @@ class ChatbotFallback {
     }
 
     // Pattern 8: Log activity (MUST come before update/add note patterns)
-    if (this.matchesPattern(message, ['log', 'log call', 'log email', 'log meeting', 'had a call', 'had a meeting', 'sent email', 'called', 'called on', 'emailed', 'met with']) ||
-        (this.matchesPattern(message, ['call', 'email', 'meeting']) && (this.matchesPattern(message, ['with', 'contact', 'discussed', 'discussed with', 'talked']) || /\b(call|email|meeting)\s+(with|on|to)\s+/.test(message)))) {
+    if (this.isActivityLogIntent(message, userMessage)) {
       return this.handleLogActivity(message, userMessage);
     }
 
@@ -175,6 +174,29 @@ class ChatbotFallback {
    */
   matchesPattern(message, keywords) {
     return keywords.some(keyword => message.includes(keyword));
+  }
+
+  /**
+   * Determine if message intends to log an activity
+   */
+  isActivityLogIntent(message, originalMessage) {
+    if (this.matchesPattern(message, ['log call', 'log email', 'log meeting', 'log activity', 'had a call', 'had a meeting', 'sent email', 'called', 'emailed', 'met with', 'followed up'])) {
+      return true;
+    }
+
+    const intentPatterns = [
+      /\b(?:log(?:ged)?|record(?:ed)?|add)\s+(?:an?\s+)?(?:activity|call|email|meeting|interaction)\b/i,
+      /\b(?:had|have|having|just\s+had)\s+(?:an?\s+)?(?:call|email|meeting|conversation)\b/i,
+      /\b(?:call(?:ed|ing)?|email(?:ed|ing)?|emailed?)\s+(?:with|to)?\s*(?:[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}|[A-Za-z]+(?:\s+[A-Za-z]+)*)/i,
+      /\b(?:met|meeting|spoke|talked)\s+(?:with|to)?\s*[A-Za-z]+(?:\s+[A-Za-z]+)*/i,
+      /\b(?:follow(?:ed)?\s+up|touch(?:ed)?\s+base)\b/i
+    ];
+
+    if (intentPatterns.some(pattern => pattern.test(originalMessage || message))) {
+      return true;
+    }
+
+    return false;
   }
 
   /**

@@ -604,7 +604,7 @@ class ImportService {
 
     const parsed = parseDateFlexible(value);
 
-    if (Number.isNaN(parsed.getTime())) {
+    if (!parsed || Number.isNaN(parsed.getTime())) {
       return fallback;
     }
 

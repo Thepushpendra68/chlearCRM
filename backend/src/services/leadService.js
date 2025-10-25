@@ -2,6 +2,46 @@ const { supabaseAdmin } = require('../config/supabase');
 const ApiError = require('../utils/ApiError');
 const configLoader = require('../config/industry/configLoader');
 
+const isPlainObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
+
+const mergeCustomFields = (existingFields, updates) => {
+  const base = isPlainObject(existingFields) ? { ...existingFields } : {};
+
+  if (updates === null) {
+    return {};
+  }
+
+  if (!isPlainObject(updates)) {
+    return base;
+  }
+
+  return Object.keys(updates).reduce((acc, key) => {
+    const value = updates[key];
+
+    if (value === undefined) {
+      return acc;
+    }
+
+    if (value === null) {
+      delete acc[key];
+      return acc;
+    }
+
+    if (isPlainObject(value)) {
+      const merged = mergeCustomFields(acc[key], value);
+      if (Object.keys(merged).length === 0) {
+        delete acc[key];
+      } else {
+        acc[key] = merged;
+      }
+      return acc;
+    }
+
+    acc[key] = value;
+    return acc;
+  }, base);
+};
+
 const normalizeEmail = (email) => {
   if (typeof email !== 'string') {
     return null;
@@ -414,22 +454,16 @@ const updateLead = async (id, leadData, currentUser, industryConfig = null) => {
 
     // Process custom fields if provided
     if (leadData.custom_fields !== undefined) {
-      if (leadData.custom_fields && typeof leadData.custom_fields === 'object') {
-        // Validate custom fields against configuration
+      if (leadData.custom_fields === null) {
+        transformedData.custom_fields = {};
+      } else if (typeof leadData.custom_fields === 'object') {
         const validation = configLoader.validateCustomFields(industryConfig, leadData.custom_fields);
 
         if (!validation.valid) {
           console.warn('⚠️ Custom field validation warnings:', validation.errors);
-          // Log warnings but don't block - allow flexibility
         }
 
-        // Merge with existing custom fields to preserve unmodified fields
-        transformedData.custom_fields = {
-          ...(existingLead.custom_fields || {}),
-          ...leadData.custom_fields
-        };
-      } else {
-        transformedData.custom_fields = {};
+        transformedData.custom_fields = mergeCustomFields(existingLead.custom_fields, leadData.custom_fields);
       }
     }
 
