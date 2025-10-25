@@ -1449,17 +1449,16 @@ Analyze the message and respond ONLY with valid JSON. Do not include any markdow
 
     // Get team member workload (number of assigned leads)
     const { data: assignmentCounts } = await supabaseAdmin
-      .from('leads')
-      .select('assigned_to', { count: 'exact' })
-      .eq('company_id', currentUser.company_id)
-      .eq('status', 'active');
+      .rpc('count_active_leads_by_user', { company_id_input: currentUser.company_id });
 
-    const workloadMap = {};
-    assignmentCounts?.forEach(assignment => {
-      if (assignment.assigned_to) {
-        workloadMap[assignment.assigned_to] = (workloadMap[assignment.assigned_to] || 0) + 1;
-      }
-    });
+    const workloadMap = Array.isArray(assignmentCounts)
+      ? assignmentCounts.reduce((acc, row) => {
+          if (row.assigned_to) {
+            acc[row.assigned_to] = row.lead_count || 0;
+          }
+          return acc;
+        }, {})
+      : {};
 
     // Score users based on role and workload
     const suggestions = users
@@ -1766,10 +1765,25 @@ Analyze the message and respond ONLY with valid JSON. Do not include any markdow
       .select('id, first_name, last_name, role')
       .eq('company_id', currentUser.company_id);
 
-    let targetUser = users?.find(u =>
-      u.first_name.toLowerCase().includes(userName.toLowerCase()) ||
-      u.last_name.toLowerCase().includes(userName.toLowerCase())
-    );
+    const searchName = userName.toLowerCase();
+    const exactMatch = users?.find(u => `${u.first_name} ${u.last_name}`.toLowerCase() === searchName);
+    const matches = exactMatch
+      ? [exactMatch]
+      : users?.filter(u => {
+          const fullName = `${u.first_name} ${u.last_name}`.toLowerCase();
+          return (
+            u.first_name.toLowerCase().includes(searchName) ||
+            u.last_name.toLowerCase().includes(searchName) ||
+            fullName.includes(searchName)
+          );
+        }) || [];
+
+    if (matches.length > 1) {
+      const names = matches.map(u => `${u.first_name} ${u.last_name}`.trim()).join(', ');
+      throw new ApiError(`Multiple team members match "${userName}". Please be more specific: ${names}`, 400);
+    }
+
+    const targetUser = matches[0];
 
     if (!targetUser && userName) {
       throw new ApiError(`Team member "${userName}" not found`, 404);

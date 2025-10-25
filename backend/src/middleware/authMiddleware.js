@@ -44,7 +44,28 @@ const authenticate = async (req, res, next) => {
 
     // Handle impersonation if header is present
     const impersonateUserId = req.headers['x-impersonate-user-id'];
+    const impersonationTimestampHeader = req.headers['x-impersonation-started-at'];
+    const impersonationMaxDurationMinutes = parseInt(process.env.IMPERSONATION_MAX_DURATION_MINUTES || '60', 10);
+    const impersonationRequiredHeader = process.env.IMPERSONATION_SECRET_HEADER;
+
+    if (impersonationTimestampHeader) {
+      const startedAt = parseInt(impersonationTimestampHeader, 10);
+      if (!Number.isFinite(startedAt)) {
+        throw ApiError.unauthorized('Invalid impersonation session timestamp');
+      }
+
+      const elapsedMinutes = (Date.now() - startedAt) / (1000 * 60);
+      if (elapsedMinutes > impersonationMaxDurationMinutes) {
+        throw ApiError.unauthorized('Impersonation session has expired');
+      }
+    }
     if (impersonateUserId && req.user.role === 'super_admin') {
+      if (impersonationRequiredHeader) {
+        const providedSecret = req.headers['x-impersonation-secret'];
+        if (providedSecret !== impersonationRequiredHeader) {
+          throw ApiError.forbidden('Invalid impersonation secret');
+        }
+      }
       console.log(`[IMPERSONATION] Super admin ${req.user.email} attempting to impersonate user ${impersonateUserId}`);
 
       // Get target user profile
@@ -68,7 +89,16 @@ const authenticate = async (req, res, next) => {
         isImpersonated: true,
         impersonatedBy: req.originalUser.id
       };
-      req.impersonationStartedAt = Date.now();
+      const now = Date.now();
+      req.impersonationStartedAt = now;
+      res.setHeader('X-Impersonation-Started-At', now.toString());
+      res.setHeader('X-Impersonation-Max-Duration-Minutes', impersonationMaxDurationMinutes.toString());
+      res.cookie('impersonation_started_at', now.toString(), {
+        httpOnly: true,
+        sameSite: 'lax',
+        maxAge: impersonationMaxDurationMinutes * 60 * 1000
+      });
+
 
       // Log impersonation
       await logAuditEvent(req, {

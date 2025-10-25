@@ -94,11 +94,31 @@ const getDashboardStatsWithComparison = async (currentUser, thirtyDaysAgo, sixty
         .select('id, created_at, status', { count: 'exact' })
         .eq('company_id', currentUser.company_id);
 
-      // Non-admin users only see their assigned leads
       if (currentUser.role !== 'company_admin' && currentUser.role !== 'super_admin') {
         query = query.eq('assigned_to', currentUser.id);
       }
       return query;
+    };
+
+    const createConvertedQuery = (fromDate, toDate) => {
+      const limit = 1000;
+      let convertedQuery = supabase
+        .from('lead_status_history')
+        .select('lead_id, changed_at')
+        .eq('company_id', currentUser.company_id)
+        .eq('status', 'won')
+        .gte('changed_at', fromDate.toISOString())
+        .limit(limit);
+
+      if (toDate) {
+        convertedQuery = convertedQuery.lt('changed_at', toDate.toISOString());
+      }
+
+      if (currentUser.role !== 'company_admin' && currentUser.role !== 'super_admin') {
+        convertedQuery = convertedQuery.eq('changed_by', currentUser.id);
+      }
+
+      return convertedQuery;
     };
 
     const { won: wonStatuses } = await getLeadStatusSegments(currentUser.company_id);
@@ -111,16 +131,11 @@ const getDashboardStatsWithComparison = async (currentUser, thirtyDaysAgo, sixty
       .lt('created_at', thirtyDaysAgo.toISOString());
 
     const currentConvertedPromise = wonStatuses.length
-      ? createBaseQuery()
-          .in('status', wonStatuses)
-          .gte('created_at', thirtyDaysAgo.toISOString())
+      ? createConvertedQuery(thirtyDaysAgo, null)
       : Promise.resolve(emptyResult);
 
     const previousConvertedPromise = wonStatuses.length
-      ? createBaseQuery()
-          .in('status', wonStatuses)
-          .gte('created_at', sixtyDaysAgo.toISOString())
-          .lt('created_at', thirtyDaysAgo.toISOString())
+      ? createConvertedQuery(sixtyDaysAgo, thirtyDaysAgo)
       : Promise.resolve(emptyResult);
 
     const [

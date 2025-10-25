@@ -5,6 +5,7 @@ import NumberInput from './FieldTypes/NumberInput';
 import DateInput from './FieldTypes/DateInput';
 import TextareaInput from './FieldTypes/TextareaInput';
 import SelectInput from './FieldTypes/SelectInput';
+import MultiSelectInput from './FieldTypes/MultiSelectInput';
 import PicklistInput from './FieldTypes/PicklistInput';
 import UserSelectInput from './FieldTypes/UserSelectInput';
 import PipelineStageInput from './FieldTypes/PipelineStageInput';
@@ -27,6 +28,7 @@ const FIELD_TYPE_MAP = {
   picklist: PicklistInput,
   user_select: UserSelectInput,
   pipeline_stage: PipelineStageInput,
+  multiselect: MultiSelectInput,
 };
 
 /**

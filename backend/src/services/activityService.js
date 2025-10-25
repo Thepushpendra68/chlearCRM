@@ -78,10 +78,8 @@ class ActivityService {
         user_profiles: undefined
       }));
 
-      const hasMore = formattedActivities.length > sanitizedLimit;
-      const paginatedActivities = hasMore
-        ? formattedActivities.slice(0, sanitizedLimit)
-        : formattedActivities;
+      const hasMore = formattedActivities.length === sanitizedLimit;
+      const paginatedActivities = formattedActivities;
 
       return {
         success: true,
