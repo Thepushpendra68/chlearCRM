@@ -98,6 +98,14 @@ class ChatbotFallback {
     // Pattern 15: Create reminder
     if (this.matchesPattern(message, ['remind', 'reminder', 'remindme']) ||
         (this.matchesPattern(message, ['in', 'days', 'hours']) && this.matchesPattern(message, ['remind']))) {
+      if (this.matchesPattern(message, ['update', 'change', 'modify', 'edit'])) {
+        const email = this.extractEmail(originalMessage);
+        const name = this.extractName(originalMessage);
+        if (email || name) {
+          return this.handleUpdateLead(message, originalMessage);
+        }
+      }
+
       return this.handleCreateReminder(message, userMessage);
     }
 
@@ -145,7 +153,7 @@ class ChatbotFallback {
 
     // Pattern 9: Update lead (EXCLUDE activity/task keywords to prevent misrouting)
     if (this.matchesPattern(message, ['update', 'change', 'modify', 'edit']) &&
-        !this.matchesPattern(message, ['stage', 'pipeline', 'call', 'email', 'meeting', 'task', 'activity', 'log', 'scheduled', 'remind'])) {
+        !this.matchesPattern(message, ['stage', 'pipeline', 'call', 'email', 'meeting', 'task', 'activity', 'log', 'scheduled'])) {
       return this.handleUpdateLead(message, userMessage);
     }
 

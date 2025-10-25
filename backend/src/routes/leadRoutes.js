@@ -58,6 +58,13 @@ router.post('/', loadLeadPicklists, validateLead, createLead);
 router.put('/:id', loadLeadPicklists, validateLead, updateLead);
 
 /**
+ * @route   GET /api/leads/search
+ * @desc    Search leads
+ * @access  Private
+ */
+router.get('/search', searchLeads);
+
+/**
  * @route   DELETE /api/leads/:id
  * @desc    Delete lead
  * @access  Private
@@ -70,12 +77,5 @@ router.delete('/:id', deleteLead);
  * @access  Private
  */
 router.put('/:id/move-stage', pipelineController.moveLeadToStage);
-
-/**
- * @route   GET /api/leads/search
- * @desc    Search leads
- * @access  Private
- */
-router.get('/search', searchLeads);
 
 module.exports = router;

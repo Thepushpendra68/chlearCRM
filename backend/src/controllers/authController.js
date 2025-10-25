@@ -3,7 +3,7 @@ const authService = require('../services/authService');
 const ApiError = require('../utils/ApiError');
 const { AuditActions, AuditSeverity, logAuditEvent } = require('../utils/auditLogger');
 
-const removeEmpty = (values = []) => values.filter(Boolean);
+const filterDefined = (values = []) => values.filter(value => value !== undefined);
 
 /**
  * Authentication controller for handling auth-related requests
@@ -191,7 +191,7 @@ class AuthController {
         resourceName: `${updatedUser.first_name || ''} ${updatedUser.last_name || ''}`.trim() || updatedUser.email,
         companyId: updatedUser.company_id,
         details: {
-          updated_fields: removeEmpty([
+          updated_fields: filterDefined([
             first_name !== undefined && 'first_name',
             last_name !== undefined && 'last_name',
             email !== undefined && 'email',
