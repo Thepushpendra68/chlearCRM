@@ -3,6 +3,7 @@ import { ChartBarIcon, UsersIcon, UserGroupIcon, CurrencyDollarIcon } from '@her
 import dashboardService from '../services/dashboardService';
 import toast from 'react-hot-toast';
 import { usePicklists } from '../context/PicklistContext';
+import { useIndustryConfig } from '../context/IndustryConfigContext';
 
 const Dashboard = () => {
   const [stats, setStats] = useState({
@@ -19,6 +20,17 @@ const Dashboard = () => {
   const [leadSourceStats, setLeadSourceStats] = useState([]);
   const [loading, setLoading] = useState(true);
   const { leadStatuses, leadSources: picklistSources } = usePicklists();
+  const { getTerminology } = useIndustryConfig();
+  const leadSingular = getTerminology('lead', 'Lead');
+  const leadPlural = getTerminology('leads', 'Leads');
+  const leadSingularSentence = useMemo(
+    () => (leadSingular ? leadSingular.charAt(0).toLowerCase() + leadSingular.slice(1) : 'lead'),
+    [leadSingular]
+  );
+  const leadPluralSentence = useMemo(
+    () => (leadPlural ? leadPlural.charAt(0).toLowerCase() + leadPlural.slice(1) : 'leads'),
+    [leadPlural]
+  );
 
   const formatValue = useCallback((value, fallback = '-') => {
     if (!value) return fallback;
@@ -27,14 +39,15 @@ const Dashboard = () => {
 
   const wonStatusTitle = useMemo(() => {
     const wonStatuses = leadStatuses.filter(option => option.metadata?.is_won);
+    const pluralLabel = leadPlural || 'Leads';
     if (wonStatuses.length === 1) {
-      return `${wonStatuses[0].label} Leads`;
+      return `${wonStatuses[0].label} ${pluralLabel}`;
     }
     if (wonStatuses.length > 1) {
-      return 'Won Leads';
+      return `Won ${pluralLabel}`;
     }
-    return 'Won Leads';
-  }, [leadStatuses]);
+    return `Won ${pluralLabel}`;
+  }, [leadStatuses, leadPlural]);
 
   const getStatusOption = useCallback(
     (status) => leadStatuses.find(option => option.value === status),
@@ -115,14 +128,14 @@ const Dashboard = () => {
   // Memoize stats data to prevent unnecessary recalculations
   const statsData = useMemo(() => [
     {
-      name: 'Total Leads',
+      name: `Total ${leadPlural}`,
       value: stats.total_leads.toLocaleString(),
       icon: UsersIcon,
       change: stats.total_leads_change || '+0%',
       changeType: stats.total_leads_change?.startsWith('+') ? 'increase' : 'decrease'
     },
     {
-      name: 'New Leads',
+      name: `New ${leadPlural}`,
       value: stats.new_leads.toLocaleString(),
       icon: UserGroupIcon,
       change: stats.new_leads_change || '+0%',
@@ -136,13 +149,13 @@ const Dashboard = () => {
       changeType: stats.converted_leads_change?.startsWith('+') ? 'increase' : 'decrease'
     },
     {
-      name: 'Conversion Rate',
+      name: `${leadSingular} Conversion Rate`,
       value: stats.conversion_rate,
       icon: ChartBarIcon,
       change: stats.conversion_rate_change || '+0%',
       changeType: stats.conversion_rate_change?.startsWith('+') ? 'increase' : 'decrease'
     },
-  ], [stats, wonStatusTitle]);
+  ], [stats, wonStatusTitle, leadPlural, leadSingular]);
 
   // Memoize the data loading function to prevent recreation on every render
   const loadDashboardData = useCallback(async () => {
@@ -207,7 +220,7 @@ const Dashboard = () => {
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
         <p className="mt-1 text-sm text-gray-500">
-          Welcome back! Here's what's happening with your leads today.
+          Welcome back! Here's what's happening with your {leadPluralSentence} today.
         </p>
       </div>
 
@@ -267,7 +280,7 @@ const Dashboard = () => {
       <div className="grid gap-8" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))' }}>
         <div className="card">
           <div className="card-header">
-            <h3 className="text-lg font-medium text-gray-900">Recent Leads</h3>
+            <h3 className="text-lg font-medium text-gray-900">Recent {leadPlural}</h3>
           </div>
           <div className="card-body">
             {loading ? (
@@ -301,14 +314,8 @@ const Dashboard = () => {
                       <div className="text-sm text-gray-500 truncate" title={lead.email}>{lead.email}</div>
                     </div>
                     <div className="flex-shrink-0">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${
-                        lead.status === 'new' ? 'bg-green-100 text-green-800' :
-                        lead.status === 'contacted' ? 'bg-blue-100 text-blue-800' :
-                        lead.status === 'qualified' ? 'bg-yellow-100 text-yellow-800' :
-                        lead.status === 'converted' ? 'bg-purple-100 text-purple-800' :
-                        'bg-red-100 text-red-800'
-                      }`}>
-                        {lead.status?.charAt(0).toUpperCase() + lead.status?.slice(1)}
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${getStatusBadge(lead.status)}`}>
+                        {getStatusLabel(lead.status)}
                       </span>
                     </div>
                   </div>
@@ -316,7 +323,7 @@ const Dashboard = () => {
               </div>
             ) : (
               <div className="text-center py-4">
-                <p className="text-gray-500">No recent leads</p>
+                <p className="text-gray-500">No recent {leadPluralSentence}</p>
               </div>
             )}
           </div>
@@ -324,7 +331,7 @@ const Dashboard = () => {
 
         <div className="card">
           <div className="card-header">
-            <h3 className="text-lg font-medium text-gray-900">Lead Sources</h3>
+            <h3 className="text-lg font-medium text-gray-900">{leadSingular} Sources</h3>
           </div>
           <div className="card-body">
             {loading ? (
@@ -362,7 +369,7 @@ const Dashboard = () => {
               </div>
             ) : (
               <div className="text-center py-4">
-                <p className="text-gray-500">No lead source data</p>
+                <p className="text-gray-500">No {leadSingularSentence} source data</p>
               </div>
             )}
           </div>

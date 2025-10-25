@@ -308,7 +308,7 @@ const getRecentLeads = async (currentUser, limit = 10) => {
         email: lead.email || '',
         company: lead.company || '',
         status: lead.status || 'new',
-        lead_source: lead.source || 'unknown',
+        lead_source: lead.lead_source || lead.source || 'unknown',
         created_at: lead.created_at,
         assigned_user_first_name: lead.user_profiles?.first_name || null,
         assigned_user_last_name: lead.user_profiles?.last_name || null
@@ -425,7 +425,7 @@ const getLeadSources = async (currentUser) => {
     // Build query to get lead source counts
     let query = supabase
       .from('leads')
-      .select('source')
+      .select('lead_source, source')
       .eq('company_id', currentUser.company_id);
 
     // Non-admin users only see their assigned leads
@@ -443,7 +443,7 @@ const getLeadSources = async (currentUser) => {
     // Group by source and count
     const sourceCounts = {};
     data.forEach(lead => {
-      const source = lead.source || 'unknown';
+      const source = lead.lead_source || lead.source || 'unknown';
       sourceCounts[source] = (sourceCounts[source] || 0) + 1;
     });
 

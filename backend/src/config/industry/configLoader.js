@@ -205,7 +205,15 @@ function validateCustomFields(config, customFieldsData) {
 
   // Check each custom field in the data
   Object.keys(customFieldsData).forEach(fieldName => {
-    const fieldDef = config.customFields ? config.customFields[fieldName] : null;
+    let fieldDef = null;
+    if (config.customFields) {
+      fieldDef = config.customFields[fieldName];
+
+      if (!fieldDef) {
+        fieldDef = Object.values(config.customFields).find(def => def && def.name === fieldName);
+      }
+    }
+
     const value = customFieldsData[fieldName];
 
     // Skip validation if field not in config (allow extra fields)

@@ -23,7 +23,7 @@ const getLeads = async (currentUser, page = 1, limit = 20, filters = {}) => {
       .from('leads')
       .select(`
         id, name, first_name, last_name, email, phone, company, title,
-        status, source, deal_value, expected_close_date, notes,
+        status, lead_source, source, deal_value, expected_close_date, notes,
         priority, created_at, updated_at, assigned_at,
         assigned_to, created_by, pipeline_stage_id, custom_fields,
         user_profiles!assigned_to(id, first_name, last_name)
@@ -36,6 +36,7 @@ const getLeads = async (currentUser, page = 1, limit = 20, filters = {}) => {
     }
 
     // Apply filters efficiently
+    const sourceFilter = filters.lead_source || filters.source;
     if (filters.search) {
       const searchTerm = `%${filters.search}%`;
       query = query.or(`name.ilike.${searchTerm},email.ilike.${searchTerm},company.ilike.${searchTerm}`);
@@ -45,8 +46,8 @@ const getLeads = async (currentUser, page = 1, limit = 20, filters = {}) => {
       query = query.eq('status', filters.status);
     }
 
-    if (filters.source) {
-      query = query.eq('source', filters.source);
+    if (sourceFilter) {
+      query = query.eq('lead_source', sourceFilter);
     }
 
     if (filters.assigned_to) {
@@ -87,6 +88,39 @@ const getLeads = async (currentUser, page = 1, limit = 20, filters = {}) => {
       countQuery = countQuery.eq('assigned_to', currentUser.id);
     }
 
+    if (filters.search) {
+      const searchTerm = `%${filters.search}%`;
+      countQuery = countQuery.or(`name.ilike.${searchTerm},email.ilike.${searchTerm},company.ilike.${searchTerm}`);
+    }
+
+    if (filters.status) {
+      countQuery = countQuery.eq('status', filters.status);
+    }
+
+    if (sourceFilter) {
+      countQuery = countQuery.eq('lead_source', sourceFilter);
+    }
+
+    if (filters.assigned_to) {
+      countQuery = countQuery.eq('assigned_to', filters.assigned_to);
+    }
+
+    if (filters.date_from) {
+      countQuery = countQuery.gte('created_at', filters.date_from);
+    }
+
+    if (filters.date_to) {
+      countQuery = countQuery.lte('created_at', filters.date_to);
+    }
+
+    if (filters.deal_value_min !== undefined && filters.deal_value_min !== null) {
+      countQuery = countQuery.gte('deal_value', filters.deal_value_min);
+    }
+
+    if (filters.deal_value_max !== undefined && filters.deal_value_max !== null) {
+      countQuery = countQuery.lte('deal_value', filters.deal_value_max);
+    }
+
     const [countResult, leadsResult] = await Promise.all([
       countQuery,
       // Paginated query
@@ -117,7 +151,8 @@ const getLeads = async (currentUser, page = 1, limit = 20, filters = {}) => {
         phone: lead.phone,
         company: lead.company,
         job_title: lead.title, // Map title to job_title for frontend
-        lead_source: lead.source, // Map source to lead_source for frontend
+        lead_source: lead.lead_source || lead.source || null,
+        source: lead.lead_source || lead.source || null,
         status: lead.status,
         deal_value: lead.deal_value,
         expected_close_date: lead.expected_close_date,
@@ -176,7 +211,8 @@ const getLeadById = async (id) => {
         first_name: lead.first_name || '',
         last_name: lead.last_name || '',
         job_title: lead.title, // Map title to job_title for frontend
-        lead_source: lead.source, // Map source to lead_source for frontend
+        lead_source: lead.lead_source || lead.source || null,
+        source: lead.lead_source || lead.source || null,
         assigned_user_first_name: lead.user_profiles?.first_name || null,
         assigned_user_last_name: lead.user_profiles?.last_name || null
       };
@@ -215,6 +251,8 @@ const createLead = async (leadData, industryConfig = null) => {
     // Transform frontend field names to database column names
     const normalizedEmail = normalizeEmail(leadData.email);
 
+    const leadSourceValue = leadData.lead_source || null;
+
     const transformedData = {
       company_id: leadData.company_id,
       first_name: leadData.first_name,
@@ -224,7 +262,8 @@ const createLead = async (leadData, industryConfig = null) => {
       phone: leadData.phone,
       company: leadData.company,
       title: leadData.job_title, // Map job_title to title
-      source: leadData.lead_source, // Map lead_source to source
+      lead_source: leadSourceValue,
+      source: leadSourceValue,
       status: leadData.status,
       deal_value: leadData.deal_value,
       expected_close_date: leadData.expected_close_date,
@@ -361,7 +400,10 @@ const updateLead = async (id, leadData, currentUser, industryConfig = null) => {
     if (leadData.phone !== undefined) transformedData.phone = leadData.phone;
     if (leadData.company !== undefined) transformedData.company = leadData.company;
     if (leadData.job_title !== undefined) transformedData.title = leadData.job_title; // Map job_title to title
-    if (leadData.lead_source !== undefined) transformedData.source = leadData.lead_source; // Map lead_source to source
+      if (leadData.lead_source !== undefined) {
+        transformedData.lead_source = leadData.lead_source;
+        transformedData.source = leadData.lead_source;
+      }
     if (leadData.status !== undefined) transformedData.status = leadData.status;
     if (leadData.deal_value !== undefined) transformedData.deal_value = leadData.deal_value;
     if (leadData.expected_close_date !== undefined) transformedData.expected_close_date = leadData.expected_close_date;
@@ -489,7 +531,7 @@ const getLeadStats = async (currentUser) => {
     // Build query with company filter
     let query = supabaseAdmin
       .from('leads')
-      .select('status, source, created_at')
+      .select('status, lead_source, source, created_at')
       .eq('company_id', currentUser.company_id);
 
     // Non-admin users only see their assigned leads
@@ -516,7 +558,7 @@ const getLeadStats = async (currentUser) => {
     // Leads by source
     const sourceStats = {};
     leads.forEach(lead => {
-      const source = lead.source || 'unknown';
+      const source = lead.lead_source || lead.source || 'unknown';
       sourceStats[source] = (sourceStats[source] || 0) + 1;
     });
 
@@ -550,7 +592,7 @@ const getRecentLeads = async (currentUser, limit = 10) => {
     let query = supabaseAdmin
       .from('leads')
       .select(`
-        id, first_name, last_name, email, company, status, source, created_at,
+        id, first_name, last_name, email, company, status, lead_source, source, created_at,
         user_profiles!assigned_to(first_name, last_name)
       `)
       .eq('company_id', currentUser.company_id)

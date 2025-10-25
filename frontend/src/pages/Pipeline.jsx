@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PipelineBoard from '../components/Pipeline/PipelineBoard';
-import LeadForm from '../components/LeadForm';
+import { DynamicLeadForm } from '../components/DynamicForm';
 
 const Pipeline = () => {
   const navigate = useNavigate();
@@ -27,7 +27,7 @@ const Pipeline = () => {
   };
 
   const handleLeadFormSubmit = (leadData) => {
-    // The LeadForm component will handle the API call
+    // The DynamicLeadForm component handles the API call
     // We need to close the modal and refresh the pipeline
     handleCloseLeadForm();
     // Refresh the pipeline data
@@ -48,7 +48,7 @@ const Pipeline = () => {
 
       {/* Lead Form Modal */}
       {showLeadForm && (
-        <LeadForm
+        <DynamicLeadForm
           lead={selectedLead}
           initialStageId={selectedStageId}
           onSuccess={handleLeadFormSubmit}

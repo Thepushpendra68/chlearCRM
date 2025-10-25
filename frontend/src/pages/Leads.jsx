@@ -223,7 +223,7 @@ const Leads = () => {
   // Handle lead creation success
   const handleLeadSaved = (leadData) => {
     setShowAddLeadForm(false)
-    // LeadForm already handles adding to global state
+    // DynamicLeadForm already handles adding to global state
   }
 
   // Handle lead edit
@@ -236,7 +236,7 @@ const Leads = () => {
   const handleLeadUpdated = (leadData) => {
     setShowEditLeadForm(false)
     setEditingLead(null)
-    // LeadForm already handles updating global state
+    // DynamicLeadForm already handles updating global state
   }
 
   // Handle delete lead

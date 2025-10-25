@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeftIcon, PencilIcon, TrashIcon, PhoneIcon, EnvelopeIcon, BuildingOfficeIcon } from '@heroicons/react/24/outline'
 import leadService from '../services/leadService'
-import LeadForm from '../components/LeadForm'
+import { DynamicLeadForm } from '../components/DynamicForm'
 import ActivityForm from '../components/Activities/ActivityForm'
 import TaskForm from '../components/Tasks/TaskForm'
 import taskService from '../services/taskService'
@@ -651,7 +651,7 @@ const LeadDetail = () => {
 
         {/* Edit Lead Modal */}
         {showEditForm && (
-          <LeadForm
+          <DynamicLeadForm
             lead={lead}
             onClose={() => setShowEditForm(false)}
             onSuccess={handleEditSuccess}

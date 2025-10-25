@@ -16,7 +16,7 @@ const computeLeadChanges = (before = {}, after = {}) => {
     ['phone', 'phone'],
     ['company', 'company'],
     ['title', 'job_title'],
-    ['source', 'lead_source'],
+    ['lead_source', 'lead_source'],
     ['status', 'status'],
     ['deal_value', 'deal_value'],
     ['expected_close_date', 'expected_close_date'],
@@ -163,7 +163,7 @@ const createLead = async (req, res, next) => {
       companyId: lead.company_id,
       details: {
         status: lead.status,
-        source: lead.source,
+        lead_source: lead.lead_source,
         assigned_to: lead.assigned_to,
         pipeline_stage_id: lead.pipeline_stage_id
       },

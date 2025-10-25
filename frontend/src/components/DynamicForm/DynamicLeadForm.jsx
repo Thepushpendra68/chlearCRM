@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Modal from '../Modal';
 import DynamicFormField from './DynamicFormField';
 import { useIndustryConfig } from '../../context/IndustryConfigContext';
@@ -20,7 +20,8 @@ const DynamicLeadForm = ({ lead = null, onClose, onSuccess, initialStageId = nul
   const { addLead, updateLead: updateLeadInContext } = useLeads();
 
   const isEditMode = !!lead;
-  const allFields = getFields();
+  const allFields = useMemo(() => getFields(), [getFields, config]);
+  const sections = useMemo(() => formLayout?.sections || [], [formLayout]);
 
   // Initialize form data when lead or configuration changes
   useEffect(() => {
@@ -266,7 +267,7 @@ const DynamicLeadForm = ({ lead = null, onClose, onSuccess, initialStageId = nul
     <Modal isOpen={true} onClose={onClose} title={modalTitle} size="lg">
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Render form sections based on layout configuration */}
-        {formLayout.sections && formLayout.sections.map(section => {
+        {sections.map(section => {
           // Get fields for this section
           const sectionFields = section.fields
             .map(fieldId => allFields.find(f => f.id === fieldId || f.fieldKey === fieldId))
