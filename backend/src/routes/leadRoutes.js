@@ -37,13 +37,6 @@ router.get('/', getLeads);
 router.get('/stats', getLeadStats);
 
 /**
- * @route   GET /api/leads/:id
- * @desc    Get lead by ID
- * @access  Private
- */
-router.get('/:id', getLeadById);
-
-/**
  * @route   POST /api/leads
  * @desc    Create new lead
  * @access  Private
@@ -63,6 +56,13 @@ router.put('/:id', loadLeadPicklists, validateLead, updateLead);
  * @access  Private
  */
 router.get('/search', searchLeads);
+
+/**
+ * @route   GET /api/leads/:id
+ * @desc    Get lead by ID
+ * @access  Private
+ */
+router.get('/:id', getLeadById);
 
 /**
  * @route   DELETE /api/leads/:id

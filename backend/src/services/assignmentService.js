@@ -306,20 +306,49 @@ class AssignmentService {
 
   // Bulk assign leads
   async bulkAssignLeads(leadIds, assignedTo, assignedBy, reason = 'Bulk assignment', currentUser) {
+    const supabase = supabaseAdmin;
+
     try {
       const results = [];
+      const successfulAssignments = [];
 
       for (const leadId of leadIds) {
         const result = await this.assignLead(leadId, assignedTo, assignedBy, reason, currentUser);
         results.push({ leadId, success: result.success, error: result.error });
+
+        if (result.success) {
+          successfulAssignments.push(leadId);
+        }
+
+        if (!result.success) {
+          break;
+        }
+      }
+
+      const allSuccessful = results.length === leadIds.length && results.every(r => r.success);
+
+      if (!allSuccessful && successfulAssignments.length > 0) {
+        const { error: rollbackError } = await supabase
+          .from('leads')
+          .update({ assigned_to: null })
+          .in('id', successfulAssignments);
+
+        if (rollbackError) {
+          console.error('Failed to rollback assignments after bulk failure:', rollbackError);
+        }
+
+        successfulAssignments.length = 0;
       }
 
       const successCount = results.filter(r => r.success).length;
       const errorCount = results.filter(r => !r.success).length;
 
       return {
-        success: true,
-        message: `Bulk assignment completed: ${successCount} successful, ${errorCount} failed`,
+        success: allSuccessful,
+        message: allSuccessful
+          ? `Bulk assignment completed: ${successCount} successful`
+          : `Bulk assignment partially failed: ${successCount} successful, ${errorCount} failed. Successful assignments were rolled back.`
+          ,
         results
       };
     } catch (error) {

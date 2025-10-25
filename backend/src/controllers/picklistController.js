@@ -78,7 +78,7 @@ const createLeadPicklistOption = async (req, res, next) => {
       createdBy: req.user?.id
     });
 
-    const picklists = await getLeadPicklists(targetCompanyId || companyId, {
+    const picklists = await getLeadPicklists(targetCompanyId ?? companyId, {
       includeInactive: true,
       forceRefresh: true
     });
@@ -108,7 +108,7 @@ const updateLeadPicklistOption = async (req, res, next) => {
 
     const option = await updatePicklistOption(req.params.id, req.body, { companyId: targetCompanyId });
 
-    const picklists = await getLeadPicklists(targetCompanyId || companyId, {
+    const picklists = await getLeadPicklists(targetCompanyId ?? companyId, {
       includeInactive: true,
       forceRefresh: true
     });

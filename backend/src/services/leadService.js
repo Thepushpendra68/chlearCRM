@@ -347,13 +347,12 @@ const createLead = async (leadData, industryConfig = null) => {
         .limit(1)
         .single();
 
-      if (stageError) {
-        console.error('Error fetching default pipeline stage:', stageError);
-        // If no stages exist, create lead without stage (better than failing)
-        cleanedData.pipeline_stage_id = null;
-      } else {
-        cleanedData.pipeline_stage_id = defaultStage.id;
+      if (stageError || !defaultStage) {
+        console.error('Error fetching default pipeline stage or no stages available:', stageError);
+        throw new ApiError('A pipeline stage is required to create a lead. Please configure pipeline stages first.', 400);
       }
+
+      cleanedData.pipeline_stage_id = defaultStage.id;
     }
 
     // Convert empty strings to null for date fields
@@ -666,33 +665,50 @@ const searchLeads = async (query, limit = 5, currentUser = null) => {
   try {
     const { supabaseAdmin } = require('../config/supabase');
 
+    const filters = [
+      `name.ilike.%${query}%`,
+      `first_name.ilike.%${query}%`,
+      `last_name.ilike.%${query}%`,
+      `email.ilike.%${query}%`,
+      `company.ilike.%${query}%`,
+      `phone.ilike.%${query}%`,
+      `notes.ilike.%${query}%`
+    ];
+
     let searchQuery = supabaseAdmin
       .from('leads')
       .select(`
-        *,
+        id,
+        name,
+        first_name,
+        last_name,
+        email,
+        company,
+        status,
+        lead_source,
+        assigned_to,
+        created_at,
         user_profiles!assigned_to(first_name, last_name)
       `)
-      .or(`name.ilike.%${query}%,first_name.ilike.%${query}%,last_name.ilike.%${query}%,email.ilike.%${query}%,company.ilike.%${query}%,phone.ilike.%${query}%,notes.ilike.%${query}%`)
+      .or(filters.join(','))
       .order('created_at', { ascending: false })
       .limit(limit);
 
-    // Apply company filter if user is provided
     if (currentUser?.company_id) {
       searchQuery = searchQuery.eq('company_id', currentUser.company_id);
 
-      // Non-admin users only see their assigned leads
       if (currentUser.role !== 'company_admin' && currentUser.role !== 'super_admin') {
         searchQuery = searchQuery.eq('assigned_to', currentUser.id);
       }
     }
 
-    const { data: leads, error } = await searchQuery;
+    const { data, error } = await searchQuery;
 
     if (error) {
       throw error;
     }
 
-    return leads;
+    return data || [];
   } catch (error) {
     console.error('Search leads error:', error);
     throw new ApiError('Failed to search leads', 500);
