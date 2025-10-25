@@ -14,13 +14,18 @@ const getLeadStatusSegments = async (companyId) => {
 
     picklists.statuses.forEach((option) => {
       const metadata = option.metadata || {};
+      const value = option.value;
 
-      if (metadata.is_won || ['converted', 'won', 'closed_won'].includes(option.value)) {
-        won.add(option.value);
+      const matchesWonValue = ['converted', 'won', 'closed_won'].includes(value);
+      const metadataWon = metadata.is_won === true;
+      const metadataLost = metadata.is_lost === true;
+
+      if (metadataWon || (matchesWonValue && metadata.is_won !== false)) {
+        won.add(value);
       }
 
-      if (metadata.is_lost || ['lost', 'closed_lost'].includes(option.value)) {
-        lost.add(option.value);
+      if (metadataLost || (['lost', 'closed_lost'].includes(value) && metadata.is_lost !== false)) {
+        lost.add(value);
       }
     });
 
@@ -272,6 +277,7 @@ const getRecentLeads = async (currentUser, limit = 10) => {
         email,
         company,
         status,
+        lead_source,
         source,
         created_at,
         assigned_to,

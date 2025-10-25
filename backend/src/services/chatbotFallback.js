@@ -99,10 +99,10 @@ class ChatbotFallback {
     if (this.matchesPattern(message, ['remind', 'reminder', 'remindme']) ||
         (this.matchesPattern(message, ['in', 'days', 'hours']) && this.matchesPattern(message, ['remind']))) {
       if (this.matchesPattern(message, ['update', 'change', 'modify', 'edit'])) {
-        const email = this.extractEmail(originalMessage);
-        const name = this.extractName(originalMessage);
+        const email = this.extractEmail(userMessage);
+        const name = this.extractName(userMessage);
         if (email || name) {
-          return this.handleUpdateLead(message, originalMessage);
+          return this.handleUpdateLead(message, userMessage);
         }
       }
 

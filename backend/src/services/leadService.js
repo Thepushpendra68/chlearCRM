@@ -440,10 +440,18 @@ const updateLead = async (id, leadData, currentUser, industryConfig = null) => {
     if (leadData.phone !== undefined) transformedData.phone = leadData.phone;
     if (leadData.company !== undefined) transformedData.company = leadData.company;
     if (leadData.job_title !== undefined) transformedData.title = leadData.job_title; // Map job_title to title
-      if (leadData.lead_source !== undefined) {
-        transformedData.lead_source = leadData.lead_source;
-        transformedData.source = leadData.lead_source;
+    if (leadData.lead_source !== undefined) {
+      let normalizedLeadSource = leadData.lead_source;
+      if (typeof normalizedLeadSource === 'string') {
+        normalizedLeadSource = normalizedLeadSource.trim();
+        if (normalizedLeadSource.length === 0) {
+          normalizedLeadSource = null;
+        }
       }
+
+      transformedData.lead_source = normalizedLeadSource;
+      transformedData.source = normalizedLeadSource;
+    }
     if (leadData.status !== undefined) transformedData.status = leadData.status;
     if (leadData.deal_value !== undefined) transformedData.deal_value = leadData.deal_value;
     if (leadData.expected_close_date !== undefined) transformedData.expected_close_date = leadData.expected_close_date;

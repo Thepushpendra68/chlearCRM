@@ -1550,31 +1550,37 @@ Analyze the message and respond ONLY with valid JSON. Do not include any markdow
    * Calculate lead score (0-100)
    */
   calculateLeadScore(lead) {
-    let score = 50; // Base score
+    let score = 30; // Base score
 
-    // Status scoring (0-30 points)
+    // Status scoring (0-25 points)
     const statusValue = this.getStatusValue(lead.status);
-    score += statusValue * 3; // Up to 30 points
+    score += Math.min(25, statusValue * 2.5);
 
-    // Deal value scoring (0-25 points)
+    // Deal value scoring (0-20 points)
     if (lead.deal_value) {
-      const dealScore = Math.min(25, (lead.deal_value / 100000) * 25);
-      score += dealScore;
+      const normalizedValue = Math.min(1, lead.deal_value / 100000);
+      score += normalizedValue * 20;
     }
 
-    // Recency scoring (0-20 points)
+    // Recency scoring (0-15 points)
     const daysSince = this.daysSinceCreated(lead.created_at);
-    const recencyScore = Math.max(0, 20 - (daysSince / 7)); // Newer = better
+    const recencyScore = Math.max(0, 15 - (daysSince / 10));
     score += recencyScore;
 
-    // Priority bonus (0-5 points)
+    // Priority bonus (0-10 points)
     if (lead.priority === 'high') {
-      score += 5;
+      score += 10;
     } else if (lead.priority === 'medium') {
-      score += 2.5;
+      score += 5;
     }
 
-    return Math.min(100, Math.max(0, score));
+    // Engagement bonus (0-20 points) if available
+    if (typeof lead.activity_count === 'number') {
+      const engagementScore = Math.min(20, lead.activity_count * 2);
+      score += engagementScore;
+    }
+
+    return Math.min(100, Math.max(0, Math.round(score)));
   }
 
   /**

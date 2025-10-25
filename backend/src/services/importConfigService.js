@@ -55,6 +55,50 @@ class ImportConfigService {
     this.cache = new Map();
   }
 
+  mergeUniqueValues(primary = [], fallback = []) {
+    const seen = new Set();
+    const result = [];
+
+    [...primary, ...fallback].forEach((value) => {
+      if (value === undefined || value === null) {
+        return;
+      }
+      const key = String(value).toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push(value);
+      }
+    });
+
+    return result;
+  }
+
+  mergeUniqueObjects(primary = [], fallback = []) {
+    const seen = new Set();
+    const result = [];
+
+    [...primary, ...fallback].forEach((item) => {
+      if (!item || typeof item !== 'object') {
+        return;
+      }
+
+      const valueKey = item.value !== undefined && item.value !== null
+        ? String(item.value).toLowerCase()
+        : '';
+      const labelKey = item.label !== undefined && item.label !== null
+        ? String(item.label).toLowerCase()
+        : '';
+      const key = `${valueKey}::${labelKey}`;
+
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push(item);
+      }
+    });
+
+    return result;
+  }
+
   async getCompanyConfig(companyId) {
     if (!companyId) {
       const config = cloneConfig(DEFAULT_CONFIG);
@@ -131,29 +175,29 @@ class ImportConfigService {
       
       console.log(`[PICKLIST_ENRICH] Company: ${companyId}, Sources count: ${picklists.sources.length}, Statuses count: ${picklists.statuses.length}`);
 
-      const sources = Array.from(new Set([
-        ...picklists.sources.map(option => option.value),
-        ...DEFAULT_CONFIG.enums.lead_source
-      ]));
+      const sources = this.mergeUniqueValues(
+        picklists.sources.map(option => option.value),
+        DEFAULT_CONFIG.enums.lead_source
+      );
 
-      const statuses = Array.from(new Set([
-        ...picklists.statuses.map(option => option.value),
-        ...DEFAULT_CONFIG.enums.status
-      ]));
+      const statuses = this.mergeUniqueValues(
+        picklists.statuses.map(option => option.value),
+        DEFAULT_CONFIG.enums.status
+      );
 
       config.enums.lead_source = sources;
       config.enums.status = statuses;
 
       // Add fuzzy matching data with both values and labels
-      const statusFuzzyData = Array.from(new Set([
-        ...picklists.statuses.map(option => ({ value: option.value, label: option.label })),
-        ...DEFAULT_CONFIG.enums.status.map(value => ({ value, label: value }))
-      ]));
+      const statusFuzzyData = this.mergeUniqueObjects(
+        picklists.statuses.map(option => ({ value: option.value, label: option.label })),
+        DEFAULT_CONFIG.enums.status.map(value => ({ value, label: value }))
+      );
       
-      const sourceFuzzyData = Array.from(new Set([
-        ...picklists.sources.map(option => ({ value: option.value, label: option.label })),
-        ...DEFAULT_CONFIG.enums.lead_source.map(value => ({ value, label: value }))
-      ]));
+      const sourceFuzzyData = this.mergeUniqueObjects(
+        picklists.sources.map(option => ({ value: option.value, label: option.label })),
+        DEFAULT_CONFIG.enums.lead_source.map(value => ({ value, label: value }))
+      );
       
       config.fuzzyMatchData = {
         status: statusFuzzyData,

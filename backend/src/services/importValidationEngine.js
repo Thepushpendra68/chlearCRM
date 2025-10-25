@@ -179,7 +179,7 @@ class ImportValidationEngine {
         if (Array.isArray(enumList) && enumList.length > 0) {
           this.fuseInstances[field] = new Fuse(enumList, {
             includeScore: true,
-            threshold: 0.4, // Lowered from 0.3 - closer to 0 is more similar
+            threshold: 0.4, // Slightly more permissive than 0.3 to balance accuracy and recall
             distance: 100,
             minMatchCharLength: 2
           });
@@ -205,7 +205,7 @@ class ImportValidationEngine {
 
           this.fuseInstances[`${field}_enhanced`] = new Fuse(searchableItems, {
             includeScore: true,
-            threshold: 0.4, // Lowered from 0.3
+            threshold: 0.4, // Slightly more permissive than 0.3 to balance accuracy and recall
             distance: 100,
             minMatchCharLength: 2,
             keys: ['value', 'label', 'searchText']
