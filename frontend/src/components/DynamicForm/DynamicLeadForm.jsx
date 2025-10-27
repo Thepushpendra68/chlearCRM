@@ -76,68 +76,7 @@ const DynamicLeadForm = ({ lead = null, onClose, onSuccess, initialStageId = nul
     }
   };
 
-  /**
-   * Validate form data
-   */
-  const validateForm = () => {
-    const newErrors = {};
 
-    allFields.forEach(field => {
-      const value = formData[field.id];
-
-      // Required field validation
-      if (field.required && (!value || value === '')) {
-        newErrors[field.id] = `${field.label} is required`;
-        return;
-      }
-
-      // Skip further validation if field is empty and not required
-      if (!value || value === '') return;
-
-      // Type-specific validation
-      if (field.validation) {
-        const { pattern, minLength, maxLength, min, max } = field.validation;
-
-        // Pattern validation
-        if (pattern) {
-          const regex = new RegExp(pattern);
-          if (!regex.test(String(value))) {
-            newErrors[field.id] = field.validation.message || `Invalid ${field.label} format`;
-          }
-        }
-
-        // Length validation
-        if (minLength && String(value).length < minLength) {
-          newErrors[field.id] = `${field.label} must be at least ${minLength} characters`;
-        }
-        if (maxLength && String(value).length > maxLength) {
-          newErrors[field.id] = `${field.label} must not exceed ${maxLength} characters`;
-        }
-
-        // Number validation
-        if (field.type === 'number' || field.type === 'currency') {
-          const numValue = parseFloat(value);
-          if (min !== undefined && numValue < min) {
-            newErrors[field.id] = `${field.label} must be at least ${min}`;
-          }
-          if (max !== undefined && numValue > max) {
-            newErrors[field.id] = `${field.label} must not exceed ${max}`;
-          }
-        }
-      }
-
-      // Email validation
-      if (field.type === 'email' && value) {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(value)) {
-          newErrors[field.id] = 'Invalid email address';
-        }
-      }
-    });
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
 
   /**
    * Handle form submission
@@ -146,10 +85,10 @@ const DynamicLeadForm = ({ lead = null, onClose, onSuccess, initialStageId = nul
     e.preventDefault();
 
     // Validate form
-    if (!validateForm()) {
-      toast.error('Please fix the errors in the form');
-      return;
-    }
+    // if (!validateForm()) {
+    //   toast.error('Please fix the errors in the form');
+    //   return;
+    // }
 
     try {
       setLoading(true);
@@ -294,7 +233,6 @@ const DynamicLeadForm = ({ lead = null, onClose, onSuccess, initialStageId = nul
                     field={field}
                     value={formData[field.id]}
                     onChange={(value) => handleFieldChange(field.id, value)}
-                    error={errors[field.id]}
                     disabled={loading}
                   />
                 ))}

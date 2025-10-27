@@ -102,84 +102,68 @@ RLS policies in place
 
 ```
 ┌─────────────────────────────────────────────────┐
-│         INDUSTRY CONFIGURATION                   │
-│  (config/industry/school.config.js)             │
-│  - Terminology                                   │
-│  - Custom Fields                                 │
-│  - Pipeline Stages                               │
-│  - Lead Sources                                  │
+│         INDUSTRY CONFIGURATION FILES             │
+│  (backend/src/config/industry/*.config.js)       │
+│  - Terminology, Core Fields, Custom Fields       │
+│  - Form Layout, List View, Pipeline, Validation  │
+│  - Automation, Integrations, Reports, Permissions│
 └──────────────────┬──────────────────────────────┘
                    │
                    ▼
 ┌─────────────────────────────────────────────────┐
-│         CONFIGURATION LOADER                     │
-│  Reads industry_type from companies table       │
-│  Loads appropriate config on startup            │
+│         BACKEND CONFIGURATION LOADER             │
+│  (backend/src/config/industry/configLoader.js)   │
+│  - Loads config based on company's industry_type │
+│  - Caches configurations in memory               │
+│  - Provides helper functions for accessing config│
 └──────────────────┬──────────────────────────────┘
                    │
                    ▼
 ┌─────────────────────────────────────────────────┐
-│         DYNAMIC COMPONENTS                       │
-│  - DynamicFormField (renders any field type)    │
-│  - TermLabel (shows industry terminology)       │
-│  - ConfigurableColumns (table views)            │
+│         FRONTEND CONFIGURATION PROVIDER          │
+│  (frontend/src/context/IndustryConfigContext.jsx)│
+│  - Fetches configuration from backend API        │
+│  - Provides config and helper functions to       │
+│    components via React Context                  │
+└──────────────────┬──────────────────────────────┘
+                   │
+                   ▼
+┌─────────────────────────────────────────────────┐
+│         DYNAMIC FRONTEND COMPONENTS              │
+│  - DynamicLeadForm.jsx (builds forms from config)│
+│  - TermLabel.jsx (displays config-driven labels) │
+│  - Leads.jsx (consumes config for table views)   │
 └─────────────────────────────────────────────────┘
 ```
 
-### Directory Structure (New Files)
+### Directory Structure (Actual)
 
 ```
 backend/
 ├── src/
 │   ├── config/
-│   │   └── industry/              # NEW
-│   │       ├── index.js           # Config loader
-│   │       ├── base.config.js     # Default/generic config
-│   │       ├── school.config.js   # School-specific config
-│   │       ├── terminology.js     # Label mappings
-│   │       ├── fields.js          # Field definitions
-│   │       ├── pipeline.js        # Pipeline configs
-│   │       └── leadSources.js     # Source options
+│   │   └── industry/
+│   │       ├── configLoader.js
+│   │       ├── base.config.js
+│   │       └── school.config.js
 │   │
 │   └── middleware/
-│       └── industryConfig.middleware.js  # NEW - Inject config
+│       └── industryConfig.middleware.js
 │
 frontend/
 ├── src/
-│   ├── config/
-│   │   └── industry/              # NEW (mirrors backend)
-│   │       ├── index.js
-│   │       ├── base.config.js
-│   │       ├── school.config.js
-│   │       ├── terminology.js
-│   │       └── fields.js
-│   │
 │   ├── components/
-│   │   ├── DynamicForm/           # NEW
-│   │   │   ├── DynamicFormField.jsx
-│   │   │   ├── DynamicLeadForm.jsx
-│   │   │   ├── FieldTypes/
-│   │   │   │   ├── TextInput.jsx
-│   │   │   │   ├── SelectInput.jsx
-│   │   │   │   ├── DateInput.jsx
-│   │   │   │   ├── PhoneInput.jsx
-│   │   │   │   └── EmailInput.jsx
-│   │   │   └── index.js
-│   │   │
-│   │   └── Shared/
-│   │       └── TermLabel.jsx      # NEW - Dynamic labels
-│   │
-│   ├── hooks/
-│   │   ├── useTerminology.js      # NEW
-│   │   └── useIndustryConfig.js   # NEW
+│   │   └── DynamicForm/
+│   │       ├── DynamicFormField.jsx
+│   │       └── DynamicLeadForm.jsx
 │   │
 │   └── context/
-│       └── IndustryConfigContext.jsx  # NEW
+│       └── IndustryConfigContext.jsx
 │
 root/
-├── PHASE_1_MODULAR_REFACTORING_PLAN.md  # This file
-├── CONFIGURATION_GUIDE.md               # NEW - How to customize
-└── INDUSTRY_TEMPLATES.md                # NEW - Examples
+├── PHASE_1_MODULAR_REFACTORING_PLAN.md
+├── CONFIGURATION_GUIDE.md
+└── DYNAMIC_FORM_IMPLEMENTATION_SUMMARY.md
 ```
 
 ---
@@ -305,771 +289,64 @@ COMMIT;
 
 ```javascript
 /**
- * Base/Generic CRM Configuration
- * This is the default configuration for a standard B2B CRM
- * Other industries extend/override this configuration
+ * Base CRM Configuration
+ * This is the foundation configuration that all industry-specific configs extend.
+ * Defines core fields, terminology, and behavior for a generic CRM.
  */
 
-module.exports = {
-  // Industry identifier
-  industry: 'generic',
-
-  // Display name
-  displayName: 'Generic CRM',
-
-  // Terminology mappings (singular and plural)
-  terminology: {
-    lead: 'Lead',
-    leads: 'Leads',
-    leadCapitalized: 'Lead',
-    leadsCapitalized: 'Leads',
-    deal_value: 'Deal Value',
-    expected_close_date: 'Expected Close Date',
-    assigned_to: 'Assigned To',
-    pipeline: 'Sales Pipeline',
-    stage: 'Stage',
-    won: 'Won',
-    lost: 'Lost',
-    contact: 'Contact',
-    company: 'Company',
-  },
-
-  // Field definitions for leads
-  fields: {
-    // Core fields (always required)
-    core: [
-      {
-        id: 'first_name',
-        name: 'first_name',
-        label: 'First Name',
-        type: 'text',
-        required: true,
-        isCustomField: false,
-        validation: {
-          minLength: 2,
-          maxLength: 50,
-          pattern: '^[a-zA-Z\\s]+$',
-          message: 'First name must be 2-50 characters, letters only',
-        },
-        uiProps: {
-          placeholder: 'Enter first name',
-          helpText: 'Lead's first name',
-          gridColumn: 'col-span-1',
-        },
-      },
-      {
-        id: 'last_name',
-        name: 'last_name',
-        label: 'Last Name',
-        type: 'text',
-        required: true,
-        isCustomField: false,
-        validation: {
-          minLength: 2,
-          maxLength: 50,
-          pattern: '^[a-zA-Z\\s]+$',
-        },
-        uiProps: {
-          placeholder: 'Enter last name',
-          gridColumn: 'col-span-1',
-        },
-      },
-    ],
-
-    // Contact fields
-    contact: [
-      {
-        id: 'email',
-        name: 'email',
-        label: 'Email',
-        type: 'email',
-        required: false, // At least one of email/phone required
-        isCustomField: false,
-        validation: {
-          pattern: '^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}$',
-          message: 'Please provide a valid email address',
-        },
-        uiProps: {
-          placeholder: 'email@example.com',
-          helpText: 'Required if no phone number',
-          gridColumn: 'col-span-1',
-        },
-      },
-      {
-        id: 'phone',
-        name: 'phone',
-        label: 'Phone',
-        type: 'phone',
-        required: false, // At least one of email/phone required
-        isCustomField: false,
-        validation: {
-          pattern: '^[\\+]?[0-9\\s\\-\\(\\)]{0,20}$',
-          message: 'Please provide a valid phone number',
-        },
-        uiProps: {
-          placeholder: '+1 (555) 123-4567',
-          helpText: 'Required if no email',
-          gridColumn: 'col-span-1',
-        },
-      },
-    ],
-
-    // Business fields
-    business: [
-      {
-        id: 'company',
-        name: 'company',
-        label: 'Company',
-        type: 'text',
-        required: false,
-        isCustomField: false,
-        validation: {
-          maxLength: 100,
-        },
-        uiProps: {
-          placeholder: 'Enter company name',
-          helpText: 'Highly recommended for B2B',
-          gridColumn: 'col-span-1',
-        },
-      },
-      {
-        id: 'job_title',
-        name: 'title', // Maps to 'title' in database
-        label: 'Job Title',
-        type: 'text',
-        required: false,
-        isCustomField: false,
-        validation: {
-          maxLength: 100,
-        },
-        uiProps: {
-          placeholder: 'e.g., Marketing Manager',
-          gridColumn: 'col-span-1',
-        },
-      },
-    ],
-
-    // CRM fields
-    crm: [
-      {
-        id: 'lead_source',
-        name: 'source', // Maps to 'source' in database
-        label: 'Lead Source',
-        type: 'picklist',
-        picklistType: 'source',
-        required: false,
-        isCustomField: false,
-        uiProps: {
-          gridColumn: 'col-span-1',
-        },
-      },
-      {
-        id: 'status',
-        name: 'status',
-        label: 'Status',
-        type: 'picklist',
-        picklistType: 'status',
-        required: false,
-        isCustomField: false,
-        defaultValue: 'new',
-        uiProps: {
-          gridColumn: 'col-span-1',
-        },
-      },
-      {
-        id: 'pipeline_stage_id',
-        name: 'pipeline_stage_id',
-        label: 'Pipeline Stage',
-        type: 'pipeline_stage',
-        required: false,
-        isCustomField: false,
-        uiProps: {
-          gridColumn: 'col-span-1',
-        },
-      },
-      {
-        id: 'assigned_to',
-        name: 'assigned_to',
-        label: 'Assigned To',
-        type: 'user_select',
-        required: false,
-        isCustomField: false,
-        uiProps: {
-          gridColumn: 'col-span-1',
-        },
-      },
-      {
-        id: 'priority',
-        name: 'priority',
-        label: 'Priority',
-        type: 'select',
-        required: false,
-        isCustomField: false,
-        defaultValue: 'medium',
-        options: [
-          { value: 'low', label: 'Low' },
-          { value: 'medium', label: 'Medium' },
-          { value: 'high', label: 'High' },
-          { value: 'urgent', label: 'Urgent' },
-        ],
-        uiProps: {
-          gridColumn: 'col-span-1',
-        },
-      },
-    ],
-
-    // Sales fields
-    sales: [
-      {
-        id: 'deal_value',
-        name: 'deal_value',
-        label: 'Deal Value',
-        type: 'number',
-        required: false,
-        isCustomField: false,
-        validation: {
-          min: 0,
-          message: 'Deal value must be positive',
-        },
-        uiProps: {
-          placeholder: 'Enter estimated value',
-          prefix: '$',
-          gridColumn: 'col-span-1',
-        },
-      },
-      {
-        id: 'probability',
-        name: 'probability',
-        label: 'Probability (%)',
-        type: 'number',
-        required: false,
-        isCustomField: false,
-        defaultValue: 0,
-        validation: {
-          min: 0,
-          max: 100,
-        },
-        uiProps: {
-          placeholder: '0-100',
-          suffix: '%',
-          gridColumn: 'col-span-1',
-        },
-      },
-      {
-        id: 'expected_close_date',
-        name: 'expected_close_date',
-        label: 'Expected Close Date',
-        type: 'date',
-        required: false,
-        isCustomField: false,
-        uiProps: {
-          gridColumn: 'col-span-1',
-        },
-      },
-    ],
-
-    // Additional fields
-    additional: [
-      {
-        id: 'notes',
-        name: 'notes',
-        label: 'Notes',
-        type: 'textarea',
-        required: false,
-        isCustomField: false,
-        validation: {
-          maxLength: 1000,
-        },
-        uiProps: {
-          placeholder: 'Enter notes about the lead',
-          rows: 3,
-          gridColumn: 'col-span-2',
-        },
-      },
-    ],
-
-    // Custom fields (industry-specific)
-    custom: [],
-  },
-
-  // Default pipeline stages
-  pipelineStages: [
-    { name: 'New Lead', color: '#3B82F6', order: 1, is_closed_won: false, is_closed_lost: false },
-    { name: 'Contacted', color: '#06B6D4', order: 2, is_closed_won: false, is_closed_lost: false },
-    { name: 'Qualified', color: '#10B981', order: 3, is_closed_won: false, is_closed_lost: false },
-    { name: 'Proposal Sent', color: '#F59E0B', order: 4, is_closed_won: false, is_closed_lost: false },
-    { name: 'Negotiation', color: '#F97316', order: 5, is_closed_won: false, is_closed_lost: false },
-    { name: 'Closed Won', color: '#22C55E', order: 6, is_closed_won: true, is_closed_lost: false },
-    { name: 'Closed Lost', color: '#EF4444', order: 7, is_closed_won: false, is_closed_lost: true },
-  ],
-
-  // Default lead sources (extends picklist)
-  leadSources: [
-    { value: 'website', label: 'Website', sort_order: 1 },
-    { value: 'referral', label: 'Referral', sort_order: 2 },
-    { value: 'cold_call', label: 'Cold Call', sort_order: 3 },
-    { value: 'email_campaign', label: 'Email Campaign', sort_order: 4 },
-    { value: 'social_media', label: 'Social Media', sort_order: 5 },
-    { value: 'event', label: 'Event', sort_order: 6 },
-    { value: 'partner', label: 'Partner', sort_order: 7 },
-    { value: 'other', label: 'Other', sort_order: 99 },
-  ],
-
-  // Default lead statuses (extends picklist)
-  leadStatuses: [
-    { value: 'new', label: 'New', sort_order: 1, metadata: { is_won: false, is_lost: false } },
-    { value: 'contacted', label: 'Contacted', sort_order: 2, metadata: { is_won: false, is_lost: false } },
-    { value: 'qualified', label: 'Qualified', sort_order: 3, metadata: { is_won: false, is_lost: false } },
-    { value: 'proposal', label: 'Proposal', sort_order: 4, metadata: { is_won: false, is_lost: false } },
-    { value: 'negotiation', label: 'Negotiation', sort_order: 5, metadata: { is_won: false, is_lost: false } },
-    { value: 'won', label: 'Won', sort_order: 6, metadata: { is_won: true, is_lost: false } },
-    { value: 'lost', label: 'Lost', sort_order: 7, metadata: { is_won: false, is_lost: true } },
-    { value: 'nurture', label: 'Nurture', sort_order: 8, metadata: { is_won: false, is_lost: false } },
-  ],
-
-  // Form layout configuration
-  formLayout: {
-    sections: [
-      {
-        id: 'contact_info',
-        title: 'Contact Information',
-        icon: 'user',
-        fields: ['first_name', 'last_name', 'email', 'phone'],
-      },
-      {
-        id: 'business_info',
-        title: 'Business Information',
-        icon: 'briefcase',
-        fields: ['company', 'job_title'],
-      },
-      {
-        id: 'crm_fields',
-        title: 'CRM Details',
-        icon: 'settings',
-        fields: ['lead_source', 'status', 'pipeline_stage_id', 'assigned_to', 'priority'],
-      },
-      {
-        id: 'sales_info',
-        title: 'Sales Information',
-        icon: 'dollar-sign',
-        fields: ['deal_value', 'probability', 'expected_close_date'],
-      },
-      {
-        id: 'additional',
-        title: 'Additional Information',
-        icon: 'file-text',
-        fields: ['notes'],
-      },
-    ],
-  },
-
-  // Validation rules
-  validation: {
-    // At least one contact method required
-    requireContactMethod: true,
-    contactMethodFields: ['email', 'phone'],
-  },
+const baseConfig = {
+  // ... (Comprehensive configuration details)
 };
-```
 
----
+module.exports = baseConfig;
+```
 
 **File**: `backend/src/config/industry/school.config.js`
 
 ```javascript
 /**
- * School/Education CRM Configuration
- * Extends base configuration with school-specific terminology and fields
+ * School CRM Configuration
+ * Extends base configuration with school-specific fields and terminology.
  */
 
 const baseConfig = require('./base.config');
 
-module.exports = {
+const schoolConfig = {
   ...baseConfig,
-
-  industry: 'school',
-  displayName: 'School Admission CRM',
-
-  // Override terminology
-  terminology: {
-    ...baseConfig.terminology,
-    lead: 'Student Inquiry',
-    leads: 'Student Inquiries',
-    leadCapitalized: 'Student Inquiry',
-    leadsCapitalized: 'Student Inquiries',
-    deal_value: 'Annual Tuition',
-    expected_close_date: 'Expected Enrollment Date',
-    assigned_to: 'Admission Counselor',
-    pipeline: 'Admission Pipeline',
-    stage: 'Admission Stage',
-    won: 'Enrolled',
-    lost: 'Not Interested',
-    contact: 'Parent/Guardian',
-    company: 'Previous School',
-  },
-
-  // Add custom fields specific to schools
-  fields: {
-    ...baseConfig.fields,
-
-    // Override business section
-    business: [
-      {
-        id: 'previous_school',
-        name: 'company', // Maps to 'company' field in DB
-        label: 'Previous School',
-        type: 'text',
-        required: false,
-        isCustomField: false,
-        validation: {
-          maxLength: 100,
-        },
-        uiProps: {
-          placeholder: 'Enter previous school name',
-          gridColumn: 'col-span-1',
-        },
-      },
-      {
-        id: 'parent_occupation',
-        name: 'title', // Repurpose 'title' field
-        label: 'Parent Occupation',
-        type: 'text',
-        required: false,
-        isCustomField: false,
-        validation: {
-          maxLength: 100,
-        },
-        uiProps: {
-          placeholder: 'e.g., Engineer, Doctor',
-          gridColumn: 'col-span-1',
-        },
-      },
-    ],
-
-    // Add student-specific custom fields
-    custom: [
-      {
-        id: 'student_name',
-        name: 'student_name',
-        label: 'Student Name',
-        type: 'text',
-        required: true,
-        isCustomField: true,
-        validation: {
-          minLength: 2,
-          maxLength: 100,
-        },
-        uiProps: {
-          placeholder: 'Student's full name',
-          helpText: 'If different from inquiry contact',
-          gridColumn: 'col-span-2',
-        },
-      },
-      {
-        id: 'date_of_birth',
-        name: 'date_of_birth',
-        label: 'Date of Birth',
-        type: 'date',
-        required: false,
-        isCustomField: true,
-        uiProps: {
-          gridColumn: 'col-span-1',
-        },
-      },
-      {
-        id: 'grade_applying_for',
-        name: 'grade_applying_for',
-        label: 'Grade Applying For',
-        type: 'select',
-        required: true,
-        isCustomField: true,
-        options: [
-          { value: 'kindergarten', label: 'Kindergarten' },
-          { value: 'grade_1', label: 'Grade 1' },
-          { value: 'grade_2', label: 'Grade 2' },
-          { value: 'grade_3', label: 'Grade 3' },
-          { value: 'grade_4', label: 'Grade 4' },
-          { value: 'grade_5', label: 'Grade 5' },
-          { value: 'grade_6', label: 'Grade 6' },
-          { value: 'grade_7', label: 'Grade 7' },
-          { value: 'grade_8', label: 'Grade 8' },
-          { value: 'grade_9', label: 'Grade 9' },
-          { value: 'grade_10', label: 'Grade 10' },
-          { value: 'grade_11', label: 'Grade 11' },
-          { value: 'grade_12', label: 'Grade 12' },
-        ],
-        uiProps: {
-          gridColumn: 'col-span-1',
-        },
-      },
-      {
-        id: 'enrollment_year',
-        name: 'enrollment_year',
-        label: 'Enrollment Year',
-        type: 'select',
-        required: true,
-        isCustomField: true,
-        options: [
-          { value: '2025', label: '2025' },
-          { value: '2026', label: '2026' },
-          { value: '2027', label: '2027' },
-        ],
-        uiProps: {
-          gridColumn: 'col-span-1',
-        },
-      },
-      {
-        id: 'parent_name',
-        name: 'parent_name',
-        label: 'Parent/Guardian Name',
-        type: 'text',
-        required: true,
-        isCustomField: true,
-        validation: {
-          minLength: 2,
-          maxLength: 100,
-        },
-        uiProps: {
-          placeholder: 'Primary parent/guardian name',
-          gridColumn: 'col-span-1',
-        },
-      },
-      {
-        id: 'parent_phone',
-        name: 'parent_phone',
-        label: 'Parent Phone',
-        type: 'phone',
-        required: false,
-        isCustomField: true,
-        validation: {
-          pattern: '^[\\+]?[0-9\\s\\-\\(\\)]{0,20}$',
-        },
-        uiProps: {
-          placeholder: 'Parent contact number',
-          gridColumn: 'col-span-1',
-        },
-      },
-      {
-        id: 'special_needs',
-        name: 'special_needs',
-        label: 'Special Needs/Requirements',
-        type: 'textarea',
-        required: false,
-        isCustomField: true,
-        validation: {
-          maxLength: 500,
-        },
-        uiProps: {
-          placeholder: 'Any special educational needs or medical requirements',
-          rows: 3,
-          gridColumn: 'col-span-2',
-        },
-      },
-      {
-        id: 'interests',
-        name: 'interests',
-        label: 'Student Interests',
-        type: 'textarea',
-        required: false,
-        isCustomField: true,
-        validation: {
-          maxLength: 500,
-        },
-        uiProps: {
-          placeholder: 'Sports, arts, extracurricular interests',
-          rows: 2,
-          gridColumn: 'col-span-2',
-        },
-      },
-    ],
-  },
-
-  // School-specific pipeline stages
-  pipelineStages: [
-    { name: 'Inquiry', color: '#3B82F6', order: 1, is_closed_won: false, is_closed_lost: false },
-    { name: 'Tour Scheduled', color: '#8B5CF6', order: 2, is_closed_won: false, is_closed_lost: false },
-    { name: 'Tour Completed', color: '#06B6D4', order: 3, is_closed_won: false, is_closed_lost: false },
-    { name: 'Application Submitted', color: '#10B981', order: 4, is_closed_won: false, is_closed_lost: false },
-    { name: 'Interview Scheduled', color: '#F59E0B', order: 5, is_closed_won: false, is_closed_lost: false },
-    { name: 'Interview Completed', color: '#F97316', order: 6, is_closed_won: false, is_closed_lost: false },
-    { name: 'Admission Offered', color: '#EC4899', order: 7, is_closed_won: false, is_closed_lost: false },
-    { name: 'Enrolled', color: '#22C55E', order: 8, is_closed_won: true, is_closed_lost: false },
-    { name: 'Not Interested', color: '#EF4444', order: 9, is_closed_won: false, is_closed_lost: true },
-  ],
-
-  // School-specific lead sources
-  leadSources: [
-    { value: 'google_ads', label: 'Google Ads', sort_order: 1 },
-    { value: 'facebook_ads', label: 'Facebook Ads', sort_order: 2 },
-    { value: 'instagram', label: 'Instagram', sort_order: 3 },
-    { value: 'website_form', label: 'Website Form', sort_order: 4 },
-    { value: 'referral', label: 'Referral (Parent/Student)', sort_order: 5 },
-    { value: 'walk_in', label: 'Walk-in Inquiry', sort_order: 6 },
-    { value: 'school_event', label: 'School Event/Open House', sort_order: 7 },
-    { value: 'phone_inquiry', label: 'Phone Inquiry', sort_order: 8 },
-    { value: 'email_inquiry', label: 'Email Inquiry', sort_order: 9 },
-    { value: 'other', label: 'Other', sort_order: 99 },
-  ],
-
-  // School-specific statuses
-  leadStatuses: [
-    { value: 'new_inquiry', label: 'New Inquiry', sort_order: 1, metadata: { is_won: false, is_lost: false } },
-    { value: 'contacted', label: 'Contacted', sort_order: 2, metadata: { is_won: false, is_lost: false } },
-    { value: 'tour_scheduled', label: 'Tour Scheduled', sort_order: 3, metadata: { is_won: false, is_lost: false } },
-    { value: 'application_received', label: 'Application Received', sort_order: 4, metadata: { is_won: false, is_lost: false } },
-    { value: 'under_review', label: 'Under Review', sort_order: 5, metadata: { is_won: false, is_lost: false } },
-    { value: 'enrolled', label: 'Enrolled', sort_order: 6, metadata: { is_won: true, is_lost: false } },
-    { value: 'not_interested', label: 'Not Interested', sort_order: 7, metadata: { is_won: false, is_lost: true } },
-    { value: 'waitlisted', label: 'Waitlisted', sort_order: 8, metadata: { is_won: false, is_lost: false } },
-  ],
-
-  // Custom form layout for schools
-  formLayout: {
-    sections: [
-      {
-        id: 'student_info',
-        title: 'Student Information',
-        icon: 'user',
-        fields: ['student_name', 'date_of_birth', 'grade_applying_for', 'enrollment_year'],
-      },
-      {
-        id: 'parent_info',
-        title: 'Parent/Guardian Information',
-        icon: 'users',
-        fields: ['first_name', 'last_name', 'parent_name', 'email', 'phone', 'parent_phone'],
-      },
-      {
-        id: 'educational_background',
-        title: 'Educational Background',
-        icon: 'book',
-        fields: ['previous_school', 'parent_occupation'],
-      },
-      {
-        id: 'admission_details',
-        title: 'Admission Details',
-        icon: 'clipboard',
-        fields: ['lead_source', 'status', 'pipeline_stage_id', 'assigned_to'],
-      },
-      {
-        id: 'additional_info',
-        title: 'Additional Information',
-        icon: 'file-text',
-        fields: ['special_needs', 'interests', 'notes'],
-      },
-    ],
-  },
+  // ... (School-specific overrides and additions)
 };
-```
 
----
+module.exports = schoolConfig;
+```
 
 #### 2.2 Create Configuration Loader
 
-**File**: `backend/src/config/industry/index.js`
+**File**: `backend/src/config/industry/configLoader.js`
 
 ```javascript
 /**
  * Industry Configuration Loader
- * Loads the appropriate industry configuration based on company settings
+ * Dynamically loads the appropriate industry configuration based on company settings.
+ * Caches configurations in memory for performance.
  */
 
 const baseConfig = require('./base.config');
-const schoolConfig = require('./school.config');
+const configCache = new Map();
 
-// Industry configuration map
-const INDUSTRY_CONFIGS = {
-  generic: baseConfig,
-  school: schoolConfig,
-  // Add more industries here as needed
-  // realEstate: require('./realEstate.config'),
-  // healthcare: require('./healthcare.config'),
-};
+function loadIndustryConfig(industryType) {
+  // ... (Caching and loading logic)
+}
 
-/**
- * Get configuration for a specific industry type
- * @param {string} industryType - The industry identifier
- * @returns {object} Industry configuration object
- */
-const getIndustryConfig = (industryType = 'generic') => {
-  const config = INDUSTRY_CONFIGS[industryType];
+function getConfigForCompany(company) {
+  // ... (Get config for a specific company)
+}
 
-  if (!config) {
-    console.warn(`Industry config for '${industryType}' not found. Falling back to generic.`);
-    return baseConfig;
-  }
-
-  return config;
-};
-
-/**
- * Get field definitions from configuration
- * @param {object} config - Industry configuration
- * @returns {array} Flat array of all field definitions
- */
-const getAllFields = (config) => {
-  const { fields } = config;
-  return [
-    ...fields.core,
-    ...fields.contact,
-    ...fields.business,
-    ...fields.crm,
-    ...fields.sales,
-    ...fields.additional,
-    ...fields.custom,
-  ];
-};
-
-/**
- * Get field by ID
- * @param {object} config - Industry configuration
- * @param {string} fieldId - Field identifier
- * @returns {object|null} Field definition or null
- */
-const getFieldById = (config, fieldId) => {
-  const allFields = getAllFields(config);
-  return allFields.find(field => field.id === fieldId) || null;
-};
-
-/**
- * Separate core fields from custom fields
- * @param {object} config - Industry configuration
- * @returns {object} { coreFields: [], customFields: [] }
- */
-const separateFields = (config) => {
-  const allFields = getAllFields(config);
-  return {
-    coreFields: allFields.filter(f => !f.isCustomField),
-    customFields: allFields.filter(f => f.isCustomField),
-  };
-};
-
-/**
- * Get validation schema for lead creation/update
- * @param {object} config - Industry configuration
- * @returns {object} Validation schema compatible with express-validator
- */
-const getValidationSchema = (config) => {
-  const allFields = getAllFields(config);
-  const schema = {};
-
-  allFields.forEach(field => {
-    schema[field.id] = {
-      required: field.required,
-      type: field.type,
-      validation: field.validation || {},
-    };
-  });
-
-  return schema;
-};
+// ... (Helper functions for accessing config)
 
 module.exports = {
-  getIndustryConfig,
-  getAllFields,
-  getFieldById,
-  separateFields,
-  getValidationSchema,
-  INDUSTRY_CONFIGS,
+  loadIndustryConfig,
+  getConfigForCompany,
+  // ... (Other exported functions)
 };
 ```
 
@@ -1081,295 +358,53 @@ module.exports = {
 
 **File**: `backend/src/services/leadService.js`
 
-Add these functions at the end of the file:
+Update the `createLead` and `updateLead` functions to handle custom fields by separating them from core fields and storing them in the `custom_fields` JSONB column. The `configLoader.js` is used to get the custom field definitions.
 
 ```javascript
-// ... existing code ...
-
-/**
- * Process and validate custom fields based on industry configuration
- */
-const processCustomFields = (customFieldsData, industryConfig) => {
-  const { customFields } = require('../config/industry').separateFields(industryConfig);
-  const processed = {};
-  const errors = [];
-
-  customFields.forEach(fieldDef => {
-    const value = customFieldsData[fieldDef.name];
-
-    // Skip if not provided and not required
-    if (value === undefined || value === null || value === '') {
-      if (fieldDef.required) {
-        errors.push(`${fieldDef.label} is required`);
-      }
-      return;
-    }
-
-    // Type validation
-    switch (fieldDef.type) {
-      case 'number':
-        const num = parseFloat(value);
-        if (isNaN(num)) {
-          errors.push(`${fieldDef.label} must be a number`);
-        } else {
-          processed[fieldDef.name] = num;
-        }
-        break;
-
-      case 'date':
-        const date = new Date(value);
-        if (isNaN(date.getTime())) {
-          errors.push(`${fieldDef.label} must be a valid date`);
-        } else {
-          processed[fieldDef.name] = date.toISOString();
-        }
-        break;
-
-      case 'select':
-        if (fieldDef.options) {
-          const validValues = fieldDef.options.map(opt => opt.value);
-          if (!validValues.includes(value)) {
-            errors.push(`${fieldDef.label} must be one of: ${validValues.join(', ')}`);
-          } else {
-            processed[fieldDef.name] = value;
-          }
-        }
-        break;
-
-      default:
-        // String types (text, textarea, email, phone, etc.)
-        processed[fieldDef.name] = String(value).trim();
-    }
-
-    // Additional validation rules
-    if (fieldDef.validation) {
-      const { minLength, maxLength, pattern, min, max } = fieldDef.validation;
-
-      if (minLength && String(value).length < minLength) {
-        errors.push(`${fieldDef.label} must be at least ${minLength} characters`);
-      }
-
-      if (maxLength && String(value).length > maxLength) {
-        errors.push(`${fieldDef.label} must not exceed ${maxLength} characters`);
-      }
-
-      if (pattern && !new RegExp(pattern).test(String(value))) {
-        errors.push(fieldDef.validation.message || `${fieldDef.label} format is invalid`);
-      }
-
-      if (min !== undefined && parseFloat(value) < min) {
-        errors.push(`${fieldDef.label} must be at least ${min}`);
-      }
-
-      if (max !== undefined && parseFloat(value) > max) {
-        errors.push(`${fieldDef.label} must not exceed ${max}`);
-      }
-    }
-  });
-
-  if (errors.length > 0) {
-    throw new ApiError(`Validation failed: ${errors.join(', ')}`, 400);
-  }
-
-  return processed;
-};
-
-module.exports = {
-  getLeads,
-  getLeadById,
-  createLead,
-  updateLead,
-  deleteLead,
-  getLeadStats,
-  getRecentLeads,
-  searchLeads,
-  processCustomFields, // NEW
-};
-```
-
-Update the `createLead` function to handle custom fields:
-
-```javascript
-// Find the createLead function and update it:
-
+// Example of updated createLead function
 const createLead = async (leadData) => {
-  try {
-    const { supabaseAdmin } = require('../config/supabase');
-    const { getIndustryConfig, separateFields } = require('../config/industry');
+  // ...
+  const industryConfig = getConfigForCompany(company);
+  const { coreFields, customFields } = separateFields(industryConfig);
 
-    // Get company's industry configuration
-    const { data: company } = await supabaseAdmin
-      .from('companies')
-      .select('industry_type')
-      .eq('id', leadData.company_id)
-      .single();
+  // ... (Separate core and custom fields from leadData)
 
-    const industryType = company?.industry_type || 'generic';
-    const industryConfig = getIndustryConfig(industryType);
-    const { customFields } = separateFields(industryConfig);
+  const processedCustomFields = validateCustomFields(industryConfig, customFieldsData);
 
-    // Separate custom fields from core fields
-    const customFieldsData = {};
-    const coreData = {};
-
-    Object.keys(leadData).forEach(key => {
-      const isCustom = customFields.some(f => f.name === key);
-      if (isCustom) {
-        customFieldsData[key] = leadData[key];
-      } else {
-        coreData[key] = leadData[key];
-      }
-    });
-
-    // Validate and process custom fields
-    const processedCustomFields = customFields.length > 0
-      ? processCustomFields(customFieldsData, industryConfig)
-      : {};
-
-    // ... existing createLead logic ...
-    // Add custom_fields to the insert:
-
-    const normalizedEmail = normalizeEmail(coreData.email);
-
-    const transformedData = {
-      company_id: coreData.company_id,
-      first_name: coreData.first_name,
-      last_name: coreData.last_name,
-      name: `${coreData.first_name} ${coreData.last_name}`.trim(),
-      email: normalizedEmail,
-      phone: coreData.phone,
-      company: coreData.company,
-      title: coreData.job_title,
-      source: coreData.lead_source,
-      status: coreData.status,
-      deal_value: coreData.deal_value,
-      expected_close_date: coreData.expected_close_date,
-      notes: coreData.notes,
-      priority: coreData.priority,
-      assigned_to: coreData.assigned_to,
-      pipeline_stage_id: coreData.pipeline_stage_id,
-      created_by: coreData.created_by,
-      custom_fields: processedCustomFields, // NEW
-    };
-
-    // ... rest of existing createLead logic ...
-  } catch (error) {
-    console.error('Error creating lead:', error);
-    if (error instanceof ApiError) {
-      throw error;
-    }
-    throw new ApiError('Failed to create lead', 500);
-  }
+  // ... (Save to database)
 };
 ```
-
----
 
 #### 3.2 Update LeadController
 
 **File**: `backend/src/controllers/leadController.js`
 
-Update the `createLead` controller to inject industry config:
+Update the `createLead` and `updateLead` controllers to use the `configLoader` to get the industry configuration and pass it to the `leadService`.
 
 ```javascript
-// Add at the top of the file
-const { getIndustryConfig } = require('../config/industry');
-
-// Update the createLead function:
+// Example of updated createLead controller
 const createLead = async (req, res, next) => {
-  try {
-    // ... existing validation code ...
-
-    const leadData = {
-      ...req.body,
-      created_by: req.user.id,
-      company_id: req.user.company_id
-    };
-
-    // Inject industry config into request for validation
-    req.industryConfig = getIndustryConfig(req.user.company?.industry_type || 'generic');
-
-    const lead = await leadService.createLead(leadData);
-
-    // ... existing audit logging ...
-
-    res.status(201).json({
-      success: true,
-      data: lead,
-      message: 'Lead created successfully'
-    });
-  } catch (error) {
-    next(error);
-  }
+  // ...
+  const lead = await leadService.createLead(leadData, req.industryConfig);
+  // ...
 };
 ```
-
----
 
 #### 3.3 Create Industry Config Middleware
 
 **File**: `backend/src/middleware/industryConfig.middleware.js`
 
+This middleware injects the industry configuration into the request object based on the user's company. This makes the configuration available to all downstream middleware and route handlers.
+
 ```javascript
-/**
- * Industry Configuration Middleware
- * Injects industry configuration into request object based on user's company
- */
+const { getConfigForCompany } = require('../config/industry/configLoader');
 
-const { getIndustryConfig } = require('../config/industry');
-const { supabaseAdmin } = require('../config/supabase');
-
-/**
- * Load and inject industry configuration
- */
 const injectIndustryConfig = async (req, res, next) => {
-  try {
-    // Skip if no authenticated user
-    if (!req.user || !req.user.company_id) {
-      req.industryConfig = getIndustryConfig('generic');
-      return next();
-    }
-
-    // Get company's industry type
-    const { data: company, error } = await supabaseAdmin
-      .from('companies')
-      .select('industry_type')
-      .eq('id', req.user.company_id)
-      .single();
-
-    if (error) {
-      console.error('Failed to load company industry type:', error);
-      req.industryConfig = getIndustryConfig('generic');
-      return next();
-    }
-
-    // Load industry configuration
-    const industryType = company?.industry_type || 'generic';
-    req.industryConfig = getIndustryConfig(industryType);
-    req.industryType = industryType;
-
-    next();
-  } catch (error) {
-    console.error('Industry config middleware error:', error);
-    req.industryConfig = getIndustryConfig('generic');
-    next();
+  if (req.user) {
+    req.industryConfig = getConfigForCompany(req.user.company);
   }
+  next();
 };
-
-module.exports = {
-  injectIndustryConfig,
-};
-```
-
-**Usage in routes**: Add to `backend/src/routes/leadRoutes.js`:
-
-```javascript
-const { injectIndustryConfig } = require('../middleware/industryConfig.middleware');
-
-// Apply middleware to all lead routes
-router.use(injectIndustryConfig);
-
-// ... existing routes ...
 ```
 
 ---
@@ -1383,43 +418,37 @@ router.use(injectIndustryConfig);
 ```javascript
 import { createContext, useContext, useEffect, useState } from 'react';
 import { useAuth } from './AuthContext';
+import api from '../services/api';
 
 const IndustryConfigContext = createContext();
-
-// Configuration loader (will be replaced with API call in production)
-const loadIndustryConfig = (industryType) => {
-  // For now, import statically. In production, fetch from API
-  try {
-    const config = require(`../config/industry/${industryType}.config.js`);
-    return config.default || config;
-  } catch (error) {
-    console.warn(`Failed to load ${industryType} config, falling back to base`);
-    const baseConfig = require('../config/industry/base.config.js');
-    return baseConfig.default || baseConfig;
-  }
-};
 
 export const IndustryConfigProvider = ({ children }) => {
   const { user } = useAuth();
   const [config, setConfig] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const loadConfig = async () => {
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
+        setError(null);
 
-        // Get industry type from user's company
-        // In production, this would come from an API call
-        const industryType = user?.company?.industry_type || 'generic';
-
-        const industryConfig = loadIndustryConfig(industryType);
-        setConfig(industryConfig);
-      } catch (error) {
-        console.error('Failed to load industry config:', error);
-        // Fallback to base config
-        const baseConfig = loadIndustryConfig('base');
-        setConfig(baseConfig);
+        const response = await api.get('/config/industry');
+        
+        if (response.data && response.data.success) {
+          setConfig(response.data.data);
+        } else {
+          throw new Error('Invalid configuration response');
+        }
+      } catch (err) {
+        console.error('Failed to load industry configuration:', err);
+        setError(err.message || 'Failed to load configuration');
       } finally {
         setLoading(false);
       }
@@ -1428,55 +457,7 @@ export const IndustryConfigProvider = ({ children }) => {
     loadConfig();
   }, [user]);
 
-  const getTerminology = (key) => {
-    if (!config || !config.terminology) return key;
-    return config.terminology[key] || key;
-  };
-
-  const getFields = () => {
-    if (!config || !config.fields) return [];
-    const { fields } = config;
-    return [
-      ...fields.core,
-      ...fields.contact,
-      ...fields.business,
-      ...fields.crm,
-      ...fields.sales,
-      ...fields.additional,
-      ...fields.custom,
-    ];
-  };
-
-  const getFieldById = (fieldId) => {
-    const allFields = getFields();
-    return allFields.find(f => f.id === fieldId) || null;
-  };
-
-  const getSectionFields = (sectionId) => {
-    if (!config || !config.formLayout) return [];
-    const section = config.formLayout.sections.find(s => s.id === sectionId);
-    if (!section) return [];
-
-    return section.fields.map(fieldId => getFieldById(fieldId)).filter(Boolean);
-  };
-
-  const value = {
-    config,
-    loading,
-    industryType: config?.industry || 'generic',
-    terminology: config?.terminology || {},
-    getTerminology,
-    getFields,
-    getFieldById,
-    getSectionFields,
-    formLayout: config?.formLayout || null,
-  };
-
-  return (
-    <IndustryConfigContext.Provider value={value}>
-      {children}
-    </IndustryConfigContext.Provider>
-  );
+  // ... (helper functions for accessing config)
 };
 
 export const useIndustryConfig = () => {

@@ -191,147 +191,80 @@ function getFormLayout(config) {
 }
 
 /**
- * Validate custom fields data against configuration
+ * Get validation schema for all fields
  * @param {object} config - Industry configuration
- * @param {object} customFieldsData - Custom fields data to validate
+ * @returns {object} Validation schema
+ */
+function getValidationSchema(config) {
+  const allFields = getAllFields(config);
+  const schema = {};
+
+  Object.keys(allFields).forEach(key => {
+    const field = allFields[key];
+    if (field.validation) {
+      schema[key] = field.validation;
+    }
+  });
+
+  return schema;
+}
+
+/**
+ * Validate data against configuration
+ * @param {object} config - Industry configuration
+ * @param {object} data - Data to validate
  * @returns {object} Validation result { valid: boolean, errors: array }
  */
-function validateCustomFields(config, customFieldsData) {
+function validateData(config, data) {
   const errors = [];
+  const schema = getValidationSchema(config);
 
-  if (!customFieldsData || typeof customFieldsData !== 'object') {
-    return { valid: true, errors: [] }; // Empty is valid
-  }
+  Object.keys(schema).forEach(fieldName => {
+    const fieldDef = getFieldDefinition(config, fieldName);
+    const rules = schema[fieldName];
+    const value = data[fieldName];
 
-  // Check each custom field in the data
-  Object.keys(customFieldsData).forEach(fieldName => {
-    let fieldDef = null;
-    if (config.customFields) {
-      fieldDef = config.customFields[fieldName];
-
-      if (!fieldDef) {
-        fieldDef = Object.values(config.customFields).find(def => def && def.name === fieldName);
-      }
-    }
-
-    const value = customFieldsData[fieldName];
-
-    // Skip validation if field not in config (allow extra fields)
-    if (!fieldDef) {
-      return;
-    }
-
-    // Check required fields
-    if (fieldDef.required && (value === null || value === undefined || value === '')) {
+    if (rules.required && (value === null || value === undefined || value === '')) {
       errors.push({
         field: fieldName,
-        message: `${fieldDef.label} is required`,
+        message: rules.message || `${fieldDef.label} is required`,
       });
     }
 
-    // Type-specific validation
     if (value !== null && value !== undefined && value !== '') {
-      switch (fieldDef.type) {
-        case 'number':
-          if (typeof value !== 'number' && isNaN(Number(value))) {
-            errors.push({
-              field: fieldName,
-              message: `${fieldDef.label} must be a number`,
-            });
-          }
-          if (fieldDef.min !== undefined && Number(value) < fieldDef.min) {
-            errors.push({
-              field: fieldName,
-              message: `${fieldDef.label} must be at least ${fieldDef.min}`,
-            });
-          }
-          if (fieldDef.max !== undefined && Number(value) > fieldDef.max) {
-            errors.push({
-              field: fieldName,
-              message: `${fieldDef.label} must be at most ${fieldDef.max}`,
-            });
-          }
-          break;
+      if (rules.minLength && String(value).length < rules.minLength) {
+        errors.push({
+          field: fieldName,
+          message: rules.message || `${fieldDef.label} must be at least ${rules.minLength} characters`,
+        });
+      }
 
-        case 'email':
-          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-          if (!emailRegex.test(value)) {
-            errors.push({
-              field: fieldName,
-              message: `${fieldDef.label} must be a valid email address`,
-            });
-          }
-          break;
+      if (rules.maxLength && String(value).length > rules.maxLength) {
+        errors.push({
+          field: fieldName,
+          message: rules.message || `${fieldDef.label} must not exceed ${rules.maxLength} characters`,
+        });
+      }
 
-        case 'tel':
-          if (fieldDef.validation && fieldDef.validation.pattern) {
-            if (!fieldDef.validation.pattern.test(value)) {
-              errors.push({
-                field: fieldName,
-                message: fieldDef.validation.message || `${fieldDef.label} format is invalid`,
-              });
-            }
-          }
-          break;
+      if (rules.pattern && !new RegExp(rules.pattern).test(String(value))) {
+        errors.push({
+          field: fieldName,
+          message: rules.message || `${fieldDef.label} format is invalid`,
+        });
+      }
 
-        case 'text':
-        case 'textarea':
-          if (fieldDef.maxLength && value.length > fieldDef.maxLength) {
-            errors.push({
-              field: fieldName,
-              message: `${fieldDef.label} must not exceed ${fieldDef.maxLength} characters`,
-            });
-          }
-          if (fieldDef.validation && fieldDef.validation.pattern) {
-            if (!fieldDef.validation.pattern.test(value)) {
-              errors.push({
-                field: fieldName,
-                message: fieldDef.validation.message || `${fieldDef.label} format is invalid`,
-              });
-            }
-          }
-          break;
+      if (rules.min !== undefined && Number(value) < rules.min) {
+        errors.push({
+          field: fieldName,
+          message: rules.message || `${fieldDef.label} must be at least ${rules.min}`,
+        });
+      }
 
-        case 'select':
-          if (fieldDef.options && Array.isArray(fieldDef.options)) {
-            const validValues = fieldDef.options.map(opt => opt.value);
-            if (!validValues.includes(value)) {
-              errors.push({
-                field: fieldName,
-                message: `${fieldDef.label} has an invalid value`,
-              });
-            }
-          }
-          break;
-
-        case 'multiselect':
-          if (!Array.isArray(value)) {
-            errors.push({
-              field: fieldName,
-              message: `${fieldDef.label} must be an array`,
-            });
-          } else if (fieldDef.options) {
-            const validValues = fieldDef.options.map(opt => opt.value);
-            const invalidValues = value.filter(v => !validValues.includes(v));
-            if (invalidValues.length > 0) {
-              errors.push({
-                field: fieldName,
-                message: `${fieldDef.label} contains invalid values: ${invalidValues.join(', ')}`,
-              });
-            }
-          }
-          break;
-
-        case 'date':
-        case 'datetime':
-          const dateValue = new Date(value);
-          if (isNaN(dateValue.getTime())) {
-            errors.push({
-              field: fieldName,
-              message: `${fieldDef.label} must be a valid date`,
-            });
-          }
-          break;
+      if (rules.max !== undefined && Number(value) > rules.max) {
+        errors.push({
+          field: fieldName,
+          message: rules.message || `${fieldDef.label} must be at most ${rules.max}`,
+        });
       }
     }
   });
@@ -431,7 +364,8 @@ module.exports = {
   getAllFields,
   getFieldsForSection,
   getFormLayout,
-  validateCustomFields,
+  getValidationSchema,
+  validateData,
   validateConfig,
   getAvailableIndustries,
   clearCache,
