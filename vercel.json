@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "outputDirectory": "frontend/dist",
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/api/index" },
+    { "handle": "filesystem" },
+    { "src": "/.*", "dest": "/index.html" }
+  ],
+  "functions": {
+    "api/**/*.js": {
+      "maxDuration": 60,
+      "memory": 1024
+    }
+  },
+  "github": {
+    "silent": false
+  }
+}

@@ -1,0 +1,618 @@
+const { supabaseAdmin } = require('../config/supabase');
+const AssignmentRules = require('../utils/assignmentRules');
+const picklistService = require('./picklistService');
+
+class AssignmentService {
+  // Get all assignment rules
+  async getAllRules(currentUser) {
+    try {
+      const supabase = supabaseAdmin;
+
+      // Check permissions - managers and admins can view rules
+      if (!['company_admin', 'super_admin', 'manager'].includes(currentUser.role)) {
+        return { success: false, error: 'Access denied' };
+      }
+
+      const { data: rules, error } = await supabase
+        .from('lead_assignment_rules')
+        .select('*')
+        .eq('company_id', currentUser.company_id)
+        .order('priority', { ascending: false })
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching assignment rules:', error);
+        return { success: false, error: error.message };
+      }
+
+      return { success: true, data: rules || [] };
+    } catch (error) {
+      console.error('Error fetching assignment rules:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Get active assignment rules
+  async getActiveRules(currentUser) {
+    try {
+      const supabase = supabaseAdmin;
+
+      const { data: rules, error } = await supabase
+        .from('lead_assignment_rules')
+        .select('*')
+        .eq('company_id', currentUser.company_id)
+        .eq('is_active', true)
+        .order('priority', { ascending: false })
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching active assignment rules:', error);
+        return { success: false, error: error.message };
+      }
+
+      return { success: true, data: rules || [] };
+    } catch (error) {
+      console.error('Error fetching active assignment rules:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Get assignment rule by ID
+  async getRuleById(ruleId, currentUser) {
+    try {
+      const supabase = supabaseAdmin;
+
+      const { data: rule, error } = await supabase
+        .from('lead_assignment_rules')
+        .select('*')
+        .eq('id', ruleId)
+        .eq('company_id', currentUser.company_id)
+        .single();
+
+      if (error || !rule) {
+        return { success: false, error: 'Assignment rule not found' };
+      }
+
+      return { success: true, data: rule };
+    } catch (error) {
+      console.error('Error fetching assignment rule:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Create new assignment rule
+  async createRule(ruleData, currentUser) {
+    try {
+      // Only admins and managers can create assignment rules
+      if (!['company_admin', 'super_admin', 'manager'].includes(currentUser.role)) {
+        return { success: false, error: 'Access denied' };
+      }
+
+      // Validate conditions
+      const validation = AssignmentRules.validateConditions(ruleData.conditions);
+      if (!validation.valid) {
+        return { success: false, error: `Invalid conditions: ${validation.errors.join(', ')}` };
+      }
+
+      const supabase = supabaseAdmin;
+
+      const newRule = {
+        name: ruleData.name,
+        conditions: ruleData.conditions, // Store as object, not JSON string
+        assignment_type: ruleData.assignment_type,
+        assigned_to: ruleData.assigned_to || null,
+        is_active: ruleData.is_active !== undefined ? ruleData.is_active : true,
+        priority: ruleData.priority || 1,
+        company_id: currentUser.company_id,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      const { data: rule, error } = await supabase
+        .from('lead_assignment_rules')
+        .insert(newRule)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating assignment rule:', error);
+        return { success: false, error: error.message };
+      }
+
+      return { success: true, data: rule };
+    } catch (error) {
+      console.error('Error creating assignment rule:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Update assignment rule
+  async updateRule(ruleId, ruleData, currentUser) {
+    try {
+      // Only admins and managers can update assignment rules
+      if (!['company_admin', 'super_admin', 'manager'].includes(currentUser.role)) {
+        return { success: false, error: 'Access denied' };
+      }
+
+      const supabase = supabaseAdmin;
+
+      // Check if rule exists and belongs to company
+      const { data: existingRule, error: findError } = await supabase
+        .from('lead_assignment_rules')
+        .select('*')
+        .eq('id', ruleId)
+        .eq('company_id', currentUser.company_id)
+        .single();
+
+      if (findError || !existingRule) {
+        return { success: false, error: 'Assignment rule not found' };
+      }
+
+      // Validate conditions if provided
+      if (ruleData.conditions) {
+        const validation = AssignmentRules.validateConditions(ruleData.conditions);
+        if (!validation.valid) {
+          return { success: false, error: `Invalid conditions: ${validation.errors.join(', ')}` };
+        }
+      }
+
+      const updateData = {
+        ...ruleData,
+        updated_at: new Date().toISOString()
+      };
+
+      const { data: updatedRule, error } = await supabase
+        .from('lead_assignment_rules')
+        .update(updateData)
+        .eq('id', ruleId)
+        .eq('company_id', currentUser.company_id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error updating assignment rule:', error);
+        return { success: false, error: error.message };
+      }
+
+      return { success: true, data: updatedRule, previousRule: existingRule };
+    } catch (error) {
+      console.error('Error updating assignment rule:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Delete assignment rule
+  async deleteRule(ruleId, currentUser) {
+    try {
+      // Only admins and managers can delete assignment rules
+      if (!['company_admin', 'super_admin', 'manager'].includes(currentUser.role)) {
+        return { success: false, error: 'Access denied' };
+      }
+
+      const supabase = supabaseAdmin;
+
+      const { data: existingRule, error: findError } = await supabase
+        .from('lead_assignment_rules')
+        .select('*')
+        .eq('id', ruleId)
+        .eq('company_id', currentUser.company_id)
+        .single();
+
+      if (findError || !existingRule) {
+        return { success: false, error: 'Assignment rule not found' };
+      }
+
+      const { error } = await supabase
+        .from('lead_assignment_rules')
+        .delete()
+        .eq('id', ruleId)
+        .eq('company_id', currentUser.company_id);
+
+      if (error) {
+        console.error('Error deleting assignment rule:', error);
+        return { success: false, error: error.message };
+      }
+
+      return { success: true, message: 'Assignment rule deleted successfully', deletedRule: existingRule };
+    } catch (error) {
+      console.error('Error deleting assignment rule:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Assign lead manually
+  async assignLead(leadId, assignedTo, assignedBy, reason = 'Manual assignment', currentUser) {
+    try {
+      const supabase = supabaseAdmin;
+
+      // Check if lead exists and belongs to company
+      const { data: lead, error: leadError } = await supabase
+        .from('leads')
+        .select('*')
+        .eq('id', leadId)
+        .eq('company_id', currentUser.company_id)
+        .single();
+
+      if (leadError || !lead) {
+        return { success: false, error: 'Lead not found' };
+      }
+
+      // Store current assignment for history
+      const currentAssignedTo = lead.assigned_to;
+
+      // Check if assigned user exists and belongs to company
+      const { data: assignedUser, error: userError } = await supabase
+        .from('user_profiles_with_auth')
+        .select('id')
+        .eq('id', assignedTo)
+        .eq('company_id', currentUser.company_id)
+        .eq('is_active', true)
+        .single();
+
+      if (userError || !assignedUser) {
+        return { success: false, error: 'Assigned user not found' };
+      }
+
+      // Update lead assignment
+      const { error } = await supabase
+        .from('leads')
+        .update({
+          assigned_to: assignedTo,
+          assigned_at: new Date().toISOString(),
+          assignment_source: 'manual',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', leadId)
+        .eq('company_id', currentUser.company_id);
+
+      if (error) {
+        console.error('Error assigning lead:', error);
+        return { success: false, error: error.message };
+      }
+
+      // Record assignment history
+      const { error: historyError } = await supabase
+        .from('lead_assignment_history')
+        .insert({
+          lead_id: leadId,
+          previous_assigned_to: currentAssignedTo,
+          new_assigned_to: assignedTo,
+          assigned_by: assignedBy,
+          assignment_reason: reason,
+          assignment_source: 'manual'
+        });
+
+      if (historyError) {
+        console.error('Failed to record assignment history:', historyError);
+        // Don't fail the assignment if history recording fails
+      }
+
+      return {
+        success: true,
+        message: 'Lead assigned successfully',
+        assignment: {
+          lead_id: leadId,
+          previous_assigned_to: currentAssignedTo,
+          new_assigned_to: assignedTo,
+          reason,
+          assigned_by: assignedBy
+        }
+      };
+    } catch (error) {
+      console.error('Error assigning lead:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Bulk assign leads
+  async bulkAssignLeads(leadIds, assignedTo, assignedBy, reason = 'Bulk assignment', currentUser) {
+    try {
+      const results = [];
+
+      for (const leadId of leadIds) {
+        const result = await this.assignLead(leadId, assignedTo, assignedBy, reason, currentUser);
+        results.push({ leadId, success: result.success, error: result.error });
+      }
+
+      const successCount = results.filter(r => r.success).length;
+      const errorCount = results.filter(r => !r.success).length;
+
+      return {
+        success: true,
+        message: `Bulk assignment completed: ${successCount} successful, ${errorCount} failed`,
+        results
+      };
+    } catch (error) {
+      console.error('Error in bulk assignment:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Get assignment history for a lead
+  async getLeadAssignmentHistory(leadId, currentUser) {
+    try {
+      const supabase = supabaseAdmin;
+
+      const { data: history, error } = await supabase
+        .from('lead_assignment_history')
+        .select(`
+          *,
+          leads!inner(id, company_id, name, first_name, last_name),
+          previous_assigned:user_profiles!lead_assignment_history_previous_assigned_to_fkey(first_name, last_name),
+          new_assigned:user_profiles!lead_assignment_history_new_assigned_to_fkey(first_name, last_name),
+          assigned_by_user:user_profiles!lead_assignment_history_assigned_by_fkey(first_name, last_name)
+        `)
+        .eq('lead_id', leadId)
+        .eq('leads.company_id', currentUser.company_id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching assignment history:', error);
+        return { success: false, error: error.message };
+      }
+
+      // Format the response
+      const formattedHistory = history.map(item => ({
+        id: item.id,
+        lead_id: item.lead_id,
+        previous_assigned_to: item.previous_assigned_to,
+        new_assigned_to: item.new_assigned_to,
+        assigned_by: item.assigned_by,
+        assignment_reason: item.assignment_reason,
+        assignment_source: item.assignment_source,
+        assignment_rule_id: item.assignment_rule_id,
+        created_at: item.created_at,
+        lead_name: item.leads ? ((item.leads.first_name || item.leads.last_name)
+          ? `${item.leads.first_name || ''} ${item.leads.last_name || ''}`.trim() || item.leads.name
+          : item.leads.name) : null,
+        previous_assigned_name: item.previous_assigned ? `${item.previous_assigned.first_name || ''} ${item.previous_assigned.last_name || ''}`.trim() || null : null,
+        new_assigned_name: item.new_assigned ? `${item.new_assigned.first_name || ''} ${item.new_assigned.last_name || ''}`.trim() || null : null,
+        assigned_by_name: item.assigned_by_user ? `${item.assigned_by_user.first_name || ''} ${item.assigned_by_user.last_name || ''}`.trim() || 'System' : 'System',
+        assigned_by_email: 'N/A'
+      }));
+
+      return { success: true, data: formattedHistory };
+    } catch (error) {
+      console.error('Error fetching assignment history:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Get assignment history for company
+  async getAssignmentHistory(currentUser, { limit = 100, offset = 0 } = {}) {
+    try {
+      const supabase = supabaseAdmin;
+
+      const parsedLimit = Math.min(Math.max(parseInt(limit, 10) || 100, 1), 500);
+      const parsedOffset = Math.max(parseInt(offset, 10) || 0, 0);
+
+      const { data: history, error } = await supabase
+        .from('lead_assignment_history')
+        .select(`
+          *,
+          leads!inner(id, company_id, name, first_name, last_name),
+          previous_assigned:user_profiles!lead_assignment_history_previous_assigned_to_fkey(first_name, last_name),
+          new_assigned:user_profiles!lead_assignment_history_new_assigned_to_fkey(first_name, last_name),
+          assigned_by_user:user_profiles!lead_assignment_history_assigned_by_fkey(first_name, last_name)
+        `)
+        .eq('leads.company_id', currentUser.company_id)
+        .order('created_at', { ascending: false })
+        .range(parsedOffset, parsedOffset + parsedLimit - 1);
+
+      if (error) {
+        console.error('Error fetching company assignment history:', error);
+        return { success: false, error: error.message };
+      }
+
+      const formattedHistory = history.map(item => ({
+        id: item.id,
+        lead_id: item.lead_id,
+        lead_name: item.leads ? ((item.leads.first_name || item.leads.last_name)
+          ? `${item.leads.first_name || ''} ${item.leads.last_name || ''}`.trim() || item.leads.name
+          : item.leads.name) : 'Unknown lead',
+        previous_assigned_to: item.previous_assigned_to,
+        new_assigned_to: item.new_assigned_to,
+        assigned_by: item.assigned_by,
+        assignment_reason: item.assignment_reason,
+        assignment_source: item.assignment_source,
+        assignment_rule_id: item.assignment_rule_id,
+        created_at: item.created_at,
+        previous_assigned_name: item.previous_assigned ? `${item.previous_assigned.first_name || ''} ${item.previous_assigned.last_name || ''}`.trim() || null : null,
+        new_assigned_name: item.new_assigned ? `${item.new_assigned.first_name || ''} ${item.new_assigned.last_name || ''}`.trim() || null : null,
+        assigned_by_name: item.assigned_by_user ? `${item.assigned_by_user.first_name || ''} ${item.assigned_by_user.last_name || ''}`.trim() || 'System' : 'System',
+        assigned_by_email: 'N/A'
+      }));
+
+      return { success: true, data: formattedHistory };
+    } catch (error) {
+      console.error('Error fetching assignment history:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Get team workload distribution
+  async getTeamWorkload(currentUser) {
+    try {
+      const supabase = supabaseAdmin;
+
+      // Get users in the company using the view that includes email
+      const { data: users, error: usersError } = await supabase
+        .from('user_profiles_with_auth')
+        .select('id, first_name, last_name, email, role')
+        .eq('company_id', currentUser.company_id)
+        .eq('is_active', true);
+
+      if (usersError) {
+        console.error('Error fetching users:', usersError);
+        return { success: false, error: usersError.message };
+      }
+
+      // Get lead counts by assigned user
+      const { data: leadCounts, error: countsError } = await supabase
+        .from('leads')
+        .select('assigned_to, status, deal_value')
+        .eq('company_id', currentUser.company_id);
+
+      if (countsError) {
+        console.error('Error fetching lead counts:', countsError);
+        return { success: false, error: countsError.message };
+      }
+
+      let wonStatuses = new Set(['converted', 'won']);
+      let lostStatuses = new Set(['lost']);
+
+      try {
+        const picklists = await picklistService.getLeadPicklists(currentUser.company_id, { includeInactive: false });
+        const resolvedWon = picklists.statuses
+          .filter(option => option.metadata?.is_won || ['converted', 'won', 'closed_won'].includes(option.value))
+          .map(option => option.value);
+        const resolvedLost = picklists.statuses
+          .filter(option => option.metadata?.is_lost || ['lost', 'closed_lost'].includes(option.value))
+          .map(option => option.value);
+
+        if (resolvedWon.length > 0) {
+          wonStatuses = new Set(resolvedWon);
+        }
+
+        if (resolvedLost.length > 0) {
+          lostStatuses = new Set(resolvedLost);
+        }
+      } catch (error) {
+        console.warn('Failed to resolve picklist metadata for assignment workload calculations', error);
+      }
+
+      // Calculate workload for each user
+      const workload = users.map(user => {
+        const userLeads = leadCounts.filter(lead => lead.assigned_to === user.id);
+        const totalValue = userLeads.reduce((sum, lead) => {
+          const value = Number(lead.deal_value);
+          return sum + (Number.isFinite(value) ? value : 0);
+        }, 0);
+        const avgValue = userLeads.length > 0 ? totalValue / userLeads.length : 0;
+
+        const firstName = user.first_name || '';
+        const lastName = user.last_name || '';
+        const displayName = `${firstName} ${lastName}`.trim() || user.email || 'Unnamed User';
+        const activeLeads = userLeads.filter(lead => lead.status === 'active').length;
+        const wonLeads = userLeads.filter(lead => wonStatuses.has(lead.status)).length;
+        const lostLeads = userLeads.filter(lead => lostStatuses.has(lead.status)).length;
+
+        return {
+          user_id: user.id,
+          user_name: displayName,
+          user_email: user.email,
+          user_role: user.role,
+          total_leads: userLeads.length,
+          active_leads: activeLeads,
+          won_leads: wonLeads,
+          lost_leads: lostLeads,
+          total_deal_value: totalValue,
+          avg_deal_value: avgValue
+        };
+      });
+
+      return { success: true, data: workload };
+    } catch (error) {
+      console.error('Error fetching team workload:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Redistribute leads based on workload
+  async redistributeLeads(assignedBy, currentUser) {
+    try {
+      // Check permissions - only admins can redistribute leads
+      if (!['company_admin', 'super_admin'].includes(currentUser.role)) {
+        return { success: false, error: 'Access denied' };
+      }
+
+      // Get current workload
+      const workloadResult = await this.getTeamWorkload(currentUser);
+      if (!workloadResult.success) {
+        return workloadResult;
+      }
+
+      const workload = workloadResult.data;
+
+      // Find user with minimum leads
+      const minLeads = Math.min(...workload.map(w => w.total_leads));
+      const targetUser = workload.find(w => w.total_leads === minLeads);
+
+      if (!targetUser) {
+        return { success: false, error: 'No target user found for redistribution' };
+      }
+
+      // Get unassigned leads
+      const supabase = supabaseAdmin;
+      const { data: unassignedLeads, error } = await supabase
+        .from('leads')
+        .select('id')
+        .eq('company_id', currentUser.company_id)
+        .is('assigned_to', null)
+        .limit(10); // Limit to prevent overwhelming
+
+      if (error) {
+        console.error('Error fetching unassigned leads:', error);
+        return { success: false, error: error.message };
+      }
+
+      // Assign unassigned leads to target user
+      const results = [];
+      for (const lead of unassignedLeads || []) {
+        const result = await this.assignLead(lead.id, targetUser.user_id, assignedBy, 'Workload redistribution', currentUser);
+        results.push({ leadId: lead.id, success: result.success, error: result.error });
+      }
+
+      return {
+        success: true,
+        message: `Redistributed ${results.filter(r => r.success).length} leads to ${targetUser.user_name}`,
+        results
+      };
+    } catch (error) {
+      console.error('Error redistributing leads:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Get assignment statistics
+  async getAssignmentStats(currentUser) {
+    try {
+      const supabase = supabaseAdmin;
+
+      // Get lead counts by assignment status and source
+      const { data: leads, error } = await supabase
+        .from('leads')
+        .select('assigned_to, assignment_source')
+        .eq('company_id', currentUser.company_id);
+
+      if (error) {
+        console.error('Error fetching leads for stats:', error);
+        return { success: false, error: error.message };
+      }
+
+      const totalLeads = leads.length;
+      const assignedLeads = leads.filter(lead => lead.assigned_to !== null).length;
+      const unassignedLeads = totalLeads - assignedLeads;
+      const manualAssignments = leads.filter(lead => lead.assignment_source === 'manual').length;
+      const autoAssignments = leads.filter(lead => lead.assignment_source === 'auto').length;
+      const ruleAssignments = leads.filter(lead => lead.assignment_source === 'rule').length;
+
+      const stats = {
+        total_leads: totalLeads,
+        assigned_leads: assignedLeads,
+        unassigned_leads: unassignedLeads,
+        manual_assignments: manualAssignments,
+        auto_assignments: autoAssignments,
+        rule_assignments: ruleAssignments
+      };
+
+      return { success: true, data: stats };
+    } catch (error) {
+      console.error('Error fetching assignment stats:', error);
+      return { success: false, error: error.message };
+    }
+  }
+}
+
+module.exports = new AssignmentService();
+
