@@ -48,6 +48,7 @@ class CustomFieldController extends BaseController {
       return this.notFound(res, 'Custom field not found');
     }
 
+<<<<<<< HEAD
     this.success(res, customField, 200, 'Custom field retrieved successfully');
   });
 
@@ -56,6 +57,18 @@ class CustomFieldController extends BaseController {
    * @route POST /api/custom-fields
    */
   createCustomField = asyncHandler(async (req, res) => {
+=======
+/**
+ * Create a new custom field
+ * @route POST /api/custom-fields
+ */
+const createCustomField = async (req, res, next) => {
+  try {
+    console.log('🔵 [CREATE CUSTOM FIELD] Request received');
+    console.log('🔵 [CREATE CUSTOM FIELD] Body:', JSON.stringify(req.body, null, 2));
+    console.log('🔵 [CREATE CUSTOM FIELD] User:', req.user.id, req.user.role);
+    
+>>>>>>> fb56af8 (FEATURE: Add public lead capture form with API integration and custom fields)
     const {
       field_name,
       field_label,
@@ -76,6 +89,7 @@ class CustomFieldController extends BaseController {
 
     // Validate required fields
     if (!field_name) {
+<<<<<<< HEAD
       return this.validationError(res, 'Field name is required');
     }
 
@@ -89,8 +103,29 @@ class CustomFieldController extends BaseController {
 
     if (!data_type) {
       return this.validationError(res, 'Data type is required');
+=======
+      console.log('❌ [CREATE CUSTOM FIELD] Validation failed: field_name missing');
+      throw new ApiError('Field name is required', 400);
     }
 
+    if (!field_label) {
+      console.log('❌ [CREATE CUSTOM FIELD] Validation failed: field_label missing');
+      throw new ApiError('Field label is required', 400);
+    }
+
+    if (!entity_type) {
+      console.log('❌ [CREATE CUSTOM FIELD] Validation failed: entity_type missing');
+      throw new ApiError('Entity type is required', 400);
+    }
+
+    if (!data_type) {
+      console.log('❌ [CREATE CUSTOM FIELD] Validation failed: data_type missing');
+      throw new ApiError('Data type is required', 400);
+>>>>>>> fb56af8 (FEATURE: Add public lead capture form with API integration and custom fields)
+    }
+
+    console.log('✅ [CREATE CUSTOM FIELD] Validation passed, calling service...');
+    
     const customField = await customFieldService.createCustomField(
       req.user.company_id,
       {
@@ -112,6 +147,8 @@ class CustomFieldController extends BaseController {
       },
       req.user.id
     );
+    
+    console.log('✅ [CREATE CUSTOM FIELD] Service completed successfully');
 
     // Log audit event
     await logAuditEvent(req, {
@@ -157,26 +194,47 @@ class CustomFieldController extends BaseController {
     this.updated(res, customField, 'Custom field updated successfully');
   });
 
+<<<<<<< HEAD
   /**
    * Delete a custom field
    * @route DELETE /api/custom-fields/:id
    */
   deleteCustomField = asyncHandler(async (req, res) => {
+=======
+/**
+ * Delete a custom field
+ * @route DELETE /api/custom-fields/:id
+ */
+const deleteCustomField = async (req, res, next) => {
+  try {
+    console.log('🔴 [DELETE CUSTOM FIELD] Request received');
+    console.log('🔴 [DELETE CUSTOM FIELD] Field ID:', req.params.id);
+    console.log('🔴 [DELETE CUSTOM FIELD] User:', req.user.id, req.user.role);
+    console.log('🔴 [DELETE CUSTOM FIELD] Company:', req.user.company_id);
+    
+>>>>>>> fb56af8 (FEATURE: Add public lead capture form with API integration and custom fields)
     // Get field info before deletion for audit log
+    console.log('🔴 [DELETE CUSTOM FIELD] Fetching field info...');
     const field = await customFieldService.getCustomFieldById(
       req.user.company_id,
       req.params.id
     );
+    console.log('🔴 [DELETE CUSTOM FIELD] Field found:', field.field_name);
 
+<<<<<<< HEAD
     if (!field) {
       return this.notFound(res, 'Custom field not found');
     }
 
+=======
+    console.log('🔴 [DELETE CUSTOM FIELD] Calling delete service...');
+>>>>>>> fb56af8 (FEATURE: Add public lead capture form with API integration and custom fields)
     await customFieldService.deleteCustomField(
       req.user.company_id,
       req.params.id,
       req.user.id
     );
+    console.log('✅ [DELETE CUSTOM FIELD] Delete service completed');
 
     // Log audit event
     await logAuditEvent(req, {
