@@ -33,6 +33,7 @@ const PlatformAnalytics = lazy(() => import('./pages/Platform/PlatformAnalytics'
 const PlatformActivity = lazy(() => import('./pages/Platform/PlatformActivity'))
 const APIClients = lazy(() => import('./pages/APIClients'))
 const CustomFields = lazy(() => import('./pages/CustomFields'))
+const PublicLeadForm = lazy(() => import('./pages/PublicLeadForm'))
 
 const RouteLoadingFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -54,6 +55,7 @@ function App() {
             <Route path="/register" element={<Navigate to="/register-company" replace />} />
             <Route path="/register-company" element={<RegisterCompany />} />
             <Route path="/dashboard" element={<Navigate to="/app/dashboard" replace />} />
+            <Route path="/lead-form" element={<PublicLeadForm />} />
             
             {/* Protected routes */}
             <Route path="/app" element={

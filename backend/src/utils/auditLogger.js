@@ -71,6 +71,12 @@ const AuditActions = Object.freeze({
   USER_PREFERENCES_RESET: 'user_preferences_reset',
   COMPANY_SETTINGS_UPDATED: 'company_settings_updated',
 
+  // Custom fields
+  CUSTOM_FIELD_CREATED: 'custom_field_created',
+  CUSTOM_FIELD_UPDATED: 'custom_field_updated',
+  CUSTOM_FIELD_DELETED: 'custom_field_deleted',
+  CUSTOM_FIELD_REORDERED: 'custom_field_reordered',
+
   // Platform existing actions (for consistency)
   PLATFORM_CREATE_USER: 'platform_create_user',
   PLATFORM_VIEW_COMPANIES: 'view_all_companies',

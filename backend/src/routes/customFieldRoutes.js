@@ -1,11 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const customFieldController = require('../controllers/customFieldController');
-const authMiddleware = require('../middleware/authMiddleware');
-const { requireRole } = require('../middleware/roleMiddleware');
+const { authenticate, requireRole } = require('../middleware/authMiddleware');
 
 // Apply authentication to all routes
-router.use(authMiddleware);
+router.use(authenticate);
 
 // Get all custom fields (with optional filters)
 router.get('/', customFieldController.getCustomFields);

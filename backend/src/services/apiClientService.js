@@ -70,7 +70,7 @@ const getApiClients = async (companyId) => {
       .from('api_clients')
       .select(`
         *,
-        user_profiles!created_by(first_name, last_name, email)
+        user_profiles!created_by(first_name, last_name)
       `)
       .eq('company_id', companyId)
       .order('created_at', { ascending: false });

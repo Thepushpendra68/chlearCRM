@@ -38,7 +38,7 @@ const createApiClient = async (req, res, next) => {
     );
 
     await logAuditEvent(req, {
-      action: AuditActions.PLATFORM_SETTINGS_UPDATED,
+      action: AuditActions.COMPANY_SETTINGS_UPDATED,
       resourceType: 'api_client',
       resourceId: apiClient.id,
       resourceName: client_name,
@@ -107,7 +107,7 @@ const updateApiClient = async (req, res, next) => {
     const apiClient = await apiClientService.updateApiClient(id, req.user.company_id, updateData);
 
     await logAuditEvent(req, {
-      action: AuditActions.PLATFORM_SETTINGS_UPDATED,
+      action: AuditActions.COMPANY_SETTINGS_UPDATED,
       resourceType: 'api_client',
       resourceId: id,
       resourceName: apiClient.client_name,
@@ -138,7 +138,7 @@ const regenerateSecret = async (req, res, next) => {
     const apiClient = await apiClientService.regenerateApiSecret(id, req.user.company_id);
 
     await logAuditEvent(req, {
-      action: AuditActions.PLATFORM_SETTINGS_UPDATED,
+      action: AuditActions.COMPANY_SETTINGS_UPDATED,
       resourceType: 'api_client',
       resourceId: id,
       resourceName: apiClient.client_name,
@@ -178,7 +178,7 @@ const deleteApiClient = async (req, res, next) => {
     await apiClientService.deleteApiClient(id, req.user.company_id);
 
     await logAuditEvent(req, {
-      action: AuditActions.PLATFORM_SETTINGS_UPDATED,
+      action: AuditActions.COMPANY_SETTINGS_UPDATED,
       resourceType: 'api_client',
       resourceId: id,
       resourceName: apiClient.client_name,

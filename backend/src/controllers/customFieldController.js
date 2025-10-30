@@ -53,6 +53,10 @@ const getCustomFieldById = async (req, res, next) => {
  */
 const createCustomField = async (req, res, next) => {
   try {
+    console.log('🔵 [CREATE CUSTOM FIELD] Request received');
+    console.log('🔵 [CREATE CUSTOM FIELD] Body:', JSON.stringify(req.body, null, 2));
+    console.log('🔵 [CREATE CUSTOM FIELD] User:', req.user.id, req.user.role);
+    
     const {
       field_name,
       field_label,
@@ -73,21 +77,27 @@ const createCustomField = async (req, res, next) => {
 
     // Validate required fields
     if (!field_name) {
+      console.log('❌ [CREATE CUSTOM FIELD] Validation failed: field_name missing');
       throw new ApiError('Field name is required', 400);
     }
 
     if (!field_label) {
+      console.log('❌ [CREATE CUSTOM FIELD] Validation failed: field_label missing');
       throw new ApiError('Field label is required', 400);
     }
 
     if (!entity_type) {
+      console.log('❌ [CREATE CUSTOM FIELD] Validation failed: entity_type missing');
       throw new ApiError('Entity type is required', 400);
     }
 
     if (!data_type) {
+      console.log('❌ [CREATE CUSTOM FIELD] Validation failed: data_type missing');
       throw new ApiError('Data type is required', 400);
     }
 
+    console.log('✅ [CREATE CUSTOM FIELD] Validation passed, calling service...');
+    
     const customField = await customFieldService.createCustomField(
       req.user.company_id,
       {
@@ -109,16 +119,17 @@ const createCustomField = async (req, res, next) => {
       },
       req.user.id
     );
+    
+    console.log('✅ [CREATE CUSTOM FIELD] Service completed successfully');
 
     // Log audit event
     await logAuditEvent(req, {
-      action: AuditActions.PLATFORM_SETTINGS_UPDATED,
+      action: AuditActions.CUSTOM_FIELD_CREATED,
       resourceType: 'custom_field',
       resourceId: customField.id,
       resourceName: field_label,
       companyId: req.user.company_id,
       details: {
-        action: 'created',
         entity_type,
         data_type,
         field_name
@@ -150,13 +161,12 @@ const updateCustomField = async (req, res, next) => {
 
     // Log audit event
     await logAuditEvent(req, {
-      action: AuditActions.PLATFORM_SETTINGS_UPDATED,
+      action: AuditActions.CUSTOM_FIELD_UPDATED,
       resourceType: 'custom_field',
       resourceId: customField.id,
       resourceName: customField.field_label,
       companyId: req.user.company_id,
       details: {
-        action: 'updated',
         changes: req.body
       }
     });
@@ -177,27 +187,35 @@ const updateCustomField = async (req, res, next) => {
  */
 const deleteCustomField = async (req, res, next) => {
   try {
+    console.log('🔴 [DELETE CUSTOM FIELD] Request received');
+    console.log('🔴 [DELETE CUSTOM FIELD] Field ID:', req.params.id);
+    console.log('🔴 [DELETE CUSTOM FIELD] User:', req.user.id, req.user.role);
+    console.log('🔴 [DELETE CUSTOM FIELD] Company:', req.user.company_id);
+    
     // Get field info before deletion for audit log
+    console.log('🔴 [DELETE CUSTOM FIELD] Fetching field info...');
     const field = await customFieldService.getCustomFieldById(
       req.user.company_id,
       req.params.id
     );
+    console.log('🔴 [DELETE CUSTOM FIELD] Field found:', field.field_name);
 
+    console.log('🔴 [DELETE CUSTOM FIELD] Calling delete service...');
     await customFieldService.deleteCustomField(
       req.user.company_id,
       req.params.id,
       req.user.id
     );
+    console.log('✅ [DELETE CUSTOM FIELD] Delete service completed');
 
     // Log audit event
     await logAuditEvent(req, {
-      action: AuditActions.PLATFORM_SETTINGS_UPDATED,
+      action: AuditActions.CUSTOM_FIELD_DELETED,
       resourceType: 'custom_field',
       resourceId: req.params.id,
       resourceName: field.field_label,
       companyId: req.user.company_id,
       details: {
-        action: 'deleted',
         field_name: field.field_name,
         entity_type: field.entity_type
       }
@@ -236,13 +254,12 @@ const reorderCustomFields = async (req, res, next) => {
 
     // Log audit event
     await logAuditEvent(req, {
-      action: AuditActions.PLATFORM_SETTINGS_UPDATED,
+      action: AuditActions.CUSTOM_FIELD_REORDERED,
       resourceType: 'custom_field',
       resourceId: null,
       resourceName: 'Field Order',
       companyId: req.user.company_id,
       details: {
-        action: 'reordered',
         entity_type,
         count: field_orders.length
       }

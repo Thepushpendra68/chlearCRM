@@ -244,22 +244,32 @@ const updateCustomField = async (companyId, fieldId, fieldData, userId) => {
  */
 const deleteCustomField = async (companyId, fieldId, userId) => {
   try {
+    console.log('🔴 [DELETE SERVICE] Starting delete for field:', fieldId, 'company:', companyId);
+    
     // Check if field exists and is not a system field
+    console.log('🔴 [DELETE SERVICE] Fetching field by ID...');
     const existing = await getCustomFieldById(companyId, fieldId);
+    console.log('🔴 [DELETE SERVICE] Field found:', existing.field_name, 'is_system_field:', existing.is_system_field);
     
     if (existing.is_system_field) {
+      console.log('❌ [DELETE SERVICE] Cannot delete system field');
       throw new ApiError('System fields cannot be deleted', 403);
     }
 
     // Check if field is being used
+    console.log('🔴 [DELETE SERVICE] Checking field usage...');
     const usage = await getCustomFieldUsage(companyId, fieldId);
+    console.log('🔴 [DELETE SERVICE] Usage count:', usage.usage_count);
+    
     if (usage.usage_count > 0) {
+      console.log('❌ [DELETE SERVICE] Field is in use, cannot delete');
       throw new ApiError(
         `This custom field is currently being used in ${usage.usage_count} ${existing.entity_type}(s). Please remove the field from all records before deleting it.`,
         409
       );
     }
 
+    console.log('🔴 [DELETE SERVICE] Executing delete query...');
     const { error } = await supabaseAdmin
       .from('custom_field_definitions')
       .delete()
@@ -267,13 +277,15 @@ const deleteCustomField = async (companyId, fieldId, userId) => {
       .eq('company_id', companyId);
 
     if (error) {
+      console.log('❌ [DELETE SERVICE] Delete query error:', error);
       throw error;
     }
 
+    console.log('✅ [DELETE SERVICE] Delete successful');
     return { success: true };
   } catch (error) {
     if (error instanceof ApiError) throw error;
-    console.error('Error deleting custom field:', error);
+    console.error('❌ [DELETE SERVICE] Unexpected error:', error);
     throw new ApiError('Failed to delete custom field', 500);
   }
 };
