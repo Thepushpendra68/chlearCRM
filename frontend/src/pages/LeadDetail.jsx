@@ -6,6 +6,7 @@ import leadService from '../services/leadService'
 import LeadForm from '../components/LeadForm'
 import ActivityForm from '../components/Activities/ActivityForm'
 import TaskForm from '../components/Tasks/TaskForm'
+import SendEmailModal from '../components/SendEmailModal'
 import taskService from '../services/taskService'
 import toast from 'react-hot-toast'
 import { usePicklists } from '../context/PicklistContext'
@@ -18,6 +19,7 @@ const LeadDetail = () => {
   const [showEditForm, setShowEditForm] = useState(false)
   const [showActivityForm, setShowActivityForm] = useState(false)
   const [showTaskForm, setShowTaskForm] = useState(false)
+  const [showSendEmailModal, setShowSendEmailModal] = useState(false)
   const [activityType, setActivityType] = useState('note')
   const { leadSources, leadStatuses } = usePicklists()
 
@@ -235,6 +237,13 @@ const LeadDetail = () => {
                 </div>
               </div>
               <div className="flex items-center space-x-2">
+                <button 
+                  onClick={() => setShowSendEmailModal(true)}
+                  className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-primary-600 border border-transparent rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <EnvelopeIcon className="h-4 w-4 mr-1.5" />
+                  Send Email
+                </button>
                 <button 
                   onClick={handleEdit}
                   className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
@@ -718,6 +727,18 @@ const LeadDetail = () => {
             onSave={handleTaskSubmit}
             onCancel={() => setShowTaskForm(false)}
             task={{lead_id: id}}
+          />
+        )}
+
+        {/* Send Email Modal */}
+        {showSendEmailModal && (
+          <SendEmailModal
+            isOpen={showSendEmailModal}
+            onClose={() => {
+              setShowSendEmailModal(false);
+              fetchLead(); // Refresh to show new email activity
+            }}
+            lead={lead}
           />
         )}
       </div>

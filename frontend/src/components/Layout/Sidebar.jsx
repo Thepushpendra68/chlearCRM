@@ -23,6 +23,8 @@ import {
   KeyIcon,
   Squares2X2Icon as CustomFieldsIcon,
   RectangleGroupIcon,
+  EnvelopeIcon,
+  BoltIcon,
 } from '@heroicons/react/24/outline'
 import api from '../../services/api'
 
@@ -62,6 +64,9 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, isCollapsed, setIsCollapsed }) =
     { name: 'Leads', href: '/app/leads', icon: UsersIcon, badge: badgeCounts.leads || null },
     { name: 'Pipeline', href: '/app/pipeline', icon: Squares2X2Icon, badge: null },
     { name: 'Activities', href: '/app/activities', icon: ClockIcon, badge: badgeCounts.activities || null },
+    { name: 'Email Templates', href: '/app/email/templates', icon: EnvelopeIcon, badge: null },
+    { name: 'Email Sequences', href: '/app/email/sequences', icon: BoltIcon, badge: null },
+    { name: 'Email Analytics', href: '/app/email/analytics', icon: ChartBarIcon, badge: null },
   ]
 
   // Utility/admin navigation items (bottom section)
@@ -82,6 +87,13 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, isCollapsed, setIsCollapsed }) =
       name: 'API Clients',
       href: '/app/api-clients',
       icon: KeyIcon,
+      badge: null
+    }] : []),
+    // Email Settings - only for company_admin and super_admin
+    ...(user?.role === 'company_admin' || user?.role === 'super_admin' ? [{
+      name: 'Email Settings',
+      href: '/app/email/settings',
+      icon: Cog6ToothIcon,
       badge: null
     }] : []),
     // Platform Admin link - only for super_admin

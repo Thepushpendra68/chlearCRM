@@ -52,9 +52,13 @@ const picklistRoutes = require('./routes/picklistRoutes');
 const leadCaptureRoutes = require('./routes/leadCaptureRoutes');
 const apiClientRoutes = require('./routes/apiClientRoutes');
 const customFieldRoutes = require('./routes/customFieldRoutes');
+const emailRoutes = require('./routes/emailRoutes');
 
 // Import middleware
 const errorHandler = require('./middleware/errorMiddleware');
+
+// Initialize email sequence worker (starts automatically in production)
+require('./workers/emailSequenceWorker');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -204,6 +208,7 @@ app.use('/api/picklists', picklistRoutes);
 app.use('/api/api-clients', apiClientRoutes); // API client management (admin only)
 app.use('/api/custom-fields', customFieldRoutes); // Custom field definitions management
 app.use('/api/v1/capture', leadCaptureRoutes); // Lead capture (public API with API key auth)
+app.use('/api/email', emailRoutes); // Email templates, sending, and automation
 
 // 404 handler
 app.use('*', (req, res) => {

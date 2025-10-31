@@ -1,4 +1,4 @@
--- =====================================================
+insufficent.png-- =====================================================
 -- CUSTOM FIELD DEFINITIONS MIGRATION
 -- =====================================================
 -- This migration creates tables for managing custom field definitions
