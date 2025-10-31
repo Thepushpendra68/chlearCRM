@@ -31,7 +31,7 @@ const EmailSettings = () => {
     try {
       setLoading(true);
       // Try to fetch existing email integration settings
-      const response = await api.get('/api/platform/settings/integration/email');
+      const response = await api.get('/email/settings/integration');
       if (response.data.data) {
         setSettings(response.data.data);
         setFormData({
@@ -74,7 +74,7 @@ const EmailSettings = () => {
       };
 
       // Save via Supabase
-      await api.post('/api/platform/settings/integration/email', {
+      await api.post('/email/settings/integration', {
         provider: formData.provider,
         config: config
       });

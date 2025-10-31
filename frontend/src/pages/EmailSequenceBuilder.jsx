@@ -128,9 +128,10 @@ const EmailSequenceBuilder = () => {
         trigger_event: sequence.trigger_event || 'lead_created'
       });
 
-      // Convert steps to nodes and edges
-      if (sequence.steps && sequence.steps.length > 0) {
-        convertStepsToFlow(sequence.steps);
+      // Convert stored json_definition.steps to nodes
+      const steps = sequence.json_definition?.steps || [];
+      if (steps.length > 0) {
+        convertStepsToFlow(steps);
       }
     } catch (error) {
       console.error('Error fetching sequence:', error);
@@ -324,7 +325,7 @@ const EmailSequenceBuilder = () => {
 
       const payload = {
         ...sequenceData,
-        steps
+        json_definition: { steps }
       };
 
       if (isNew) {

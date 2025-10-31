@@ -41,6 +41,10 @@ router.post('/templates/:id/versions', authorize(['company_admin', 'manager']), 
 router.post('/templates/versions/:versionId/publish', authorize(['company_admin', 'manager']), emailTemplateController.publishVersion);
 router.post('/templates/versions/:versionId/preview', emailTemplateController.previewTemplate);
 
+// Integration settings
+router.get('/settings/integration', emailTemplateController.getIntegrationSettings);
+router.post('/settings/integration', authorize(['company_admin', 'manager']), emailTemplateController.upsertIntegrationSettings);
+
 // =====================================================
 // EMAIL SENDING ROUTES
 // =====================================================

@@ -1,4 +1,5 @@
 const emailTemplateService = require('../services/emailTemplateService');
+const { supabaseAdmin } = require('../config/supabase');
 const ApiError = require('../utils/ApiError');
 
 /**
@@ -196,6 +197,76 @@ class EmailTemplateController {
         success: true,
         data: folders
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/email/settings/integration
+   */
+  async getIntegrationSettings(req, res, next) {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('integration_settings')
+        .select('*')
+        .eq('company_id', req.user.company_id)
+        .eq('type', 'email')
+        .single();
+
+      if (error && error.code !== 'PGRST116') throw error; // ignore 'no rows'
+
+      res.json({ success: true, data: data || null });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * POST /api/email/settings/integration
+   */
+  async upsertIntegrationSettings(req, res, next) {
+    try {
+      const { provider, config } = req.body;
+      if (!provider || !config) throw new ApiError('provider and config are required', 400);
+
+      const { data: existing } = await supabaseAdmin
+        .from('integration_settings')
+        .select('id')
+        .eq('company_id', req.user.company_id)
+        .eq('type', 'email')
+        .single();
+
+      const payload = {
+        company_id: req.user.company_id,
+        type: 'email',
+        provider,
+        config,
+        is_active: true,
+        created_by: req.user.id,
+        updated_at: new Date().toISOString()
+      };
+
+      let query;
+      if (existing) {
+        query = supabaseAdmin
+          .from('integration_settings')
+          .update(payload)
+          .eq('id', existing.id)
+          .select()
+          .single();
+      } else {
+        query = supabaseAdmin
+          .from('integration_settings')
+          .insert(payload)
+          .select()
+          .single();
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      res.json({ success: true, data });
     } catch (error) {
       next(error);
     }
