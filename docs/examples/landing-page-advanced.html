@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contact Us - Advanced Form with Custom Fields</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f5f5f5;
+      padding: 40px 20px;
+    }
+
+    .container {
+      max-width: 700px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 40px 30px;
+      text-align: center;
+    }
+
+    .header h1 {
+      font-size: 32px;
+      margin-bottom: 10px;
+    }
+
+    .header p {
+      font-size: 16px;
+      opacity: 0.9;
+    }
+
+    .form-container {
+      padding: 40px 30px;
+    }
+
+    .form-section {
+      margin-bottom: 30px;
+    }
+
+    .form-section h2 {
+      color: #333;
+      font-size: 18px;
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #667eea;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group.full-width {
+      grid-column: 1 / -1;
+    }
+
+    label {
+      display: block;
+      color: #555;
+      font-weight: 600;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+    .required {
+      color: #e74c3c;
+    }
+
+    input,
+    textarea,
+    select {
+      width: 100%;
+      padding: 12px 15px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: all 0.3s ease;
+      font-family: inherit;
+    }
+
+    input:focus,
+    textarea:focus,
+    select:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 100px;
+    }
+
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      margin-top: 20px;
+    }
+
+    .checkbox-group input[type="checkbox"] {
+      width: auto;
+      margin-right: 10px;
+    }
+
+    .checkbox-group label {
+      margin: 0;
+      font-weight: normal;
+      font-size: 13px;
+      color: #666;
+    }
+
+    button {
+      width: 100%;
+      padding: 16px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin-top: 10px;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+    }
+
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .message {
+      margin-top: 20px;
+      padding: 15px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      display: none;
+    }
+
+    .message.show {
+      display: block;
+      animation: slideIn 0.3s ease;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .message.success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+
+    .message.error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 3px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: white;
+      animation: spin 0.6s linear infinite;
+      margin-right: 8px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .help-text {
+      font-size: 12px;
+      color: #999;
+      margin-top: 5px;
+    }
+
+    @media (max-width: 768px) {
+      .form-row {
+        grid-template-columns: 1fr;
+      }
+
+      .header h1 {
+        font-size: 24px;
+      }
+
+      .form-container {
+        padding: 30px 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Request a Demo</h1>
+      <p>Tell us about your business and we'll show you how we can help</p>
+    </div>
+
+    <div class="form-container">
+      <form id="contactForm">
+        <!-- Personal Information -->
+        <div class="form-section">
+          <h2>Personal Information</h2>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="first_name">First Name <span class="required">*</span></label>
+              <input type="text" id="first_name" name="first_name" required>
+            </div>
+
+            <div class="form-group">
+              <label for="last_name">Last Name <span class="required">*</span></label>
+              <input type="text" id="last_name" name="last_name" required>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="email">Work Email <span class="required">*</span></label>
+              <input type="email" id="email" name="email" required>
+              <div class="help-text">We'll never share your email with anyone else.</div>
+            </div>
+
+            <div class="form-group">
+              <label for="phone">Phone Number</label>
+              <input type="tel" id="phone" name="phone" placeholder="+1 (555) 123-4567">
+            </div>
+          </div>
+        </div>
+
+        <!-- Company Information -->
+        <div class="form-section">
+          <h2>Company Information</h2>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="company">Company Name</label>
+              <input type="text" id="company" name="company">
+            </div>
+
+            <div class="form-group">
+              <label for="job_title">Job Title</label>
+              <input type="text" id="job_title" name="job_title" placeholder="e.g., Marketing Manager">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="company_size">Company Size</label>
+              <select id="company_size" name="company_size">
+                <option value="">Select...</option>
+                <option value="1-10">1-10 employees</option>
+                <option value="11-50">11-50 employees</option>
+                <option value="51-200">51-200 employees</option>
+                <option value="201-500">201-500 employees</option>
+                <option value="501+">501+ employees</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="industry">Industry</label>
+              <select id="industry" name="industry">
+                <option value="">Select...</option>
+                <option value="technology">Technology</option>
+                <option value="healthcare">Healthcare</option>
+                <option value="finance">Finance</option>
+                <option value="retail">Retail</option>
+                <option value="manufacturing">Manufacturing</option>
+                <option value="education">Education</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Project Details -->
+        <div class="form-section">
+          <h2>Project Details</h2>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="budget">Budget Range</label>
+              <select id="budget" name="budget">
+                <option value="">Select...</option>
+                <option value="<10k">Less than $10,000</option>
+                <option value="10k-50k">$10,000 - $50,000</option>
+                <option value="50k-100k">$50,000 - $100,000</option>
+                <option value="100k+">$100,000+</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="timeline">Timeline</label>
+              <select id="timeline" name="timeline">
+                <option value="">Select...</option>
+                <option value="immediate">Immediate (< 1 month)</option>
+                <option value="1-3months">1-3 months</option>
+                <option value="3-6months">3-6 months</option>
+                <option value="6+months">6+ months</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group full-width">
+            <label for="notes">Tell us about your needs</label>
+            <textarea id="notes" name="notes" placeholder="What are you looking to achieve? What challenges are you facing?"></textarea>
+          </div>
+        </div>
+
+        <!-- Additional Information -->
+        <div class="form-section">
+          <div class="form-group">
+            <label for="hear_about_us">How did you hear about us?</label>
+            <select id="hear_about_us" name="hear_about_us">
+              <option value="">Select...</option>
+              <option value="google">Google Search</option>
+              <option value="social">Social Media</option>
+              <option value="referral">Referral</option>
+              <option value="ad">Advertisement</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+
+          <div class="checkbox-group">
+            <input type="checkbox" id="newsletter" name="newsletter" value="yes">
+            <label for="newsletter">Subscribe to our newsletter for updates and tips</label>
+          </div>
+        </div>
+
+        <button type="submit" id="submitBtn">
+          Request Demo
+        </button>
+
+        <div id="message" class="message"></div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // ============================================
+    // CONFIGURATION - UPDATE THESE VALUES
+    // ============================================
+    const CONFIG = {
+      API_URL: 'https://your-crm-url.com/api/v1/capture/lead',
+      API_KEY: 'ck_your_api_key_here',
+      API_SECRET: 'your_api_secret_here'
+    };
+
+    // ============================================
+    // FORM HANDLING
+    // ============================================
+    const form = document.getElementById('contactForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const messageDiv = document.getElementById('message');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      // Disable form
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span class="spinner"></span> Submitting...';
+      messageDiv.classList.remove('show', 'success', 'error');
+
+      try {
+        // Get form data
+        const formData = new FormData(form);
+        const data = {};
+        const customFields = {};
+
+        // Separate standard and custom fields
+        const standardFields = ['first_name', 'last_name', 'email', 'phone', 'company', 'job_title', 'notes'];
+        
+        formData.forEach((value, key) => {
+          if (value && value.trim() !== '') {
+            if (standardFields.includes(key)) {
+              data[key] = value.trim();
+            } else {
+              customFields[key] = value.trim();
+            }
+          }
+        });
+
+        // Add custom fields to data
+        if (Object.keys(customFields).length > 0) {
+          data.custom_fields = customFields;
+        }
+
+        // Set lead source
+        data.lead_source = 'website_demo_request';
+
+        console.log('Sending data:', data);
+
+        // Send to CRM
+        const response = await fetch(CONFIG.API_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-API-Key': CONFIG.API_KEY,
+            'X-API-Secret': CONFIG.API_SECRET
+          },
+          body: JSON.stringify(data)
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+          // Success
+          showMessage('success', '✓ Thank you! Your demo request has been received. We\'ll contact you within 24 hours.');
+          form.reset();
+          
+          // Optional: Track conversion with analytics
+          if (typeof gtag !== 'undefined') {
+            gtag('event', 'conversion', {
+              'send_to': 'AW-CONVERSION-ID'
+            });
+          }
+        } else {
+          // API error
+          throw new Error(result.error?.message || 'Something went wrong. Please try again.');
+        }
+      } catch (error) {
+        // Network or other error
+        showMessage('error', '✗ ' + error.message);
+        console.error('Form submission error:', error);
+      } finally {
+        // Re-enable form
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Request Demo';
+      }
+    });
+
+    function showMessage(type, text) {
+      messageDiv.textContent = text;
+      messageDiv.className = `message ${type} show`;
+      
+      // Auto-hide success messages after 7 seconds
+      if (type === 'success') {
+        setTimeout(() => {
+          messageDiv.classList.remove('show');
+        }, 7000);
+      }
+    }
+
+    // ============================================
+    // CLIENT-SIDE VALIDATION
+    // ============================================
+    
+    // Email validation
+    const emailInput = document.getElementById('email');
+    emailInput.addEventListener('blur', function() {
+      const email = this.value.trim();
+      if (email && !isValidEmail(email)) {
+        this.setCustomValidity('Please enter a valid email address');
+        this.reportValidity();
+      } else {
+        this.setCustomValidity('');
+      }
+    });
+
+    function isValidEmail(email) {
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    }
+
+    // Phone formatting (US format)
+    const phoneInput = document.getElementById('phone');
+    phoneInput.addEventListener('input', function() {
+      let value = this.value.replace(/\D/g, '');
+      if (value.length > 0) {
+        if (value.length <= 3) {
+          value = value;
+        } else if (value.length <= 6) {
+          value = `(${value.slice(0, 3)}) ${value.slice(3)}`;
+        } else {
+          value = `(${value.slice(0, 3)}) ${value.slice(3, 6)}-${value.slice(6, 10)}`;
+        }
+        this.value = value;
+      }
+    });
+  </script>
+</body>
+</html>
+

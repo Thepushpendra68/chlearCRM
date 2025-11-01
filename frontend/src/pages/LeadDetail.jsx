@@ -6,6 +6,7 @@ import leadService from '../services/leadService'
 import LeadForm from '../components/LeadForm'
 import ActivityForm from '../components/Activities/ActivityForm'
 import TaskForm from '../components/Tasks/TaskForm'
+import SendEmailModal from '../components/SendEmailModal'
 import taskService from '../services/taskService'
 import toast from 'react-hot-toast'
 import { usePicklists } from '../context/PicklistContext'
@@ -18,6 +19,7 @@ const LeadDetail = () => {
   const [showEditForm, setShowEditForm] = useState(false)
   const [showActivityForm, setShowActivityForm] = useState(false)
   const [showTaskForm, setShowTaskForm] = useState(false)
+  const [showSendEmailModal, setShowSendEmailModal] = useState(false)
   const [activityType, setActivityType] = useState('note')
   const { leadSources, leadStatuses } = usePicklists()
 
@@ -236,6 +238,13 @@ const LeadDetail = () => {
               </div>
               <div className="flex items-center space-x-2">
                 <button 
+                  onClick={() => setShowSendEmailModal(true)}
+                  className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-primary-600 border border-transparent rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <EnvelopeIcon className="h-4 w-4 mr-1.5" />
+                  Send Email
+                </button>
+                <button 
                   onClick={handleEdit}
                   className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
                 >
@@ -429,6 +438,48 @@ const LeadDetail = () => {
                 </div>
                 <div className="px-6 py-4">
                   <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{lead.notes}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Custom Fields Section */}
+            {lead.custom_fields && Object.keys(lead.custom_fields).length > 0 && (
+              <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+                <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                  <h2 className="text-lg font-semibold text-gray-900">Custom Fields</h2>
+                  <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                    {Object.keys(lead.custom_fields).length} field{Object.keys(lead.custom_fields).length !== 1 ? 's' : ''}
+                  </span>
+                </div>
+                <div className="px-6 py-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {Object.entries(lead.custom_fields).map(([key, value]) => {
+                      // Format the field name (convert snake_case to Title Case)
+                      const formattedKey = key
+                        .split('_')
+                        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                        .join(' ');
+                      
+                      // Handle different value types
+                      const displayValue = (() => {
+                        if (value === null || value === undefined) return 'N/A';
+                        if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+                        if (typeof value === 'object') return JSON.stringify(value);
+                        return String(value);
+                      })();
+
+                      return (
+                        <div key={key} className="flex flex-col space-y-1">
+                          <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                            {formattedKey}
+                          </dt>
+                          <dd className="text-sm text-gray-900 font-medium break-words">
+                            {displayValue}
+                          </dd>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             )}
@@ -676,6 +727,18 @@ const LeadDetail = () => {
             onSave={handleTaskSubmit}
             onCancel={() => setShowTaskForm(false)}
             task={{lead_id: id}}
+          />
+        )}
+
+        {/* Send Email Modal */}
+        {showSendEmailModal && (
+          <SendEmailModal
+            isOpen={showSendEmailModal}
+            onClose={() => {
+              setShowSendEmailModal(false);
+              fetchLead(); // Refresh to show new email activity
+            }}
+            lead={lead}
           />
         )}
       </div>
