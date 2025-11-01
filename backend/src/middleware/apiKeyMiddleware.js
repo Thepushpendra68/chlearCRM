@@ -94,7 +94,7 @@ const logApiRequest = async (apiClientId, req, statusCode, responseTime, leadId 
         method: req.method,
         status_code: statusCode,
         response_time_ms: responseTime,
-        ip_address: req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress,
+        ip_address: req.ip || req.headers['x-forwarded-for'] || req.connection?.remoteAddress || req.socket?.remoteAddress || null,
         user_agent: req.headers['user-agent'],
         request_body: req.body,
         lead_id: leadId,
@@ -117,7 +117,7 @@ const logFailedRequest = async (apiClientId, req, errorMessage) => {
         endpoint: req.path,
         method: req.method,
         status_code: 401,
-        ip_address: req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress,
+        ip_address: req.ip || req.headers['x-forwarded-for'] || req.connection?.remoteAddress || req.socket?.remoteAddress || null,
         user_agent: req.headers['user-agent'],
         error_message: errorMessage
       });
