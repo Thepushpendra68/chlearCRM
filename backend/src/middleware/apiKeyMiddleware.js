@@ -128,6 +128,8 @@ const logFailedRequest = async (apiClientId, req, errorMessage) => {
 
 module.exports = {
   authenticateApiKey,
-  logApiRequest
+  logApiRequest,
+  // Backwards compatibility for older tests/modules
+  validateApiKey: authenticateApiKey
 };
 
