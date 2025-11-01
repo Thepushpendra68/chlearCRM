@@ -476,7 +476,11 @@ const EmailTemplateEditor = () => {
                 onClick={() => {
                   // Destroy GrapesJS instance when leaving visual to avoid overlay issues
                   if (grapesEditorRef.current) {
-                    try { grapesEditorRef.current.destroy(); } catch {}
+                    try { 
+                      grapesEditorRef.current.destroy(); 
+                    } catch (e) {
+                      console.error('Error destroying GrapesJS editor:', e);
+                    }
                     grapesEditorRef.current = null;
                   }
                   setEditorMode('code');
