@@ -72,6 +72,11 @@ try {
   const platformRoutes = require('../backend/src/routes/platformRoutes');
   const picklistRoutes = require('../backend/src/routes/picklistRoutes');
   const apiClientRoutes = require('../backend/src/routes/apiClientRoutes');
+  const configRoutes = require('../backend/src/routes/configRoutes');
+  const customFieldRoutes = require('../backend/src/routes/customFieldRoutes');
+  const emailRoutes = require('../backend/src/routes/emailRoutes');
+  const leadCaptureRoutes = require('../backend/src/routes/leadCaptureRoutes');
+  const preferencesRoutes = require('../backend/src/routes/preferencesRoutes');
 
   app.use('/api/auth', authRoutes);
   app.use('/api/supabase-auth', supabaseAuthRoutes);
@@ -89,6 +94,11 @@ try {
   app.use('/api/platform', platformRoutes);
   app.use('/api/picklists', picklistRoutes);
   app.use('/api', apiClientRoutes);
+  app.use('/api/config', configRoutes);
+  app.use('/api/custom-fields', customFieldRoutes);
+  app.use('/api/email', emailRoutes);
+  app.use('/api/v1/capture', leadCaptureRoutes);
+  app.use('/api/preferences', preferencesRoutes);
 } catch (error) {
   console.error('Failed to load backend routes:', error);
 
