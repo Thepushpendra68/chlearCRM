@@ -93,9 +93,9 @@ try {
   app.use('/api/chatbot', chatbotRoutes);
   app.use('/api/platform', platformRoutes);
   app.use('/api/picklists', picklistRoutes);
-  app.use('/api', apiClientRoutes);
   app.use('/api/config', configRoutes);
   app.use('/api/custom-fields', customFieldRoutes);
+  app.use('/api/api-clients', apiClientRoutes);
   app.use('/api/email', emailRoutes);
   app.use('/api/v1/capture', leadCaptureRoutes);
   app.use('/api/preferences', preferencesRoutes);
