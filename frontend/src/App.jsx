@@ -31,6 +31,15 @@ const AuditLogs = lazy(() => import('./pages/Platform/AuditLogs'))
 const PlatformUsers = lazy(() => import('./pages/Platform/PlatformUsers'))
 const PlatformAnalytics = lazy(() => import('./pages/Platform/PlatformAnalytics'))
 const PlatformActivity = lazy(() => import('./pages/Platform/PlatformActivity'))
+const APIClients = lazy(() => import('./pages/APIClients'))
+const CustomFields = lazy(() => import('./pages/CustomFields'))
+const PublicLeadForm = lazy(() => import('./pages/PublicLeadForm'))
+const EmailSettings = lazy(() => import('./pages/EmailSettings'))
+const EmailTemplates = lazy(() => import('./pages/EmailTemplates'))
+const EmailTemplateEditor = lazy(() => import('./pages/EmailTemplateEditor'))
+const EmailSequences = lazy(() => import('./pages/EmailSequences'))
+const EmailSequenceBuilder = lazy(() => import('./pages/EmailSequenceBuilder'))
+const EmailAnalytics = lazy(() => import('./pages/EmailAnalytics'))
 
 const RouteLoadingFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -52,6 +61,7 @@ function App() {
             <Route path="/register" element={<Navigate to="/register-company" replace />} />
             <Route path="/register-company" element={<RegisterCompany />} />
             <Route path="/dashboard" element={<Navigate to="/app/dashboard" replace />} />
+            <Route path="/lead-form" element={<PublicLeadForm />} />
             
             {/* Protected routes */}
             <Route path="/app" element={
@@ -84,6 +94,26 @@ function App() {
               <Route path="search" element={<SearchResults />} />
               <Route path="profile" element={<Profile />} />
               <Route path="settings" element={<Settings />} />
+              <Route path="api-clients" element={
+                <RoleProtectedRoute allowedRoles={['company_admin', 'super_admin']}>
+                  <APIClients />
+                </RoleProtectedRoute>
+              } />
+              <Route path="custom-fields" element={
+                <RoleProtectedRoute allowedRoles={['manager', 'company_admin', 'super_admin']}>
+                  <CustomFields />
+                </RoleProtectedRoute>
+              } />
+              <Route path="email/settings" element={
+                <RoleProtectedRoute allowedRoles={['company_admin', 'super_admin']}>
+                  <EmailSettings />
+                </RoleProtectedRoute>
+              } />
+              <Route path="email/templates" element={<EmailTemplates />} />
+              <Route path="email/templates/:id" element={<EmailTemplateEditor />} />
+              <Route path="email/sequences" element={<EmailSequences />} />
+              <Route path="email/sequences/:id" element={<EmailSequenceBuilder />} />
+              <Route path="email/analytics" element={<EmailAnalytics />} />
             </Route>
 
             {/* Platform routes - Super Admin only */}

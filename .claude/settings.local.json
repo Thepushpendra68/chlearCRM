@@ -121,7 +121,9 @@
       "Bash(test:*)",
       "mcp__vercel__list_teams",
       "mcp__vercel__get_access_to_vercel_url",
-      "WebFetch(domain:chlear-15rcctzei-pushpendrachl-gmailcoms-projects.vercel.app)"
+      "WebFetch(domain:chlear-15rcctzei-pushpendrachl-gmailcoms-projects.vercel.app)",
+      "Bash(ls -la \"C:\\Users\\Vishaka\\downloads\\chlear crm\\migrations\"\" | grep -E \".sql)",
+      "Bash(.md \")"
     ],
     "deny": [],
     "ask": []
