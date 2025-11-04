@@ -16,7 +16,7 @@ const computeLeadChanges = (before = {}, after = {}) => {
     ['phone', 'phone'],
     ['company', 'company'],
     ['title', 'job_title'],
-    ['lead_source', 'lead_source'],
+    ['source', 'lead_source'],
     ['status', 'status'],
     ['deal_value', 'deal_value'],
     ['expected_close_date', 'expected_close_date'],
@@ -152,8 +152,7 @@ const createLead = async (req, res, next) => {
       company_id: req.user.company_id
     };
 
-    // Pass industry config from middleware to service
-    const lead = await leadService.createLead(leadData, req.industryConfig);
+    const lead = await leadService.createLead(leadData);
 
     await logAuditEvent(req, {
       action: AuditActions.LEAD_CREATED,
@@ -163,7 +162,7 @@ const createLead = async (req, res, next) => {
       companyId: lead.company_id,
       details: {
         status: lead.status,
-        lead_source: lead.lead_source,
+        source: lead.source,
         assigned_to: lead.assigned_to,
         pipeline_stage_id: lead.pipeline_stage_id
       },
@@ -215,8 +214,7 @@ const updateLead = async (req, res, next) => {
     const { id } = req.params;
     const leadData = req.body;
 
-    // Pass industry config from middleware to service
-    const leadResult = await leadService.updateLead(id, leadData, req.user, req.industryConfig);
+    const leadResult = await leadService.updateLead(id, leadData, req.user);
 
     if (!leadResult) {
       throw new ApiError('Lead not found', 404);

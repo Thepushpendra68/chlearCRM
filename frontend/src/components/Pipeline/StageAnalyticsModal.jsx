@@ -56,7 +56,7 @@ const StageAnalyticsModal = ({ isOpen, onClose, stageId, leads, stage }) => {
   const getLeadSources = (leads) => {
     const sources = {};
     leads.forEach(lead => {
-      const source = lead.lead_source || lead.source || 'Unknown';
+      const source = lead.source || 'Unknown';
       sources[source] = (sources[source] || 0) + 1;
     });
     

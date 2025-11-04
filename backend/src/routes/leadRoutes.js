@@ -1,6 +1,5 @@
 const express = require('express');
 const { authenticate } = require('../middleware/authMiddleware');
-const { injectIndustryConfig } = require('../middleware/industryConfig.middleware');
 const { validateLead } = require('../validators/leadValidators');
 const { loadLeadPicklists } = require('../middleware/picklistMiddleware');
 const {
@@ -19,9 +18,6 @@ const router = express.Router();
 // All lead routes require authentication
 router.use(authenticate);
 
-// Inject industry configuration for all lead routes
-router.use(injectIndustryConfig);
-
 /**
  * @route   GET /api/leads
  * @desc    Get all leads with pagination and filtering
@@ -35,6 +31,13 @@ router.get('/', getLeads);
  * @access  Private
  */
 router.get('/stats', getLeadStats);
+
+/**
+ * @route   GET /api/leads/:id
+ * @desc    Get lead by ID
+ * @access  Private
+ */
+router.get('/:id', getLeadById);
 
 /**
  * @route   POST /api/leads
@@ -51,20 +54,6 @@ router.post('/', loadLeadPicklists, validateLead, createLead);
 router.put('/:id', loadLeadPicklists, validateLead, updateLead);
 
 /**
- * @route   GET /api/leads/search
- * @desc    Search leads
- * @access  Private
- */
-router.get('/search', searchLeads);
-
-/**
- * @route   GET /api/leads/:id
- * @desc    Get lead by ID
- * @access  Private
- */
-router.get('/:id', getLeadById);
-
-/**
  * @route   DELETE /api/leads/:id
  * @desc    Delete lead
  * @access  Private
@@ -77,5 +66,12 @@ router.delete('/:id', deleteLead);
  * @access  Private
  */
 router.put('/:id/move-stage', pipelineController.moveLeadToStage);
+
+/**
+ * @route   GET /api/leads/search
+ * @desc    Search leads
+ * @access  Private
+ */
+router.get('/search', searchLeads);
 
 module.exports = router;

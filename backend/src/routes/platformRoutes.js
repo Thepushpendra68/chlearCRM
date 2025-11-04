@@ -69,12 +69,6 @@ router.get('/audit-logs', platformController.getAuditLogs);
  * @access  Super Admin
  */
 router.get('/activity', platformController.getRecentActivity);
-
-/**
- * @route   GET /api/platform/imports/telemetry
- * @desc    Get telemetry data for imports
- * @access  Super Admin
- */
 router.get('/imports/telemetry', platformController.getImportTelemetry);
 
 /**

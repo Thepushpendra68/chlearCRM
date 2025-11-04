@@ -1,46 +1,5 @@
 const { supabaseAdmin } = require('../config/supabase');
 const ApiError = require('../utils/ApiError');
-const configLoader = require('../config/industry/configLoader');
-
-const isPlainObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
-
-const mergeCustomFields = (existingFields, updates) => {
-  const base = isPlainObject(existingFields) ? { ...existingFields } : {};
-
-  if (updates === null) {
-    return {};
-  }
-
-  if (!isPlainObject(updates)) {
-    return base;
-  }
-
-  return Object.keys(updates).reduce((acc, key) => {
-    const value = updates[key];
-
-    if (value === undefined) {
-      return acc;
-    }
-
-    if (value === null) {
-      delete acc[key];
-      return acc;
-    }
-
-    if (isPlainObject(value)) {
-      const merged = mergeCustomFields(acc[key], value);
-      if (Object.keys(merged).length === 0) {
-        delete acc[key];
-      } else {
-        acc[key] = merged;
-      }
-      return acc;
-    }
-
-    acc[key] = value;
-    return acc;
-  }, base);
-};
 
 const normalizeEmail = (email) => {
   if (typeof email !== 'string') {
@@ -63,9 +22,9 @@ const getLeads = async (currentUser, page = 1, limit = 20, filters = {}) => {
       .from('leads')
       .select(`
         id, name, first_name, last_name, email, phone, company, title,
-        status, lead_source, source, deal_value, expected_close_date, notes,
+        status, source, deal_value, expected_close_date, notes,
         priority, created_at, updated_at, assigned_at,
-        assigned_to, created_by, pipeline_stage_id, custom_fields,
+        assigned_to, created_by, pipeline_stage_id,
         user_profiles!assigned_to(id, first_name, last_name)
       `)
       .eq('company_id', currentUser.company_id);
@@ -76,7 +35,6 @@ const getLeads = async (currentUser, page = 1, limit = 20, filters = {}) => {
     }
 
     // Apply filters efficiently
-    const sourceFilter = filters.lead_source || filters.source;
     if (filters.search) {
       const searchTerm = `%${filters.search}%`;
       query = query.or(`name.ilike.${searchTerm},email.ilike.${searchTerm},company.ilike.${searchTerm}`);
@@ -86,8 +44,8 @@ const getLeads = async (currentUser, page = 1, limit = 20, filters = {}) => {
       query = query.eq('status', filters.status);
     }
 
-    if (sourceFilter) {
-      query = query.eq('lead_source', sourceFilter);
+    if (filters.source) {
+      query = query.eq('source', filters.source);
     }
 
     if (filters.assigned_to) {
@@ -128,39 +86,6 @@ const getLeads = async (currentUser, page = 1, limit = 20, filters = {}) => {
       countQuery = countQuery.eq('assigned_to', currentUser.id);
     }
 
-    if (filters.search) {
-      const searchTerm = `%${filters.search}%`;
-      countQuery = countQuery.or(`name.ilike.${searchTerm},email.ilike.${searchTerm},company.ilike.${searchTerm}`);
-    }
-
-    if (filters.status) {
-      countQuery = countQuery.eq('status', filters.status);
-    }
-
-    if (sourceFilter) {
-      countQuery = countQuery.eq('lead_source', sourceFilter);
-    }
-
-    if (filters.assigned_to) {
-      countQuery = countQuery.eq('assigned_to', filters.assigned_to);
-    }
-
-    if (filters.date_from) {
-      countQuery = countQuery.gte('created_at', filters.date_from);
-    }
-
-    if (filters.date_to) {
-      countQuery = countQuery.lte('created_at', filters.date_to);
-    }
-
-    if (filters.deal_value_min !== undefined && filters.deal_value_min !== null) {
-      countQuery = countQuery.gte('deal_value', filters.deal_value_min);
-    }
-
-    if (filters.deal_value_max !== undefined && filters.deal_value_max !== null) {
-      countQuery = countQuery.lte('deal_value', filters.deal_value_max);
-    }
-
     const [countResult, leadsResult] = await Promise.all([
       countQuery,
       // Paginated query
@@ -191,8 +116,7 @@ const getLeads = async (currentUser, page = 1, limit = 20, filters = {}) => {
         phone: lead.phone,
         company: lead.company,
         job_title: lead.title, // Map title to job_title for frontend
-        lead_source: lead.lead_source || lead.source || null,
-        source: lead.lead_source || lead.source || null,
+        lead_source: lead.source, // Map source to lead_source for frontend
         status: lead.status,
         deal_value: lead.deal_value,
         expected_close_date: lead.expected_close_date,
@@ -204,7 +128,6 @@ const getLeads = async (currentUser, page = 1, limit = 20, filters = {}) => {
         assigned_to: lead.assigned_to,
         created_by: lead.created_by,
         pipeline_stage_id: lead.pipeline_stage_id,
-        custom_fields: lead.custom_fields || {},
         assigned_user_first_name: lead.user_profiles?.first_name || null,
         assigned_user_last_name: lead.user_profiles?.last_name || null
       };
@@ -251,8 +174,7 @@ const getLeadById = async (id) => {
         first_name: lead.first_name || '',
         last_name: lead.last_name || '',
         job_title: lead.title, // Map title to job_title for frontend
-        lead_source: lead.lead_source || lead.source || null,
-        source: lead.lead_source || lead.source || null,
+        lead_source: lead.source, // Map source to lead_source for frontend
         assigned_user_first_name: lead.user_profiles?.first_name || null,
         assigned_user_last_name: lead.user_profiles?.last_name || null
       };
@@ -268,30 +190,12 @@ const getLeadById = async (id) => {
 /**
  * Create new lead
  */
-const createLead = async (leadData, industryConfig = null) => {
+const createLead = async (leadData) => {
   try {
     const { supabaseAdmin } = require('../config/supabase');
 
-    // Use injected industry config from middleware, or load as fallback
-    if (!industryConfig) {
-      console.warn('⚠️ No industry config provided, loading from company');
-      const { data: company, error: companyError } = await supabaseAdmin
-        .from('companies')
-        .select('industry_type')
-        .eq('id', leadData.company_id)
-        .single();
-
-      if (companyError) {
-        console.warn('⚠️ Could not load company configuration, using base config');
-      }
-
-      industryConfig = configLoader.getConfigForCompany(company);
-    }
-
     // Transform frontend field names to database column names
     const normalizedEmail = normalizeEmail(leadData.email);
-
-    const leadSourceValue = leadData.lead_source || null;
 
     const transformedData = {
       company_id: leadData.company_id,
@@ -302,8 +206,7 @@ const createLead = async (leadData, industryConfig = null) => {
       phone: leadData.phone,
       company: leadData.company,
       title: leadData.job_title, // Map job_title to title
-      lead_source: leadSourceValue,
-      source: leadSourceValue,
+      source: leadData.lead_source, // Map lead_source to source
       status: leadData.status,
       deal_value: leadData.deal_value,
       expected_close_date: leadData.expected_close_date,
@@ -313,21 +216,6 @@ const createLead = async (leadData, industryConfig = null) => {
       pipeline_stage_id: leadData.pipeline_stage_id,
       created_by: leadData.created_by
     };
-
-    // Process custom fields if provided
-    if (leadData.custom_fields && typeof leadData.custom_fields === 'object') {
-      // Validate custom fields against configuration
-      const validation = configLoader.validateCustomFields(industryConfig, leadData.custom_fields);
-
-      if (!validation.valid) {
-        console.warn('⚠️ Custom field validation warnings:', validation.errors);
-        // Log warnings but don't block - allow flexibility
-      }
-
-      transformedData.custom_fields = leadData.custom_fields;
-    } else {
-      transformedData.custom_fields = {};
-    }
 
     // Clean up empty strings for UUID and date fields
     const cleanedData = { ...transformedData };
@@ -347,12 +235,13 @@ const createLead = async (leadData, industryConfig = null) => {
         .limit(1)
         .single();
 
-      if (stageError || !defaultStage) {
-        console.error('Error fetching default pipeline stage or no stages available:', stageError);
-        throw new ApiError('A pipeline stage is required to create a lead. Please configure pipeline stages first.', 400);
+      if (stageError) {
+        console.error('Error fetching default pipeline stage:', stageError);
+        // If no stages exist, create lead without stage (better than failing)
+        cleanedData.pipeline_stage_id = null;
+      } else {
+        cleanedData.pipeline_stage_id = defaultStage.id;
       }
-
-      cleanedData.pipeline_stage_id = defaultStage.id;
     }
 
     // Convert empty strings to null for date fields
@@ -391,7 +280,7 @@ const createLead = async (leadData, industryConfig = null) => {
 /**
  * Update lead
  */
-const updateLead = async (id, leadData, currentUser, industryConfig = null) => {
+const updateLead = async (id, leadData, currentUser) => {
   try {
     const { supabaseAdmin } = require('../config/supabase');
 
@@ -411,22 +300,6 @@ const updateLead = async (id, leadData, currentUser, industryConfig = null) => {
       throw new ApiError('Access denied', 403);
     }
 
-    // Use injected industry config from middleware, or load as fallback
-    if (!industryConfig) {
-      console.warn('⚠️ No industry config provided, loading from company');
-      const { data: company, error: companyError } = await supabaseAdmin
-        .from('companies')
-        .select('industry_type')
-        .eq('id', existingLead.company_id)
-        .single();
-
-      if (companyError) {
-        console.warn('⚠️ Could not load company configuration, using base config');
-      }
-
-      industryConfig = configLoader.getConfigForCompany(company);
-    }
-
     // Transform frontend field names to database column names
     const transformedData = {};
     if (leadData.first_name !== undefined) transformedData.first_name = leadData.first_name;
@@ -439,18 +312,7 @@ const updateLead = async (id, leadData, currentUser, industryConfig = null) => {
     if (leadData.phone !== undefined) transformedData.phone = leadData.phone;
     if (leadData.company !== undefined) transformedData.company = leadData.company;
     if (leadData.job_title !== undefined) transformedData.title = leadData.job_title; // Map job_title to title
-    if (leadData.lead_source !== undefined) {
-      let normalizedLeadSource = leadData.lead_source;
-      if (typeof normalizedLeadSource === 'string') {
-        normalizedLeadSource = normalizedLeadSource.trim();
-        if (normalizedLeadSource.length === 0) {
-          normalizedLeadSource = null;
-        }
-      }
-
-      transformedData.lead_source = normalizedLeadSource;
-      transformedData.source = normalizedLeadSource;
-    }
+    if (leadData.lead_source !== undefined) transformedData.source = leadData.lead_source; // Map lead_source to source
     if (leadData.status !== undefined) transformedData.status = leadData.status;
     if (leadData.deal_value !== undefined) transformedData.deal_value = leadData.deal_value;
     if (leadData.expected_close_date !== undefined) transformedData.expected_close_date = leadData.expected_close_date;
@@ -458,21 +320,6 @@ const updateLead = async (id, leadData, currentUser, industryConfig = null) => {
     if (leadData.priority !== undefined) transformedData.priority = leadData.priority;
     if (leadData.assigned_to !== undefined) transformedData.assigned_to = leadData.assigned_to;
     if (leadData.pipeline_stage_id !== undefined) transformedData.pipeline_stage_id = leadData.pipeline_stage_id;
-
-    // Process custom fields if provided
-    if (leadData.custom_fields !== undefined) {
-      if (leadData.custom_fields === null) {
-        transformedData.custom_fields = {};
-      } else if (typeof leadData.custom_fields === 'object') {
-        const validation = configLoader.validateCustomFields(industryConfig, leadData.custom_fields);
-
-        if (!validation.valid) {
-          console.warn('⚠️ Custom field validation warnings:', validation.errors);
-        }
-
-        transformedData.custom_fields = mergeCustomFields(existingLead.custom_fields, leadData.custom_fields);
-      }
-    }
 
     // Clean up empty strings for UUID and date fields
     const cleanedData = { ...transformedData };
@@ -572,7 +419,7 @@ const getLeadStats = async (currentUser) => {
     // Build query with company filter
     let query = supabaseAdmin
       .from('leads')
-      .select('status, lead_source, source, created_at')
+      .select('status, source, created_at')
       .eq('company_id', currentUser.company_id);
 
     // Non-admin users only see their assigned leads
@@ -599,7 +446,7 @@ const getLeadStats = async (currentUser) => {
     // Leads by source
     const sourceStats = {};
     leads.forEach(lead => {
-      const source = lead.lead_source || lead.source || 'unknown';
+      const source = lead.source || 'unknown';
       sourceStats[source] = (sourceStats[source] || 0) + 1;
     });
 
@@ -633,7 +480,7 @@ const getRecentLeads = async (currentUser, limit = 10) => {
     let query = supabaseAdmin
       .from('leads')
       .select(`
-        id, first_name, last_name, email, company, status, lead_source, source, created_at,
+        id, first_name, last_name, email, company, status, source, created_at,
         user_profiles!assigned_to(first_name, last_name)
       `)
       .eq('company_id', currentUser.company_id)
@@ -665,50 +512,33 @@ const searchLeads = async (query, limit = 5, currentUser = null) => {
   try {
     const { supabaseAdmin } = require('../config/supabase');
 
-    const filters = [
-      `name.ilike.%${query}%`,
-      `first_name.ilike.%${query}%`,
-      `last_name.ilike.%${query}%`,
-      `email.ilike.%${query}%`,
-      `company.ilike.%${query}%`,
-      `phone.ilike.%${query}%`,
-      `notes.ilike.%${query}%`
-    ];
-
     let searchQuery = supabaseAdmin
       .from('leads')
       .select(`
-        id,
-        name,
-        first_name,
-        last_name,
-        email,
-        company,
-        status,
-        lead_source,
-        assigned_to,
-        created_at,
+        *,
         user_profiles!assigned_to(first_name, last_name)
       `)
-      .or(filters.join(','))
+      .or(`name.ilike.%${query}%,first_name.ilike.%${query}%,last_name.ilike.%${query}%,email.ilike.%${query}%,company.ilike.%${query}%,phone.ilike.%${query}%,notes.ilike.%${query}%`)
       .order('created_at', { ascending: false })
       .limit(limit);
 
+    // Apply company filter if user is provided
     if (currentUser?.company_id) {
       searchQuery = searchQuery.eq('company_id', currentUser.company_id);
 
+      // Non-admin users only see their assigned leads
       if (currentUser.role !== 'company_admin' && currentUser.role !== 'super_admin') {
         searchQuery = searchQuery.eq('assigned_to', currentUser.id);
       }
     }
 
-    const { data, error } = await searchQuery;
+    const { data: leads, error } = await searchQuery;
 
     if (error) {
       throw error;
     }
 
-    return data || [];
+    return leads;
   } catch (error) {
     console.error('Search leads error:', error);
     throw new ApiError('Failed to search leads', 500);

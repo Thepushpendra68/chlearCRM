@@ -56,7 +56,7 @@ class ActivityService {
       const offset = Number.isInteger(filters.offset)
         ? Math.max(filters.offset, 0)
         : (page - 1) * sanitizedLimit;
-      const fetchEnd = offset + sanitizedLimit - 1;
+      const fetchEnd = offset + sanitizedLimit;
 
       const { data: activities, error } = await query.range(offset, fetchEnd);
 
@@ -78,8 +78,10 @@ class ActivityService {
         user_profiles: undefined
       }));
 
-      const hasMore = formattedActivities.length === sanitizedLimit;
-      const paginatedActivities = formattedActivities;
+      const hasMore = formattedActivities.length > sanitizedLimit;
+      const paginatedActivities = hasMore
+        ? formattedActivities.slice(0, sanitizedLimit)
+        : formattedActivities;
 
       return {
         success: true,

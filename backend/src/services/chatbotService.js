@@ -1449,16 +1449,17 @@ Analyze the message and respond ONLY with valid JSON. Do not include any markdow
 
     // Get team member workload (number of assigned leads)
     const { data: assignmentCounts } = await supabaseAdmin
-      .rpc('count_active_leads_by_user', { company_id_input: currentUser.company_id });
+      .from('leads')
+      .select('assigned_to', { count: 'exact' })
+      .eq('company_id', currentUser.company_id)
+      .eq('status', 'active');
 
-    const workloadMap = Array.isArray(assignmentCounts)
-      ? assignmentCounts.reduce((acc, row) => {
-          if (row.assigned_to) {
-            acc[row.assigned_to] = row.lead_count || 0;
-          }
-          return acc;
-        }, {})
-      : {};
+    const workloadMap = {};
+    assignmentCounts?.forEach(assignment => {
+      if (assignment.assigned_to) {
+        workloadMap[assignment.assigned_to] = (workloadMap[assignment.assigned_to] || 0) + 1;
+      }
+    });
 
     // Score users based on role and workload
     const suggestions = users
@@ -1549,37 +1550,31 @@ Analyze the message and respond ONLY with valid JSON. Do not include any markdow
    * Calculate lead score (0-100)
    */
   calculateLeadScore(lead) {
-    let score = 30; // Base score
+    let score = 50; // Base score
 
-    // Status scoring (0-25 points)
+    // Status scoring (0-30 points)
     const statusValue = this.getStatusValue(lead.status);
-    score += Math.min(25, statusValue * 2.5);
+    score += statusValue * 3; // Up to 30 points
 
-    // Deal value scoring (0-20 points)
+    // Deal value scoring (0-25 points)
     if (lead.deal_value) {
-      const normalizedValue = Math.min(1, lead.deal_value / 100000);
-      score += normalizedValue * 20;
+      const dealScore = Math.min(25, (lead.deal_value / 100000) * 25);
+      score += dealScore;
     }
 
-    // Recency scoring (0-15 points)
+    // Recency scoring (0-20 points)
     const daysSince = this.daysSinceCreated(lead.created_at);
-    const recencyScore = Math.max(0, 15 - (daysSince / 10));
+    const recencyScore = Math.max(0, 20 - (daysSince / 7)); // Newer = better
     score += recencyScore;
 
-    // Priority bonus (0-10 points)
+    // Priority bonus (0-5 points)
     if (lead.priority === 'high') {
-      score += 10;
-    } else if (lead.priority === 'medium') {
       score += 5;
+    } else if (lead.priority === 'medium') {
+      score += 2.5;
     }
 
-    // Engagement bonus (0-20 points) if available
-    if (typeof lead.activity_count === 'number') {
-      const engagementScore = Math.min(20, lead.activity_count * 2);
-      score += engagementScore;
-    }
-
-    return Math.min(100, Math.max(0, Math.round(score)));
+    return Math.min(100, Math.max(0, score));
   }
 
   /**
@@ -1765,25 +1760,10 @@ Analyze the message and respond ONLY with valid JSON. Do not include any markdow
       .select('id, first_name, last_name, role')
       .eq('company_id', currentUser.company_id);
 
-    const searchName = userName.toLowerCase();
-    const exactMatch = users?.find(u => `${u.first_name} ${u.last_name}`.toLowerCase() === searchName);
-    const matches = exactMatch
-      ? [exactMatch]
-      : users?.filter(u => {
-          const fullName = `${u.first_name} ${u.last_name}`.toLowerCase();
-          return (
-            u.first_name.toLowerCase().includes(searchName) ||
-            u.last_name.toLowerCase().includes(searchName) ||
-            fullName.includes(searchName)
-          );
-        }) || [];
-
-    if (matches.length > 1) {
-      const names = matches.map(u => `${u.first_name} ${u.last_name}`.trim()).join(', ');
-      throw new ApiError(`Multiple team members match "${userName}". Please be more specific: ${names}`, 400);
-    }
-
-    const targetUser = matches[0];
+    let targetUser = users?.find(u =>
+      u.first_name.toLowerCase().includes(userName.toLowerCase()) ||
+      u.last_name.toLowerCase().includes(userName.toLowerCase())
+    );
 
     if (!targetUser && userName) {
       throw new ApiError(`Team member "${userName}" not found`, 404);

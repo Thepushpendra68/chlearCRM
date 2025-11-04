@@ -129,54 +129,6 @@ const leadService = {
     } catch (error) {
       throw error.response?.data || error;
     }
-  },
-
-  /**
-   * Get industry configuration for current company
-   */
-  getIndustryConfig: async () => {
-    try {
-      const response = await api.get('/config/industry');
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || error;
-    }
-  },
-
-  /**
-   * Get form layout configuration
-   */
-  getFormLayout: async () => {
-    try {
-      const response = await api.get('/config/form-layout');
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || error;
-    }
-  },
-
-  /**
-   * Get field definitions
-   */
-  getFieldDefinitions: async () => {
-    try {
-      const response = await api.get('/config/fields');
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || error;
-    }
-  },
-
-  /**
-   * Get industry-specific terminology
-   */
-  getTerminology: async () => {
-    try {
-      const response = await api.get('/config/terminology');
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || error;
-    }
   }
 };
 

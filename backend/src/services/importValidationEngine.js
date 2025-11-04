@@ -29,26 +29,15 @@ const parseDateFlexible = (value) => {
   if (!dateStr) return null;
 
   // Try parsing as Excel serial number (common in CSV exports)
-  // Excel stores dates as days since 1900-01-01 (with an artificial leap day at 1900-02-29)
-  if (/^\d+$/.test(dateStr) && dateStr.length >= 5) {
-    const excelSerial = parseInt(dateStr, 10);
-
-    if (excelSerial >= 1 && excelSerial <= 600000) {
-      let adjustedSerial = excelSerial;
-
-      if (adjustedSerial >= 60) {
-        adjustedSerial -= 1;
-      }
-
-      const excelEpoch = Date.UTC(1899, 11, 30);
-      const milliseconds = excelEpoch + adjustedSerial * 86400 * 1000;
-      const date = new Date(milliseconds);
-
+  // Excel stores dates as days since 1900-01-01
+  if (/^\d+$/.test(dateStr)) {
+    const excelDate = parseInt(dateStr, 10);
+    if (excelDate > 0 && excelDate < 100000) {
+      // Excel serial date conversion
+      // Excel epoch is 1900-01-01, but has a leap year bug (1900 is not a leap year but Excel treats it as one)
+      const date = new Date((excelDate - 25569) * 86400 * 1000);
       if (!Number.isNaN(date.getTime())) {
-        const year = date.getUTCFullYear();
-        if (year >= 1900 && year <= 2100) {
-          return date;
-        }
+        return date;
       }
     }
   }
@@ -179,7 +168,7 @@ class ImportValidationEngine {
         if (Array.isArray(enumList) && enumList.length > 0) {
           this.fuseInstances[field] = new Fuse(enumList, {
             includeScore: true,
-            threshold: 0.4, // Slightly more permissive than 0.3 to balance accuracy and recall
+            threshold: 0.4, // Lowered from 0.3 - closer to 0 is more similar
             distance: 100,
             minMatchCharLength: 2
           });
@@ -205,7 +194,7 @@ class ImportValidationEngine {
 
           this.fuseInstances[`${field}_enhanced`] = new Fuse(searchableItems, {
             includeScore: true,
-            threshold: 0.4, // Slightly more permissive than 0.3 to balance accuracy and recall
+            threshold: 0.4, // Lowered from 0.3
             distance: 100,
             minMatchCharLength: 2,
             keys: ['value', 'label', 'searchText']

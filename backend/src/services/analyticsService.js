@@ -14,18 +14,13 @@ const getLeadStatusSegments = async (companyId) => {
 
     picklists.statuses.forEach((option) => {
       const metadata = option.metadata || {};
-      const value = option.value;
 
-      const matchesWonValue = ['converted', 'won', 'closed_won'].includes(value);
-      const metadataWon = metadata.is_won === true;
-      const metadataLost = metadata.is_lost === true;
-
-      if (metadataWon || (matchesWonValue && metadata.is_won !== false)) {
-        won.add(value);
+      if (metadata.is_won || ['converted', 'won', 'closed_won'].includes(option.value)) {
+        won.add(option.value);
       }
 
-      if (metadataLost || (['lost', 'closed_lost'].includes(value) && metadata.is_lost !== false)) {
-        lost.add(value);
+      if (metadata.is_lost || ['lost', 'closed_lost'].includes(option.value)) {
+        lost.add(option.value);
       }
     });
 
@@ -94,31 +89,11 @@ const getDashboardStatsWithComparison = async (currentUser, thirtyDaysAgo, sixty
         .select('id, created_at, status', { count: 'exact' })
         .eq('company_id', currentUser.company_id);
 
+      // Non-admin users only see their assigned leads
       if (currentUser.role !== 'company_admin' && currentUser.role !== 'super_admin') {
         query = query.eq('assigned_to', currentUser.id);
       }
       return query;
-    };
-
-    const createConvertedQuery = (fromDate, toDate) => {
-      const limit = 1000;
-      let convertedQuery = supabase
-        .from('lead_status_history')
-        .select('lead_id, changed_at')
-        .eq('company_id', currentUser.company_id)
-        .eq('status', 'won')
-        .gte('changed_at', fromDate.toISOString())
-        .limit(limit);
-
-      if (toDate) {
-        convertedQuery = convertedQuery.lt('changed_at', toDate.toISOString());
-      }
-
-      if (currentUser.role !== 'company_admin' && currentUser.role !== 'super_admin') {
-        convertedQuery = convertedQuery.eq('changed_by', currentUser.id);
-      }
-
-      return convertedQuery;
     };
 
     const { won: wonStatuses } = await getLeadStatusSegments(currentUser.company_id);
@@ -131,11 +106,16 @@ const getDashboardStatsWithComparison = async (currentUser, thirtyDaysAgo, sixty
       .lt('created_at', thirtyDaysAgo.toISOString());
 
     const currentConvertedPromise = wonStatuses.length
-      ? createConvertedQuery(thirtyDaysAgo, null)
+      ? createBaseQuery()
+          .in('status', wonStatuses)
+          .gte('created_at', thirtyDaysAgo.toISOString())
       : Promise.resolve(emptyResult);
 
     const previousConvertedPromise = wonStatuses.length
-      ? createConvertedQuery(sixtyDaysAgo, thirtyDaysAgo)
+      ? createBaseQuery()
+          .in('status', wonStatuses)
+          .gte('created_at', sixtyDaysAgo.toISOString())
+          .lt('created_at', thirtyDaysAgo.toISOString())
       : Promise.resolve(emptyResult);
 
     const [
@@ -177,10 +157,9 @@ const getDashboardStatsWithComparison = async (currentUser, thirtyDaysAgo, sixty
       : currentConvertedLeadsCount > 0 ? '100.0' : '0.0';
 
     // Calculate total leads change (comparing current period vs previous period)
-    const previousTotalLeadsCount = totalLeadsCount - currentNewLeadsCount;
-    const totalLeadsChangePercent = previousTotalLeadsCount > 0
-      ? ((totalLeadsCount - previousTotalLeadsCount) / previousTotalLeadsCount * 100).toFixed(1)
-      : totalLeadsCount > 0 ? '100.0' : '0.0';
+    const totalLeadsChange = previousNewLeadsCount > 0
+      ? ((currentNewLeadsCount - previousNewLeadsCount) / previousNewLeadsCount * 100).toFixed(1)
+      : currentNewLeadsCount > 0 ? '100.0' : '0.0';
 
     // Calculate conversion rate change
     const previousConversionRate = totalLeadsCount > 0 ? (previousConvertedLeadsCount / totalLeadsCount * 100) : 0;
@@ -194,7 +173,7 @@ const getDashboardStatsWithComparison = async (currentUser, thirtyDaysAgo, sixty
       converted_leads: currentConvertedLeadsCount,
       conversion_rate: `${conversionRate}%`,
       // Include percentage changes for frontend
-      total_leads_change: `${totalLeadsChangePercent >= 0 ? '+' : ''}${totalLeadsChangePercent}%`,
+      total_leads_change: `${totalLeadsChange >= 0 ? '+' : ''}${totalLeadsChange}%`,
       new_leads_change: `${newLeadsChange >= 0 ? '+' : ''}${newLeadsChange}%`,
       converted_leads_change: `${convertedLeadsChange >= 0 ? '+' : ''}${convertedLeadsChange}%`,
       conversion_rate_change: `${conversionRateChange >= 0 ? '+' : ''}${conversionRateChange}%`
@@ -293,7 +272,6 @@ const getRecentLeads = async (currentUser, limit = 10) => {
         email,
         company,
         status,
-        lead_source,
         source,
         created_at,
         assigned_to,
@@ -330,7 +308,7 @@ const getRecentLeads = async (currentUser, limit = 10) => {
         email: lead.email || '',
         company: lead.company || '',
         status: lead.status || 'new',
-        lead_source: lead.lead_source || lead.source || 'unknown',
+        lead_source: lead.source || 'unknown',
         created_at: lead.created_at,
         assigned_user_first_name: lead.user_profiles?.first_name || null,
         assigned_user_last_name: lead.user_profiles?.last_name || null
@@ -447,7 +425,7 @@ const getLeadSources = async (currentUser) => {
     // Build query to get lead source counts
     let query = supabase
       .from('leads')
-      .select('lead_source, source')
+      .select('source')
       .eq('company_id', currentUser.company_id);
 
     // Non-admin users only see their assigned leads
@@ -465,7 +443,7 @@ const getLeadSources = async (currentUser) => {
     // Group by source and count
     const sourceCounts = {};
     data.forEach(lead => {
-      const source = lead.lead_source || lead.source || 'unknown';
+      const source = lead.source || 'unknown';
       sourceCounts[source] = (sourceCounts[source] || 0) + 1;
     });
 

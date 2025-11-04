@@ -102,7 +102,7 @@ const getLeadStatus = async (req, res, next) => {
  */
 const getUserPerformance = async (req, res, next) => {
   try {
-    const performance = await analyticsService.getUserPerformance(req.user);
+    const performance = await analyticsService.getUserPerformance();
 
     res.json({
       success: true,

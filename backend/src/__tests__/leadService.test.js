@@ -9,18 +9,6 @@ jest.mock('../config/supabase', () => ({
   }
 }));
 
-jest.mock('../config/industry/configLoader', () => ({
-  getConfigForCompany: jest.fn(() => ({
-    industryType: 'generic',
-    customFields: {},
-    validation: {}
-  })),
-  validateCustomFields: jest.fn(() => ({
-    valid: true,
-    errors: []
-  }))
-}));
-
 const ApiError = require('../utils/ApiError');
 const { supabaseAdmin } = require('../config/supabase');
 const leadService = require('../services/leadService');
@@ -55,23 +43,9 @@ describe('leadService', () => {
       });
 
       supabaseAdmin.from.mockImplementation((table) => {
-        if (table === 'companies') {
-          const singleMockCompany = jest.fn().mockResolvedValue({
-            data: {
-              id: 'company-1',
-              industry_type: 'generic'
-            },
-            error: null
-          });
-          const eqMock = jest.fn().mockReturnValue({ single: singleMockCompany });
-          const selectMockCompany = jest.fn().mockReturnValue({ eq: eqMock });
-          return { select: selectMockCompany };
-        }
-
         if (table === 'leads') {
           return { insert: insertMock };
         }
-
         throw new Error(`Unexpected table: ${table}`);
       });
 
@@ -113,23 +87,9 @@ describe('leadService', () => {
       const insertMock = jest.fn().mockReturnValue({ select: selectMock });
 
       supabaseAdmin.from.mockImplementation((table) => {
-        if (table === 'companies') {
-          const singleMockCompany = jest.fn().mockResolvedValue({
-            data: {
-              id: 'company-1',
-              industry_type: 'generic'
-            },
-            error: null
-          });
-          const eqMock = jest.fn().mockReturnValue({ single: singleMockCompany });
-          const selectMockCompany = jest.fn().mockReturnValue({ eq: eqMock });
-          return { select: selectMockCompany };
-        }
-
         if (table === 'leads') {
           return { insert: insertMock };
         }
-
         throw new Error(`Unexpected table: ${table}`);
       });
 
@@ -202,18 +162,6 @@ describe('leadService', () => {
         .mockImplementationOnce(() => ({
           select: fetchSelectMock
         }))
-        .mockImplementationOnce(() => {
-          const singleMockCompany = jest.fn().mockResolvedValue({
-            data: {
-              id: 'company-1',
-              industry_type: 'generic'
-            },
-            error: null
-          });
-          const eqMock = jest.fn().mockReturnValue({ single: singleMockCompany });
-          const selectMockCompany = jest.fn().mockReturnValue({ eq: eqMock });
-          return { select: selectMockCompany };
-        })
         .mockImplementationOnce(() => ({
           update: updateMock
         }));
