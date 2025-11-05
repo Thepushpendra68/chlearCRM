@@ -380,12 +380,24 @@ export async function uploadFile(file, path, companyId) {
   try {
     const filePath = `${companyId}/${path}`;
 
-    const { data, error } = await supabase.storage
-      .from('company-files')
-      .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: false,
-      });
+    // Prefer configured bucket, fallback to 'public'
+    const preferredBucket = import.meta.env.VITE_SUPABASE_STORAGE_BUCKET || 'company-files';
+    const tryUpload = async (bucket) => {
+      return await supabase.storage
+        .from(bucket)
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false,
+        });
+    };
+
+    let bucketUsed = preferredBucket;
+    let { data, error } = await tryUpload(bucketUsed);
+    if (error && (error.statusCode === 404 || `${error.message}`.toLowerCase().includes('bucket not found'))) {
+      // Retry with public bucket
+      bucketUsed = 'public';
+      ({ data, error } = await tryUpload(bucketUsed));
+    }
 
     if (error) {
       throw error;
@@ -393,7 +405,7 @@ export async function uploadFile(file, path, companyId) {
 
     // Get public URL
     const { data: urlData } = supabase.storage
-      .from('company-files')
+      .from(bucketUsed)
       .getPublicUrl(filePath);
 
     return {

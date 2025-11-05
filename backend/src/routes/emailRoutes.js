@@ -4,6 +4,7 @@ const emailTemplateController = require('../controllers/emailTemplateController'
 const emailSendController = require('../controllers/emailSendController');
 const automationController = require('../controllers/automationController');
 const emailWebhookController = require('../controllers/emailWebhookController');
+const workflowTemplateController = require('../controllers/workflowTemplateController');
 
 const router = express.Router();
 
@@ -46,6 +47,32 @@ router.get('/settings/integration', emailTemplateController.getIntegrationSettin
 router.post('/settings/integration', authorize(['company_admin', 'manager']), emailTemplateController.upsertIntegrationSettings);
 
 // =====================================================
+// AI-POWERED EMAIL FEATURES
+// =====================================================
+
+// AI Status
+router.get('/ai/status', emailTemplateController.aiStatus);
+
+// Template AI
+router.post('/ai/generate-template', authorize(['company_admin', 'manager']), emailTemplateController.aiGenerateTemplate);
+router.post('/ai/generate-subject-variants', emailTemplateController.aiGenerateSubjectVariants);
+router.post('/ai/optimize-content', authorize(['company_admin', 'manager']), emailTemplateController.aiOptimizeContent);
+router.post('/ai/suggest-variables', emailTemplateController.aiSuggestVariables);
+
+// Sequence AI
+router.post('/ai/generate-sequence', authorize(['company_admin', 'manager']), emailTemplateController.aiGenerateSequence);
+router.post('/ai/optimize-timing', emailTemplateController.aiOptimizeTiming);
+
+// Personalization AI
+router.post('/ai/personalized-subject', emailTemplateController.aiPersonalizedSubject);
+router.post('/ai/personalized-email', emailTemplateController.aiPersonalizedEmail);
+router.post('/ai/optimal-send-time', emailTemplateController.aiOptimalSendTime);
+
+// Analytics AI
+router.post('/ai/analyze-performance', emailTemplateController.aiAnalyzePerformance);
+router.post('/ai/predict-engagement', emailTemplateController.aiPredictEngagement);
+
+// =====================================================
 // EMAIL SENDING ROUTES
 // =====================================================
 
@@ -80,6 +107,28 @@ router.get('/sequences/:id/enrollments', automationController.getEnrollments);
 
 // Process (internal/cron)
 router.post('/process', automationController.processDueEnrollments);
+
+// =====================================================
+// WORKFLOW TEMPLATE LIBRARY ROUTES
+// =====================================================
+
+// Template Packs (MUST be before /:id routes to avoid matching "packs" as an ID)
+router.get('/workflow-templates/packs', workflowTemplateController.getTemplatePacks);
+router.get('/workflow-templates/packs/:id', workflowTemplateController.getPackById);
+
+// Import/Export (specific routes before /:id)
+router.post('/workflow-templates/import', authorize(['company_admin', 'manager']), workflowTemplateController.importTemplate);
+router.get('/workflow-templates/:id/export', workflowTemplateController.exportTemplate);
+
+// Templates
+router.get('/workflow-templates', workflowTemplateController.getTemplates);
+router.get('/workflow-templates/:id', workflowTemplateController.getTemplateById);
+router.post('/workflow-templates', authorize(['company_admin', 'manager']), workflowTemplateController.createTemplate);
+router.put('/workflow-templates/:id', authorize(['company_admin', 'manager']), workflowTemplateController.updateTemplate);
+router.delete('/workflow-templates/:id', authorize(['company_admin']), workflowTemplateController.deleteTemplate);
+
+// Create sequence from template
+router.post('/workflow-templates/:id/create-sequence', authorize(['company_admin', 'manager']), workflowTemplateController.createSequenceFromTemplate);
 
 module.exports = router;
 

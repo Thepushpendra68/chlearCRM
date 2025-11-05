@@ -100,3 +100,9 @@ Thumbs.db
 # Temporary files
 tmp/
 temp/
+.env
+backend/.env
+frontend/.env
+node_modules/
+frontend/dist/
+backend/node_modules/

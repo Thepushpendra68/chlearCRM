@@ -381,6 +381,358 @@ class EmailService {
       throw error;
     }
   }
+
+  // ================== AI FEATURES ==================
+
+  /**
+   * Check AI availability status
+   */
+  async getAiStatus() {
+    try {
+      const response = await api.get('/email/ai/status');
+      return response.data;
+    } catch (error) {
+      console.error('Error checking AI status:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Generate template from description
+   */
+  async aiGenerateTemplate(description, templateType = 'general', context = {}) {
+    try {
+      const response = await api.post('/email/ai/generate-template', {
+        description,
+        template_type: templateType,
+        context
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error generating template:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Generate subject line variants
+   */
+  async aiGenerateSubjectVariants(subject, leadId = null, count = 5) {
+    try {
+      const response = await api.post('/email/ai/generate-subject-variants', {
+        subject,
+        lead_id: leadId,
+        count
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error generating subject variants:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Optimize template content
+   */
+  async aiOptimizeContent(html, subject, goals = ['engagement', 'clarity']) {
+    try {
+      const response = await api.post('/email/ai/optimize-content', {
+        html,
+        subject,
+        goals
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error optimizing content:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Suggest personalization variables
+   */
+  async aiSuggestVariables(html, purpose = '') {
+    try {
+      const response = await api.post('/email/ai/suggest-variables', {
+        html,
+        purpose
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error suggesting variables:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Generate email sequence from goal
+   */
+  async aiGenerateSequence(goal, leadType = 'prospect', sequenceLength = 5) {
+    try {
+      const response = await api.post('/email/ai/generate-sequence', {
+        goal,
+        lead_type: leadType,
+        sequence_length: sequenceLength
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error generating sequence:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Optimize sequence timing
+   */
+  async aiOptimizeTiming(sequenceSteps, targetAudience = {}) {
+    try {
+      const response = await api.post('/email/ai/optimize-timing', {
+        sequence_steps: sequenceSteps,
+        target_audience: targetAudience
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error optimizing timing:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Generate personalized subject for specific lead
+   */
+  async aiPersonalizedSubject(leadId, emailContext = {}) {
+    try {
+      const response = await api.post('/email/ai/personalized-subject', {
+        lead_id: leadId,
+        email_context: emailContext
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error generating personalized subject:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Generate personalized email for specific lead
+   */
+  async aiPersonalizedEmail(leadId, templateContext = {}) {
+    try {
+      const response = await api.post('/email/ai/personalized-email', {
+        lead_id: leadId,
+        template_context: templateContext
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error generating personalized email:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get optimal send time for lead
+   */
+  async aiOptimalSendTime(leadId, timezone = 'America/New_York') {
+    try {
+      const response = await api.post('/email/ai/optimal-send-time', {
+        lead_id: leadId,
+        timezone
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error getting optimal send time:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Analyze email performance
+   */
+  async aiAnalyzePerformance(metrics, templateInfo = {}) {
+    try {
+      const response = await api.post('/email/ai/analyze-performance', {
+        metrics,
+        template_info: templateInfo
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error analyzing performance:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Predict engagement likelihood
+   */
+  async aiPredictEngagement(leadId, emailData, historicalData = {}) {
+    try {
+      const response = await api.post('/email/ai/predict-engagement', {
+        lead_id: leadId,
+        email_data: emailData,
+        historical_data: historicalData
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error predicting engagement:', error);
+      throw error;
+    }
+  }
+
+  // ================== WORKFLOW TEMPLATES ==================
+
+  /**
+   * Get all workflow templates
+   */
+  async getWorkflowTemplates(filters = {}) {
+    try {
+      const params = new URLSearchParams();
+      if (filters.category) params.append('category', filters.category);
+      if (filters.industry) params.append('industry', filters.industry);
+      if (filters.search) params.append('search', filters.search);
+      if (filters.is_active !== undefined) params.append('is_active', filters.is_active);
+      if (filters.include_public !== undefined) params.append('include_public', filters.include_public);
+
+      const response = await api.get(`/email/workflow-templates?${params.toString()}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching workflow templates:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get workflow template by ID
+   */
+  async getWorkflowTemplate(templateId) {
+    try {
+      const response = await api.get(`/email/workflow-templates/${templateId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching workflow template:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Create workflow template
+   */
+  async createWorkflowTemplate(templateData) {
+    try {
+      const response = await api.post('/email/workflow-templates', templateData);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating workflow template:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update workflow template
+   */
+  async updateWorkflowTemplate(templateId, templateData) {
+    try {
+      const response = await api.put(`/email/workflow-templates/${templateId}`, templateData);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating workflow template:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete workflow template
+   */
+  async deleteWorkflowTemplate(templateId) {
+    try {
+      const response = await api.delete(`/email/workflow-templates/${templateId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting workflow template:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Create sequence from template
+   */
+  async createSequenceFromTemplate(templateId, sequenceData = {}) {
+    try {
+      const response = await api.post(`/email/workflow-templates/${templateId}/create-sequence`, sequenceData);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating sequence from template:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Export workflow template as JSON
+   */
+  async exportWorkflowTemplate(templateId) {
+    try {
+      const response = await api.get(`/email/workflow-templates/${templateId}/export`);
+      
+      // Create download link
+      const exportData = response.data.data || response.data;
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${exportData.name.replace(/[^a-zA-Z0-9]/g, '_')}_template.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      return response.data;
+    } catch (error) {
+      console.error('Error exporting workflow template:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Import workflow template from JSON
+   */
+  async importWorkflowTemplate(importData) {
+    try {
+      const response = await api.post('/email/workflow-templates/import', importData);
+      return response.data;
+    } catch (error) {
+      console.error('Error importing workflow template:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get workflow template packs
+   */
+  async getWorkflowTemplatePacks(filters = {}) {
+    try {
+      const params = new URLSearchParams();
+      if (filters.industry) params.append('industry', filters.industry);
+      if (filters.search) params.append('search', filters.search);
+
+      const response = await api.get(`/email/workflow-templates/packs?${params.toString()}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching workflow template packs:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get workflow template pack by ID
+   */
+  async getWorkflowTemplatePack(packId) {
+    try {
+      const response = await api.get(`/email/workflow-templates/packs/${packId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching workflow template pack:', error);
+      throw error;
+    }
+  }
 }
 
 export default new EmailService();

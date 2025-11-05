@@ -8,7 +8,9 @@ import {
   CursorArrowRippleIcon,
   ExclamationTriangleIcon,
   ArrowTrendingUpIcon,
-  ArrowTrendingDownIcon
+  ArrowTrendingDownIcon,
+  SparklesIcon,
+  LightBulbIcon
 } from '@heroicons/react/24/outline';
 
 const EmailAnalytics = () => {
@@ -25,6 +27,10 @@ const EmailAnalytics = () => {
     click_rate: 0,
     bounce_rate: 0
   });
+  
+  // AI Analysis State
+  const [aiAnalysis, setAiAnalysis] = useState(null);
+  const [aiAnalyzing, setAiAnalyzing] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -67,6 +73,35 @@ const EmailAnalytics = () => {
     }
   };
 
+  const handleAiAnalysis = async () => {
+    if (stats.total_sent === 0) {
+      return;
+    }
+
+    try {
+      setAiAnalyzing(true);
+      const response = await emailService.aiAnalyzePerformance(
+        {
+          sent: stats.total_sent,
+          delivered: stats.total_delivered,
+          opened: stats.total_opened,
+          clicked: stats.total_clicked,
+          bounced: stats.total_bounced,
+          delivery_rate: parseFloat(stats.delivery_rate),
+          open_rate: parseFloat(stats.open_rate),
+          click_rate: parseFloat(stats.click_rate),
+          bounce_rate: parseFloat(stats.bounce_rate)
+        },
+        { name: 'Overall Campaign Performance' }
+      );
+      setAiAnalysis(response.data);
+    } catch (error) {
+      console.error('Error getting AI analysis:', error);
+    } finally {
+      setAiAnalyzing(false);
+    }
+  };
+
   const StatCard = ({ title, value, subtitle, icon: Icon, trend, trendUp }) => (
     <div className="bg-white rounded-lg shadow-sm border p-6">
       <div className="flex items-center justify-between mb-2">
@@ -106,13 +141,27 @@ const EmailAnalytics = () => {
     <div className="p-6">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 flex items-center">
-          <ChartBarIcon className="h-8 w-8 mr-3 text-primary-600" />
-          Email Analytics
-        </h1>
-        <p className="text-gray-600 mt-1">
-          Track your email campaign performance
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 flex items-center">
+              <ChartBarIcon className="h-8 w-8 mr-3 text-primary-600" />
+              Email Analytics
+            </h1>
+            <p className="text-gray-600 mt-1">
+              Track your email campaign performance
+            </p>
+          </div>
+          {stats.total_sent > 0 && (
+            <button
+              onClick={handleAiAnalysis}
+              disabled={aiAnalyzing}
+              className="btn-primary flex items-center space-x-2"
+            >
+              <SparklesIcon className="h-5 w-5" />
+              <span>{aiAnalyzing ? 'Analyzing...' : 'AI Insights'}</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Stats Grid */}
@@ -141,6 +190,114 @@ const EmailAnalytics = () => {
           icon={CursorArrowRippleIcon}
         />
       </div>
+
+      {/* AI Analysis Results */}
+      {aiAnalysis && (
+        <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg shadow-sm border-2 border-purple-200 p-6 mb-8">
+          <div className="flex items-start space-x-3 mb-4">
+            <LightBulbIcon className="h-6 w-6 text-purple-600 flex-shrink-0 mt-1" />
+            <div className="flex-1">
+              <h2 className="text-lg font-semibold text-gray-900 mb-1">
+                AI Performance Insights
+              </h2>
+              <p className="text-sm text-gray-700">
+                Performance Level: <span className={`font-semibold capitalize ${
+                  aiAnalysis.performance_level === 'excellent' ? 'text-green-700' :
+                  aiAnalysis.performance_level === 'good' ? 'text-blue-700' :
+                  aiAnalysis.performance_level === 'average' ? 'text-yellow-700' :
+                  'text-red-700'
+                }`}>
+                  {aiAnalysis.performance_level}
+                </span>
+                {aiAnalysis.overall_score && (
+                  <span className="ml-2">• Score: {aiAnalysis.overall_score}/100</span>
+                )}
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Strengths */}
+            {aiAnalysis.strengths && aiAnalysis.strengths.length > 0 && (
+              <div className="bg-white rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-green-800 mb-2 flex items-center">
+                  <span className="mr-2">✓</span> What's Working Well
+                </h3>
+                <ul className="space-y-1">
+                  {aiAnalysis.strengths.map((strength, idx) => (
+                    <li key={idx} className="text-sm text-gray-700 flex items-start">
+                      <span className="text-green-600 mr-2">•</span>
+                      <span>{strength}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Weaknesses */}
+            {aiAnalysis.weaknesses && aiAnalysis.weaknesses.length > 0 && (
+              <div className="bg-white rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-orange-800 mb-2 flex items-center">
+                  <span className="mr-2">!</span> Areas for Improvement
+                </h3>
+                <ul className="space-y-1">
+                  {aiAnalysis.weaknesses.map((weakness, idx) => (
+                    <li key={idx} className="text-sm text-gray-700 flex items-start">
+                      <span className="text-orange-600 mr-2">•</span>
+                      <span>{weakness}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+
+          {/* Recommendations */}
+          {aiAnalysis.recommendations && aiAnalysis.recommendations.length > 0 && (
+            <div className="mt-4 bg-white rounded-lg p-4">
+              <h3 className="text-sm font-semibold text-purple-900 mb-3">
+                📋 Action Recommendations
+              </h3>
+              <div className="space-y-3">
+                {aiAnalysis.recommendations.map((rec, idx) => (
+                  <div key={idx} className="border-l-4 border-purple-400 pl-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <h4 className="text-sm font-medium text-gray-900">{rec.area}</h4>
+                        <p className="text-sm text-gray-700 mt-1">{rec.suggestion}</p>
+                        {rec.expected_impact && (
+                          <p className="text-xs text-purple-700 mt-1">
+                            Expected Impact: {rec.expected_impact}
+                          </p>
+                        )}
+                      </div>
+                      <span className={`ml-3 px-2 py-1 rounded text-xs font-medium ${
+                        rec.priority === 'high' ? 'bg-red-100 text-red-800' :
+                        rec.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-blue-100 text-blue-800'
+                      }`}>
+                        {rec.priority}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Key Insights */}
+          {aiAnalysis.key_insights && aiAnalysis.key_insights.length > 0 && (
+            <div className="mt-4 p-3 bg-purple-100 rounded-lg">
+              <h4 className="text-sm font-semibold text-purple-900 mb-2">💡 Key Insights</h4>
+              <ul className="space-y-1">
+                {aiAnalysis.key_insights.map((insight, idx) => (
+                  <li key={idx} className="text-sm text-purple-800">• {insight}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Additional Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">

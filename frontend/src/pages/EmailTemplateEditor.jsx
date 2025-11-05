@@ -3,8 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom';
 import emailService from '../services/emailService';
 import toast from 'react-hot-toast';
 import Editor from '@monaco-editor/react';
+import { getCurrentUserProfile, uploadFile } from '../config/supabase';
+import supabase from '../config/supabase';
 // GrapesJS styles for visual editor
 import 'grapesjs/dist/css/grapes.min.css';
+import EmailAiToolbar from '../components/EmailAiToolbar';
 import {
   CodeBracketIcon,
   PaintBrushIcon,
@@ -91,22 +94,22 @@ const EmailTemplateEditor = () => {
   const fetchTemplate = async () => {
     try {
       setLoading(true);
-      const response = await emailService.getTemplate(id);
-      const template = response.data;
+      const resp = await emailService.getTemplate(id);
+      const template = resp?.data || resp;
 
-      // Determine base version (published or latest)
+      // Determine base version: prefer published, otherwise latest
       let baseVersion = null;
-      if (template.versions && template.versions.length > 0) {
-        if (template.published_version_id) {
-          baseVersion = template.versions.find(v => v.id === template.published_version_id) || template.versions[0];
-        } else {
-          baseVersion = template.versions[0];
-        }
+      if (template.published_version) {
+        baseVersion = template.published_version;
+      } else if (template.latest_version) {
+        baseVersion = template.latest_version;
+      } else if (template.versions && template.versions.length > 0) {
+        baseVersion = template.versions[0];
       }
 
       setTemplateData(prev => ({
         name: template.name,
-        subject: baseVersion?.subject || prev.subject || '',
+        subject: (baseVersion && baseVersion.subject) ? baseVersion.subject : (template.subject || prev.subject || ''),
         category: template.category || 'general',
         folder: template.folder || '',
         description: template.description || '',
@@ -115,8 +118,9 @@ const EmailTemplateEditor = () => {
 
       // Load version content if available
       if (baseVersion) {
-        // Backend stores fields as mjml, html, json_design
-        setMjmlContent(baseVersion.mjml || DEFAULT_MJML);
+        // Prefer MJML when present; otherwise show saved HTML in code editor to maintain parity
+        const nextCodeContent = baseVersion.mjml || baseVersion.html || DEFAULT_MJML;
+        setMjmlContent(nextCodeContent);
         setHtmlContent(baseVersion.html || '');
         setDesignJson(baseVersion.json_design || null);
       }
@@ -154,12 +158,86 @@ const EmailTemplateEditor = () => {
         console.warn('Newsletter preset not available, using basic editor:', err);
       }
 
+      // Custom upload handler - uploads to Supabase email-assets bucket
+      const uploadHandler = async (files, dropData = null) => {
+        try {
+          const { profile } = await getCurrentUserProfile();
+          const companyId = profile?.company_id || 'default';
+          const uploaded = [];
+          
+          for (const file of files) {
+            // Create short filename
+            const ext = file.name.split('.').pop().toLowerCase();
+            const base = file.name.replace(/\.[^/.]+$/, '').slice(0, 8).replace(/[^a-zA-Z0-9]/g, '');
+            const timestamp = Date.now().toString(36);
+            const shortName = `${timestamp}-${base}.${ext}`;
+            
+            // Upload to email-assets bucket
+            const filePath = `${companyId}/${shortName}`;
+            
+            const { data, error } = await supabase.storage
+              .from('email-assets')
+              .upload(filePath, file, {
+                cacheControl: '3600',
+                upsert: false,
+              });
+
+            if (error) {
+              console.error('Upload error:', error);
+              toast.error(`Failed to upload ${file.name}: ${error.message}`);
+              continue;
+            }
+
+            // Get public URL
+            const { data: urlData } = supabase.storage
+              .from('email-assets')
+              .getPublicUrl(filePath);
+
+            if (urlData?.publicUrl) {
+              uploaded.push({ src: urlData.publicUrl, name: shortName, type: 'image' });
+            }
+          }
+
+          if (uploaded.length > 0) {
+            const editorInst = grapesEditorRef.current;
+            editorInst?.AssetManager.add(uploaded);
+
+            // If dropped on canvas, place/replace the first image directly
+            if (dropData) {
+              const first = uploaded[0];
+              const selected = editorInst.getSelected();
+              if (selected && selected.is('image')) {
+                selected.addAttributes({ src: first.src });
+              } else {
+                editorInst.addComponents(`<img src="${first.src}" style="max-width: 100%;" />`);
+              }
+            }
+            toast.success(`Uploaded ${uploaded.length} image(s)`);
+          } else {
+            toast.error('No images were uploaded');
+          }
+        } catch (err) {
+          console.error('Asset upload error:', err);
+          toast.error('Failed to upload: ' + err.message);
+        }
+      };
+
       const config = {
         container: '#gjs-editor',
         height: '600px',
         width: 'auto',
         storageManager: false,
         fromElement: false,
+        assetManager: {
+          upload: false,
+          autoAdd: true,
+          uploadFile: async (e) => {
+            const files = e.dataTransfer?.files || e.target?.files || [];
+            if (files.length > 0) {
+              await uploadHandler(Array.from(files));
+            }
+          }
+        },
         canvas: {
           styles: [],
           scripts: []
@@ -178,15 +256,75 @@ const EmailTemplateEditor = () => {
       const editor = grapesjs.init(config);
       console.log('GrapesJS editor initialized:', !!editor);
 
-      // Add some default content if no design exists
+      // Override the asset manager's upload behavior entirely
+      const am = editor.AssetManager;
+      
+      // Hook into the asset manager's container for drops
+      setTimeout(() => {
+        // Find the asset manager drop zone
+        const assetContainer = document.querySelector('.gjs-am-assets-cont') || 
+                               document.querySelector('#gjs-editor .gjs-am-assets') ||
+                               document.querySelector('#gjs-am-uploadFile');
+        
+        if (assetContainer) {
+          console.log('Found asset container, wiring drop handler');
+          
+          // Prevent default drag behaviors
+          ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            assetContainer.addEventListener(eventName, (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }, false);
+          });
+
+          // Handle drop
+          assetContainer.addEventListener('drop', async (e) => {
+            const files = e.dataTransfer?.files;
+            console.log('[Asset Manager Drop] Received files:', files?.length || 0);
+            if (files && files.length > 0) {
+              await uploadHandler(Array.from(files));
+            }
+          }, false);
+        }
+
+        // Also wire the file input button
+        const fileInput = document.querySelector('#gjs-editor input[type="file"]');
+        if (fileInput) {
+          console.log('Found file input, wiring change handler');
+          fileInput.addEventListener('change', async (e) => {
+            console.log('[File Input] Selected files:', e.target.files?.length || 0);
+            if (e.target.files && e.target.files.length > 0) {
+              await uploadHandler(Array.from(e.target.files));
+            }
+          });
+        }
+      }, 1500);
+
+      // Handle canvas drops for direct image placement
+      editor.on('canvas:drop', async (data) => {
+        const files = data?.dataTransfer?.files;
+        console.log('[Canvas Drop] Received files:', files?.length || 0);
+        if (files && files.length > 0) {
+          await uploadHandler(Array.from(files), data);
+        }
+      });
+
+      // Load existing design if available, otherwise use saved HTML
       if (!designJson || Object.keys(designJson).length === 0) {
-        editor.addComponents(`
-          <div style="padding: 20px; font-family: Arial, sans-serif;">
-            <h1>Welcome Email</h1>
-            <p>Hello {{lead.name}},</p>
-            <p>This is your email template. Start editing to customize it!</p>
-          </div>
-        `);
+        if (htmlContent && htmlContent.trim().length > 0) {
+          // Strip global <style> from start if present and keep it within canvas
+          // GrapesJS supports styles via setStyle or inline; we include as-is for simplicity
+          editor.setComponents('');
+          editor.addComponents(htmlContent);
+        } else {
+          // Final fallback: minimal starter
+          editor.addComponents(`
+            <div style="padding: 20px; font-family: Arial, sans-serif;">
+              <h1>New Email</h1>
+              <p>Hello {{lead.name}},</p>
+            </div>
+          `);
+        }
       } else {
         // Load existing design if available
         try {
@@ -214,6 +352,8 @@ const EmailTemplateEditor = () => {
   };
 
   const isFullHtml = (content) => /<\s*html[\s>]/i.test(content || '');
+  const isMjmlDocument = (content) => /<\s*mjml[\s>]/i.test(content || '');
+  const isHtmlFragment = (content) => /<\s*(div|span|table|tr|td|p|style|section|header|footer|h1|h2|h3|h4|h5|h6|img)[\s>]/i.test(content || '');
 
   const handleCompileMJML = async () => {
     try {
@@ -314,6 +454,57 @@ const EmailTemplateEditor = () => {
   };
 
 
+  const insertHtmlIntoVisual = async (html, subject = '') => {
+    try {
+      // Ensure visual editor is ready
+      if (!grapesEditorRef.current) {
+        setEditorMode('visual');
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
+      if (!grapesEditorRef.current) {
+        toast.error('Visual editor not ready. Try again in a moment.');
+        return;
+      }
+      const editor = grapesEditorRef.current;
+
+      // Clear current canvas and insert new HTML
+      try { editor.DomComponents.clear(); } catch {}
+      editor.setComponents('');
+      editor.addComponents(html);
+
+      if (subject && (!templateData.subject || templateData.subject.trim().length === 0)) {
+        setTemplateData(prev => ({ ...prev, subject }));
+      }
+
+      toast.success('Inserted AI content into visual editor');
+    } catch (err) {
+      console.error('Error inserting into visual editor:', err);
+      toast.error('Could not insert content into visual editor');
+    }
+  };
+
+  const syncVisualFromCode = async () => {
+    try {
+      let html = '';
+      if (isFullHtml(mjmlContent)) {
+        html = mjmlContent;
+      } else {
+        const toCompile = ensureMjmlDocument(mjmlContent);
+        const compiled = await emailService.compileMJML(toCompile);
+        html = compiled?.html || '';
+      }
+      if (!html) {
+        toast.error('No content to load into visual editor');
+        return;
+      }
+      await insertHtmlIntoVisual(html, templateData.subject);
+    } catch (err) {
+      console.error('Error syncing visual from code:', err);
+      toast.error('Could not load code into visual editor');
+    }
+  };
+
+
   const handleSave = async (andPublish = false) => {
     if (!templateData.name) {
       toast.error('Template name is required');
@@ -334,9 +525,9 @@ const EmailTemplateEditor = () => {
       // Create or update template metadata
       if (isNew) {
         console.log('Creating new template:', templateData);
-        const response = await emailService.createTemplate(templateData);
-        console.log('Template created:', response);
-        templateId = response.data?.id || response.id;
+        const createdResp = await emailService.createTemplate(templateData);
+        console.log('Template created:', createdResp);
+        templateId = createdResp?.data?.id || createdResp?.id;
         if (!templateId) throw new Error('No template ID returned');
         toast.success('Template created!');
       } else {
@@ -360,15 +551,35 @@ const EmailTemplateEditor = () => {
             html: mjmlContent,
             json_design: null
           };
-        } else {
+        } else if (isMjmlDocument(mjmlContent)) {
           // MJML - compile to HTML
+          const compiled = await emailService.compileMJML(mjmlContent);
+          if (!compiled?.html) throw new Error('Failed to compile MJML');
+          versionData = {
+            editor_type: 'code',
+            subject: templateData.subject,
+            mjml: mjmlContent,
+            html: compiled.html,
+            json_design: null
+          };
+        } else if (isHtmlFragment(mjmlContent)) {
+          // HTML fragment (no <html>), save as HTML as-is
+          versionData = {
+            editor_type: 'code',
+            subject: templateData.subject,
+            mjml: null,
+            html: mjmlContent,
+            json_design: null
+          };
+        } else {
+          // Plain text: wrap and compile as MJML
           const toCompile = ensureMjmlDocument(mjmlContent);
           const compiled = await emailService.compileMJML(toCompile);
           if (!compiled?.html) throw new Error('Failed to compile MJML');
           versionData = {
             editor_type: 'code',
             subject: templateData.subject,
-            mjml: mjmlContent,
+            mjml: toCompile,
             html: compiled.html,
             json_design: null
           };
@@ -398,10 +609,10 @@ const EmailTemplateEditor = () => {
       }
 
       console.log('Creating version with data:', { templateId, versionData });
-      const versionResponse = await emailService.createVersion(templateId, versionData);
-      console.log('Version created:', versionResponse);
+      const versionResp = await emailService.createVersion(templateId, versionData);
+      console.log('Version created:', versionResp);
       
-      const versionId = versionResponse.data?.id || versionResponse.id;
+      const versionId = versionResp?.data?.id || versionResp?.id;
       if (!versionId) throw new Error('No version ID returned');
       
       // Publish if requested
@@ -419,11 +630,15 @@ const EmailTemplateEditor = () => {
     } catch (error) {
       console.error('Error saving template:', error);
       console.error('Error details:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status
       });
-      const msg = error.response?.data?.message || error.response?.data?.error || error.message || 'Failed to save template';
+      const respData = error?.response?.data;
+      let msg = respData?.message || respData?.error || error?.message || 'Failed to save template';
+      if (typeof msg === 'object') {
+        msg = respData?.error?.message || JSON.stringify(respData);
+      }
       toast.error('Save failed: ' + msg);
     } finally {
       setSaving(false);
@@ -469,13 +684,32 @@ const EmailTemplateEditor = () => {
           </div>
 
           <div className="flex items-center space-x-3">
+            {/* AI Toolbar */}
+            <EmailAiToolbar 
+              templateData={templateData}
+              setTemplateData={setTemplateData}
+              mjmlContent={mjmlContent}
+              setMjmlContent={setMjmlContent}
+              htmlContent={htmlContent}
+              editorMode={editorMode}
+              onInsertVisualHtml={insertHtmlIntoVisual}
+            />
+
             {/* Editor Mode Toggle */}
             <div className="flex bg-gray-100 rounded-lg p-1">
               <button
                 type="button"
-                onClick={() => {
-                  // Destroy GrapesJS instance when leaving visual to avoid overlay issues
+                onClick={async () => {
+                  // If leaving visual mode, sync visual design into code editor as HTML
                   if (grapesEditorRef.current) {
+                    try {
+                      const html = grapesEditorRef.current.getHtml();
+                      const css = grapesEditorRef.current.getCss();
+                      if (html) {
+                        setMjmlContent(`<style>${css}</style>${html}`);
+                        setHtmlContent(`<style>${css}</style>${html}`);
+                      }
+                    } catch {}
                     try { grapesEditorRef.current.destroy(); } catch {}
                     grapesEditorRef.current = null;
                   }
@@ -494,7 +728,9 @@ const EmailTemplateEditor = () => {
               </button>
               <button
                 type="button"
-                onClick={() => setEditorMode('visual')}
+                onClick={async () => {
+                  await syncVisualFromCode();
+                }}
                 className={`px-4 py-2 rounded flex items-center space-x-2 transition-colors ${
                   editorMode === 'visual'
                     ? 'bg-white shadow-sm text-primary-600'

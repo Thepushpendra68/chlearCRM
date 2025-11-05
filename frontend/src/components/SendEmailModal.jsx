@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { XMarkIcon, EnvelopeIcon, EyeIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, EnvelopeIcon, EyeIcon, SparklesIcon } from '@heroicons/react/24/outline';
 import emailService from '../services/emailService';
 import toast from 'react-hot-toast';
 
@@ -11,6 +11,12 @@ const SendEmailModal = ({ isOpen, onClose, lead }) => {
   const [previewHtml, setPreviewHtml] = useState('');
   const [showPreview, setShowPreview] = useState(false);
   const [customData, setCustomData] = useState({});
+  
+  // AI Features
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiPersonalizedSubject, setAiPersonalizedSubject] = useState('');
+  const [aiSendTimeRecommendation, setAiSendTimeRecommendation] = useState(null);
+  const [aiEngagementPrediction, setAiEngagementPrediction] = useState(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -92,6 +98,47 @@ const SendEmailModal = ({ isOpen, onClose, lead }) => {
     }
   };
 
+  const handleAiPersonalization = async () => {
+    if (!selectedTemplate) {
+      toast.error('Please select a template first');
+      return;
+    }
+
+    try {
+      setAiGenerating(true);
+      
+      // Get personalized subject
+      const subjectResponse = await emailService.aiPersonalizedSubject(lead.id, {
+        purpose: selectedTemplate.description || 'Follow-up',
+        default_subject: selectedTemplate.subject
+      });
+      setAiPersonalizedSubject(subjectResponse.data.subject);
+
+      // Get optimal send time
+      const sendTimeResponse = await emailService.aiOptimalSendTime(lead.id);
+      setAiSendTimeRecommendation(sendTimeResponse.data);
+
+      // Get engagement prediction
+      const engagementResponse = await emailService.aiPredictEngagement(
+        lead.id,
+        {
+          subject: subjectResponse.data.subject,
+          has_personalization: true,
+          has_cta: true
+        },
+        {}
+      );
+      setAiEngagementPrediction(engagementResponse.data);
+
+      toast.success('✨ AI personalization complete!');
+    } catch (error) {
+      console.error('Error with AI personalization:', error);
+      toast.error('AI features unavailable');
+    } finally {
+      setAiGenerating(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -163,19 +210,81 @@ const SendEmailModal = ({ isOpen, onClose, lead }) => {
                 {/* Template Info */}
                 {selectedTemplate && (
                   <div className="bg-gray-50 rounded-lg p-4">
-                    <h3 className="font-semibold text-gray-900 mb-2">
-                      {selectedTemplate.name}
-                    </h3>
-                    {selectedTemplate.subject && (
-                      <div className="text-sm mb-2">
-                        <span className="font-medium text-gray-700">Subject: </span>
-                        <span className="text-gray-600">{selectedTemplate.subject}</span>
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-gray-900 mb-2">
+                          {selectedTemplate.name}
+                        </h3>
+                        {selectedTemplate.subject && (
+                          <div className="text-sm mb-2">
+                            <span className="font-medium text-gray-700">Subject: </span>
+                            <span className="text-gray-600">{selectedTemplate.subject}</span>
+                          </div>
+                        )}
+                        {selectedTemplate.description && (
+                          <p className="text-sm text-gray-600">
+                            {selectedTemplate.description}
+                          </p>
+                        )}
                       </div>
-                    )}
-                    {selectedTemplate.description && (
-                      <p className="text-sm text-gray-600">
-                        {selectedTemplate.description}
-                      </p>
+                      <button
+                        onClick={handleAiPersonalization}
+                        disabled={aiGenerating}
+                        className="btn-primary flex items-center space-x-2 ml-3"
+                        title="Get AI personalization for this lead"
+                      >
+                        <SparklesIcon className="h-4 w-4" />
+                        <span className="text-sm">{aiGenerating ? 'Analyzing...' : 'AI Personalize'}</span>
+                      </button>
+                    </div>
+
+                    {/* AI Personalization Results */}
+                    {aiPersonalizedSubject && (
+                      <div className="mt-3 p-3 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg">
+                        <div className="flex items-start space-x-2">
+                          <SparklesIcon className="h-5 w-5 text-purple-600 flex-shrink-0 mt-0.5" />
+                          <div className="flex-1">
+                            <h4 className="text-sm font-semibold text-purple-900 mb-1">
+                              AI Personalized Subject
+                            </h4>
+                            <p className="text-sm text-gray-800 mb-2 font-medium">
+                              {aiPersonalizedSubject}
+                            </p>
+                            
+                            {/* Engagement Prediction */}
+                            {aiEngagementPrediction && (
+                              <div className="grid grid-cols-3 gap-2 mt-2 text-xs">
+                                <div className="bg-white p-2 rounded">
+                                  <div className="text-gray-600">Engagement</div>
+                                  <div className="font-semibold text-purple-700 capitalize">
+                                    {aiEngagementPrediction.engagement_likelihood}
+                                  </div>
+                                </div>
+                                <div className="bg-white p-2 rounded">
+                                  <div className="text-gray-600">Open Rate</div>
+                                  <div className="font-semibold text-blue-700">
+                                    ~{aiEngagementPrediction.open_probability}%
+                                  </div>
+                                </div>
+                                <div className="bg-white p-2 rounded">
+                                  <div className="text-gray-600">Click Rate</div>
+                                  <div className="font-semibold text-green-700">
+                                    ~{aiEngagementPrediction.click_probability}%
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Send Time Recommendation */}
+                            {aiSendTimeRecommendation && (
+                              <div className="mt-2 text-xs text-gray-700 bg-white p-2 rounded">
+                                <span className="font-medium">📅 Best time to send: </span>
+                                {aiSendTimeRecommendation.recommended_day} at {aiSendTimeRecommendation.recommended_hour}:{String(aiSendTimeRecommendation.recommended_minute).padStart(2, '0')}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     )}
                   </div>
                 )}
