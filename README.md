@@ -17,67 +17,93 @@ A modern, full-stack Customer Relationship Management (CRM) system built with cu
 ## ✨ Key Features
 
 ### 🔐 Authentication & Security
-- **JWT-based Authentication** with secure token management
-- **Role-based Access Control** (Admin, Manager, Sales Rep)
-- **Password Hashing** with bcryptjs (12 salt rounds)
+- **Supabase Auth Integration** with JWT token validation
+- **Multi-tenant Architecture** with company-based data isolation
+- **Role-based Access Control** (Super Admin, Company Admin, Manager, Sales Rep)
+- **Row Level Security (RLS)** for database-level access control
 - **Rate Limiting** protection against brute force attacks
 - **Input Validation** and sanitization
 - **CORS Protection** and security headers
 
 ### 👥 User & Lead Management
 - **Complete User Management** with role assignments
-- **Advanced Lead Tracking** with custom fields
-- **Pipeline Management** with drag-and-drop interface
-- **Task & Activity Management** with timeline tracking
-- **Assignment & Routing System** with workload balancing
-- **Bulk Operations** for efficient data management
+- **Advanced Lead Tracking** with CRUD operations, filtering, and search
+- **Pipeline Management** with visual Kanban board and drag-and-drop
+- **Task & Activity Management** with timeline tracking and notifications
+- **Assignment Automation** with rule-based lead distribution
+- **Import/Export** functionality (CSV and Excel processing)
+
+### 📧 Email Marketing System
+- **Email Templates** - Create and manage reusable templates
+- **Email Sequences** - Automated email sequence builder and management
+- **Email Analytics** - Campaign performance tracking and metrics
+- **Email Settings** - System-level email configuration (Admin only)
 
 ### 📊 Analytics & Reporting
-- **Real-time Dashboard** with key performance indicators
-- **Advanced Analytics** with trend analysis
-- **Custom Report Builder** with export capabilities
-- **Lead Conversion Tracking** and pipeline analytics
+- **Real-time Dashboard** with badge counts and key metrics
+- **Custom Reports** with analytics and visualizations
 - **Performance Metrics** and team productivity insights
+- **Lead Conversion Tracking** and pipeline analytics
 
 ### 🎨 User Experience
-
-- **Modern UI/UX** with Tailwind CSS
+- **Modern UI/UX** with Tailwind CSS and responsive design
+- **Collapsible Sidebar** with Ctrl+B keyboard shortcut
 - **Accessibility Features** built with Headless UI
-- **Real-time Notifications** and toast messages
-- **Dark/Light Mode** support (coming soon)
-- **Progressive Web App** capabilities
+- **Real-time Notifications** with badge counts
+- **Role-based UI** - features shown based on user permissions
+- **Mobile Responsive** with slide-out navigation
 
-### ?? Chatbot Assistant
-- Executes lead lifecycle actions (create, update, search, stats) from natural-language prompts
-- Uses Google Gemini first and automatically falls back to the built-in rules engine when AI is unavailable
-- Shows confirmation summaries, missing field hints, and result data directly inside the chat widget
-- Works even without a GEMINI_API_KEY by enabling CHATBOT_FALLBACK_ONLY=true
+### ?? AI Chatbot Assistant
+- **Google Gemini AI Integration** with fallback chain
+- **Natural Language Processing** for CRM actions
+- **Intelligent Insights** and assistance
+- **Automatic Fallback** when AI unavailable
+
+### 🛠️ Platform Administration
+- **Custom Fields** configuration (Manager+)
+- **API Clients** management (Company Admin+)
+- **Platform Admin** panel (Super Admin only)
+- **Company Registration** and multi-tenant setup
 
 ## 🛠 Tech Stack
 
 ### Backend
 - **Node.js** with Express.js
-- **Supabase** (hosted database + Auth + Real-time)
-- **Supabase Client** for database operations and authentication
-- **JWT** for token validation (Supabase managed)
-- **bcryptjs** for password hashing (legacy fallback)
-- **express-validator** for input validation
+- **Supabase** (PostgreSQL + Auth + Real-time + Row Level Security)
+- **@supabase/supabase-js** for database operations
+- **Google Gemini AI** (@google/generative-ai) for chatbot with model fallback
+- **JWT** (jsonwebtoken) for token validation
+- **Express middleware**: cors, helmet, express-rate-limit, express-validator
+- **Email**: postmark, mjml, handlebars, juice, html-minifier, sanitize-html
+- **Data processing**: csv-parser, xlsx for Excel/CSV operations
+- **File uploads**: multer
+- **Scheduling**: node-cron for email sequences
+- **Utilities**: date-fns, uuid, fuse.js (fuzzy search), zod (validation), validator
+- **Rate limiting**: bottleneck, p-retry
 
 ### Frontend
-1. Build the application: npm run build
-2. Serve the dist folder or deploy to a static host
-3. Configure reverse proxy when self-hosting
-4. Set up SSL certificates
+- **React 18** with functional components and hooks
+- **Vite** for fast development and building
+- **React Router v6** for client-side routing
+- **Tailwind CSS** + **PostCSS** + **Autoprefixer** for styling
+- **@headlessui/react** for accessible UI components
+- **@heroicons/react** + **lucide-react** for iconography
+- **React Hook Form** for form management
+- **React Hot Toast** for notifications
+- **@tanstack/react-query** for data fetching
+- **Axios** for HTTP requests
+- **Radix UI** components (@radix-ui/*)
+- **Class Variance Authority (CVA)** + **clsx** + **tailwind-merge** for class management
+- **Monaco Editor** for code editing
+- **React Flow** for visual pipeline/flow diagrams
+- **GrapesJS** for email template building
+- **Vercel Analytics** for tracking
 
-### Vercel Preview Deployments
-1. Connect the repository and set the project root to `frontend` (or keep the supplied vercel.json in the repository root).
-2. Configure environment variables:
-   - Frontend: VITE_API_URL, VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
-   - Backend: SUPABASE_* keys, GEMINI_API_KEY, optional CHATBOT_GEMINI_MODELS or CHATBOT_FALLBACK_ONLY
-3. The chatbot automatically falls back to the rules engine if Gemini is unavailable or the API key is missing.
-4. Trigger a Vercel build to generate a branch preview with the enhanced chat widget.
-
-- **Headless UI** for accessible components
+### Deployment & Infrastructure
+- **Vercel** for frontend hosting (https://chlear-crm.vercel.app)
+- **Vercel Serverless Functions** for backend API (api/index.js)
+- **Supabase** for managed PostgreSQL database and authentication
+- **GitHub Actions** for CI/CD pipeline
 
 ## 📁 Project Architecture
 
@@ -125,11 +151,12 @@ sakha/
 
 ### 🏗️ Architecture Overview
 
-- **Backend**: RESTful API with Express.js, Supabase integration, JWT token validation
-- **Frontend**: Single Page Application with React 18, Vite build tool, Tailwind CSS
-- **Database**: Supabase (hosted database + Auth + Real-time + RLS policies)
-- **Authentication**: Supabase Auth with JWT tokens and role-based access control
-- **Deployment**: Local-development-friendly with CI/CD pipeline support, Supabase hosted database
+- **Backend**: Express.js REST API deployed as Vercel Serverless Function (api/index.js)
+- **Frontend**: React 18 SPA with Vite build tool, deployed on Vercel
+- **Database**: Supabase (PostgreSQL + Auth + Real-time + Row Level Security)
+- **Authentication**: Supabase Auth with JWT token validation and role-based access control
+- **Multi-tenancy**: Company-based data isolation with RLS policies
+- **Deployment**: Production at https://chlear-crm.vercel.app with serverless backend
 
 ## 🚀 Quick Start
 
@@ -239,30 +266,137 @@ npm run dev
 
 ## 📊 API Endpoints
 
-### Authentication
+### Authentication & Registration
+- `POST /api/auth/register-company` - Register company and admin user (multi-tenant setup)
 - `POST /api/auth/register` - Register new user
 - `POST /api/auth/login` - Login user
 - `POST /api/auth/logout` - Logout user
 - `GET /api/auth/me` - Get current user profile
 - `PUT /api/auth/profile` - Update user profile
+- `PUT /api/auth/change-password` - Change password
 
-### Users (Admin only)
-- `GET /api/users` - Get all users
+### Users
+- `GET /api/users` - Get all users (Admin only)
 - `GET /api/users/:id` - Get user by ID
 - `PUT /api/users/:id` - Update user
 - `DELETE /api/users/:id` - Deactivate user
 
 ### Leads
-- `GET /api/leads` - Get all leads (with pagination & filtering)
+- `GET /api/leads` - Get all leads with pagination & filtering
+- `GET /api/leads/stats` - Get lead statistics
 - `GET /api/leads/:id` - Get lead by ID
 - `POST /api/leads` - Create new lead
 - `PUT /api/leads/:id` - Update lead
 - `DELETE /api/leads/:id` - Delete lead
+- `PUT /api/leads/:id/move-stage` - Move lead to pipeline stage
+- `GET /api/leads/search` - Search leads
+
+### Pipeline
+- `GET /api/pipeline/stages` - Get pipeline stages
+- `POST /api/pipeline/stages` - Create stage
+- `PUT /api/pipeline/stages/:id` - Update stage
+- `DELETE /api/pipeline/stages/:id` - Delete stage
+- `PUT /api/pipeline/stages/reorder` - Reorder stages
+- `GET /api/pipeline/overview` - Get pipeline overview
+- `GET /api/pipeline/conversion-rates` - Get conversion rates
+
+### Activities
+- `GET /api/activities` - Get all activities
+- `GET /api/activities/stats` - Get activity statistics
+- `GET /api/activities/trends` - Get activity trends
+- `GET /api/activities/:id` - Get activity by ID
+- `POST /api/activities` - Create activity
+- `POST /api/activities/bulk` - Create bulk activities
+- `PUT /api/activities/:id` - Update activity
+- `PUT /api/activities/:id/complete` - Complete activity
+- `DELETE /api/activities/:id` - Delete activity
+- `GET /api/activities/leads/:id/timeline` - Get lead timeline
+
+### Tasks
+- `GET /api/tasks` - Get all tasks
+- `POST /api/tasks` - Create task
+- `PUT /api/tasks/:id` - Update task
+- `PUT /api/tasks/:id/complete` - Complete task
+- `DELETE /api/tasks/:id` - Delete task
+
+### Assignments
+- `GET /api/assignments/rules` - Get assignment rules
+- `GET /api/assignments/rules/active` - Get active rules
+- `GET /api/assignments/rules/:id` - Get rule by ID
+- `POST /api/assignments/rules` - Create assignment rule
+- `PUT /api/assignments/rules/:id` - Update assignment rule
+- `DELETE /api/assignments/rules/:id` - Delete assignment rule
+- `POST /api/assignments/leads/:leadId/assign` - Assign lead
+- `POST /api/assignments/leads/bulk-assign` - Bulk assign leads
+- `POST /api/assignments/leads/:leadId/auto-assign` - Auto-assign lead
+- `GET /api/assignments/workload` - Get team workload
+
+### Email Management
+- `GET /api/email/templates` - Get email templates
+- `POST /api/email/templates` - Create template (Manager+)
+- `PUT /api/email/templates/:id` - Update template (Manager+)
+- `DELETE /api/email/templates/:id` - Delete template (Admin+)
+- `GET /api/email/sequences` - Get email sequences
+- `POST /api/email/sequences` - Create sequence (Manager+)
+- `PUT /api/email/sequences/:id` - Update sequence (Manager+)
+- `DELETE /api/email/sequences/:id` - Delete sequence (Admin+)
+- `POST /api/email/send/lead` - Send email to lead
+- `GET /api/email/sent` - Get sent emails
+- `GET /api/email/settings/integration` - Get email settings
+- `POST /api/email/settings/integration` - Update email settings (Manager+)
 
 ### Dashboard
 - `GET /api/dashboard/stats` - Get dashboard statistics
 - `GET /api/dashboard/recent-leads` - Get recent leads
 - `GET /api/dashboard/lead-trends` - Get lead trends
+- `GET /api/dashboard/lead-sources` - Get lead sources
+- `GET /api/dashboard/lead-status` - Get lead status
+- `GET /api/dashboard/user-performance` - Get user performance (Admin+)
+- `GET /api/dashboard/badge-counts` - Get badge counts for sidebar
+
+### Custom Fields
+- `GET /api/custom-fields` - Get custom fields
+- `POST /api/custom-fields` - Create custom field (Manager+)
+- `PUT /api/custom-fields/:id` - Update custom field (Manager+)
+- `DELETE /api/custom-fields/:id` - Delete custom field (Admin+)
+
+### API Clients
+- `GET /api/api-clients` - Get API clients (Admin+)
+- `POST /api/api-clients` - Create API client (Admin+)
+- `GET /api/api-clients/:id` - Get API client by ID
+- `PUT /api/api-clients/:id` - Update API client
+- `POST /api/api-clients/:id/regenerate-secret` - Regenerate API key
+- `DELETE /api/api-clients/:id` - Delete API client
+- `GET /api/api-clients/:id/stats` - Get API client stats
+
+### Reports
+- `GET /api/reports/leads` - Generate leads report
+- `GET /api/reports/users` - Generate users report
+- `GET /api/reports/activities` - Generate activities report
+
+### Import/Export
+- `POST /api/import/leads` - Import leads from CSV/Excel
+- `POST /api/import/leads/dry-run` - Validate import file
+- `GET /api/import/template` - Get import template
+- `GET /api/import/history` - Get import history
+- `GET /api/import/export/leads` - Export leads to CSV
+
+### Platform Administration (Super Admin only)
+- `GET /api/platform/stats` - Get platform statistics
+- `GET /api/platform/companies` - Get all companies
+- `PUT /api/platform/companies/:companyId/status` - Update company status
+- `POST /api/platform/impersonate/:userId` - Impersonate user
+- `DELETE /api/platform/impersonate` - End impersonation
+
+### Chatbot
+- `POST /api/chatbot/message` - Process chatbot message
+- `POST /api/chatbot/confirm` - Confirm chatbot action
+- `DELETE /api/chatbot/history` - Clear chat history
+
+### Lead Capture (Public API)
+- `POST /api/capture/lead` - Capture lead from external source
+- `POST /api/capture/leads/bulk` - Bulk capture leads
+- `GET /api/capture/info` - Get API information
 
 ## 🔐 Security Features
 

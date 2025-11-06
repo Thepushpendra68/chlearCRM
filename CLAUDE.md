@@ -133,6 +133,220 @@ This is **Sakha**, a full-stack CRM application with separated backend and front
 - **User management**: Admin-level user administration with role assignment
 - **AI Chatbot**: Google Gemini-powered assistant for CRM insights and assistance
 
+## Application Navigation & Features
+
+### Sidebar Navigation Structure
+
+The application features a comprehensive sidebar navigation organized into **Main Navigation** and **Utility/Management** sections, with role-based access control.
+
+#### Main Navigation (Top Section)
+1. **Dashboard** (`/app/dashboard`) - Home overview with analytics, metrics, and quick actions
+2. **Leads** (`/app/leads`) - Lead management with full CRUD operations, filtering, and search
+   - Real-time badge count showing total active leads
+3. **Pipeline** (`/app/pipeline`) - Visual Kanban board for lead progression through stages
+4. **Activities** (`/app/activities`) - Activity tracking and timeline management
+   - Real-time badge count for pending activities
+5. **Email Templates** (`/app/email/templates`) - Template creation and management
+6. **Email Sequences** (`/app/email/sequences`) - Automated email sequence builder
+7. **Email Analytics** (`/app/email/analytics`) - Campaign performance and metrics
+
+#### Utility/Management Navigation (Bottom Section)
+8. **Assignments** (`/app/assignments`) - Lead assignment rules and automation
+9. **Tasks** (`/app/tasks`) - Task creation, tracking, and management
+   - Real-time badge count for pending tasks
+10. **Users** (`/app/users`) - User administration and role management
+11. **Reports** (`/app/reports`) - Customizable reporting with analytics
+
+#### Role-Based Features
+12. **Custom Fields** (`/app/custom-fields`) - Custom field configuration
+    - **Access:** Manager, Company Admin, Super Admin
+    - Location: Utility section
+13. **API Clients** (`/app/api-clients`) - API client management and keys
+    - **Access:** Company Admin, Super Admin only
+    - Location: Utility section
+14. **Email Settings** (`/app/email/settings`) - System email configuration
+    - **Access:** Company Admin, Super Admin only
+    - Location: Utility section
+15. **Platform Admin** (`/platform`) - Platform-level administration
+    - **Access:** Super Admin only
+    - Location: Bottom utility section with separator
+
+#### User Profile Menu
+- **My Profile** (`/app/profile`) - Personal profile management
+- **Settings** (`/app/settings`) - Application settings
+- **Sign out** - Logout functionality
+
+### Sidebar UI/UX Features
+
+#### Interactive Elements
+- **Collapsible Design**: Sidebar can collapse/expand (width: 240px → 64px)
+  - Keyboard shortcut: `Ctrl+B` for quick toggle
+  - Smooth animation transitions
+- **Hover Expansion**: Collapsed sidebar expands on hover for better usability
+- **Badge Counts**: Real-time notification badges for:
+  - Leads count (red badge)
+  - Activities count (red badge)
+  - Tasks count (red badge)
+  - Auto-refresh every 5 minutes via `/api/dashboard/badge-counts`
+
+#### Role-Based Visibility
+Navigation items are dynamically shown/hidden based on user role:
+
+| Feature | Sales Rep | Manager | Company Admin | Super Admin |
+|---------|-----------|---------|---------------|-------------|
+| Dashboard | ✓ | ✓ | ✓ | ✓ |
+| Leads | ✓ | ✓ | ✓ | ✓ |
+| Pipeline | ✓ | ✓ | ✓ | ✓ |
+| Activities | ✓ | ✓ | ✓ | ✓ |
+| Email Templates | ✓ | ✓ | ✓ | ✓ |
+| Email Sequences | ✓ | ✓ | ✓ | ✓ |
+| Email Analytics | ✓ | ✓ | ✓ | ✓ |
+| Assignments | ✓ | ✓ | ✓ | ✓ |
+| Tasks | ✓ | ✓ | ✓ | ✓ |
+| Users | ✓ | ✓ | ✓ | ✓ |
+| Reports | ✓ | ✓ | ✓ | ✓ |
+| Custom Fields | - | ✓ | ✓ | ✓ |
+| API Clients | - | - | ✓ | ✓ |
+| Email Settings | - | - | ✓ | ✓ |
+| Platform Admin | - | - | - | ✓ |
+
+#### Layout Structure
+- **Mobile**: Slide-out drawer with full-width overlay
+- **Desktop**: Fixed sidebar with collapsible behavior
+- **Responsive Breakpoint**: `md` (768px) threshold
+- **User Profile**: Fixed bottom section with role display
+- **Active State**: Highlights current page with `bg-primary-500` color
+- **Color Scheme**:
+  - Active: Primary blue (`bg-primary-500 text-white`)
+  - Inactive: Gray (`text-gray-600 hover:bg-gray-100`)
+
+#### Technical Implementation
+- **Component Location**: `frontend/src/components/Layout/Sidebar.jsx`
+- **State Management**: React hooks (useState, useEffect)
+- **Badge API**: `/api/dashboard/badge-counts` endpoint
+- **Navigation**: React Router NavLink with active state handling
+- **Icons**: Heroicons v2 for consistent iconography
+- **User Context**: AuthContext for role-based permissions
+
+## Tech Stack & Dependencies
+
+### Backend Stack (backend/package.json)
+**Core Framework & Database:**
+- **Express.js** - Web framework
+- **@supabase/supabase-js** - Database client
+- **Supabase** - PostgreSQL + Auth + Real-time + Row Level Security
+
+**AI & Chatbot:**
+- **@google/generative-ai** - Google Gemini AI integration
+- **Model fallback chain**: `gemini-2.0-flash-exp` → `gemini-1.5-flash-latest` → `gemini-1.5-pro-latest` → `gemini-pro-latest`
+
+**Authentication & Security:**
+- **jsonwebtoken** - JWT token handling
+- **bcryptjs** - Password hashing (legacy fallback)
+- **helmet** - Security headers
+- **cors** - CORS handling
+- **express-rate-limit** - Rate limiting
+- **express-validator** - Input validation
+
+**Email System:**
+- **postmark** - Email sending service
+- **mjml** - Email template rendering
+- **handlebars** - Template engine
+- **juice** - Inlines CSS
+- **html-minifier** - HTML compression
+- **sanitize-html** - HTML sanitization
+
+**Data Processing & Import/Export:**
+- **csv-parser** - CSV parsing
+- **xlsx** - Excel file processing
+- **multer** - File upload handling
+
+**Scheduling & Background Tasks:**
+- **node-cron** - Scheduled tasks (email sequences)
+
+**Utilities:**
+- **date-fns** - Date manipulation
+- **uuid** - UUID generation
+- **fuse.js** - Fuzzy search
+- **zod** - Schema validation
+- **validator** - String validation
+- **bottleneck** - Rate limiting
+- **p-retry** - Retry logic
+
+### Frontend Stack (frontend/package.json)
+**Core:**
+- **React 18** - UI framework with hooks
+- **Vite** - Build tool and dev server
+- **React Router v6** - Client-side routing
+
+**Styling:**
+- **Tailwind CSS** - Utility-first CSS framework
+- **PostCSS** - CSS processing
+- **Autoprefixer** - CSS vendor prefixes
+
+**UI Components & Libraries:**
+- **@headlessui/react** - Accessible UI primitives
+- **@heroicons/react** - Heroicons icon set
+- **lucide-react** - Additional icon library
+- **@radix-ui/*** - Radix UI primitives (Avatar, ScrollArea, Separator, Slot)
+- **class-variance-authority** - Component variants
+- **clsx** - Conditional className utility
+- **tailwind-merge** - Tailwind CSS merge utility
+
+**Forms & State:**
+- **React Hook Form** - Form management
+- **@tanstack/react-query** - Data fetching and caching
+- **React Hot Toast** - Notifications
+
+**HTTP & API:**
+- **Axios** - HTTP client
+- **@supabase/supabase-js** - Supabase client
+
+**Advanced Features:**
+- **@monaco-editor/react** - Monaco code editor
+- **React Flow** - Visual flow diagrams
+- **GrapesJS** + **grapesjs-preset-newsletter** - Email template builder
+- **@vercel/analytics** - Vercel analytics
+
+**Testing & Quality:**
+- **Vitest** - Test runner
+- **@testing-library/react** - React testing utilities
+- **ESLint** - Linting
+
+### Backend Route Modules
+
+The backend implements **18 route modules** (`backend/src/routes/`) with 150+ endpoints:
+
+1. **authRoutes.js** (7 endpoints) - Authentication & registration
+2. **leadRoutes.js** (11 endpoints) - Lead management
+3. **pipelineRoutes.js** (8 endpoints) - Pipeline management
+4. **activityRoutes.js** (13 endpoints) - Activity tracking
+5. **taskRoutes.js** (5 endpoints) - Task management
+6. **assignmentRoutes.js** (15 endpoints) - Lead assignment automation
+7. **emailRoutes.js** (25+ endpoints) - Email system (templates, sequences, sending, webhooks)
+8. **dashboardRoutes.js** (8 endpoints) - Dashboard data
+9. **customFieldRoutes.js** (9 endpoints) - Custom field management
+10. **apiClientRoutes.js** (8 endpoints) - API client management
+11. **userRoutes.js** - User administration
+12. **reportRoutes.js** (3+ endpoints) - Reporting system
+13. **importRoutes.js** (7 endpoints) - Import/Export system
+14. **chatbotRoutes.js** (3 endpoints) - AI chatbot
+15. **platformRoutes.js** - Platform administration (Super Admin)
+16. **leadCaptureRoutes.js** (3 endpoints) - Public API
+17. **picklistRoutes.js** - Picklist management
+18. **configRoutes.js** (5 endpoints) - System configuration
+
+### API Key Features
+- **Role-based Access**: All endpoints include role-based authorization
+- **Pagination**: All list endpoints support pagination parameters
+- **Filtering & Search**: Comprehensive filtering and fuzzy search (fuse.js)
+- **Bulk Operations**: Bulk create/update operations for leads and activities
+- **Real-time**: Supabase real-time subscriptions for live updates
+- **File Upload**: Multer integration for import functionality
+- **Error Handling**: Centralized error middleware with proper HTTP status codes
+- **Rate Limiting**: Express-rate-limit on all endpoints
+- **Validation**: express-validator and zod schemas for input validation
+
 ## Environment Setup
 
 ### Frontend Environment Variables
