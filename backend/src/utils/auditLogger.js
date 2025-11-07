@@ -31,6 +31,13 @@ const AuditActions = Object.freeze({
   LEAD_OWNER_CHANGED: 'lead_owner_changed',
   LEAD_NOTE_ADDED: 'lead_note_added',
 
+  // Account lifecycle
+  ACCOUNT_CREATED: 'account_created',
+  ACCOUNT_UPDATED: 'account_updated',
+  ACCOUNT_DELETED: 'account_deleted',
+  ACCOUNT_STATUS_CHANGED: 'account_status_changed',
+  ACCOUNT_OWNER_CHANGED: 'account_owner_changed',
+
   // Pipeline & activities
   PIPELINE_STAGE_CREATED: 'pipeline_stage_created',
   PIPELINE_STAGE_UPDATED: 'pipeline_stage_updated',

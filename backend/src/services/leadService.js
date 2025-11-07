@@ -24,8 +24,9 @@ const getLeads = async (currentUser, page = 1, limit = 20, filters = {}) => {
         id, name, first_name, last_name, email, phone, company, title,
         status, source, deal_value, expected_close_date, notes,
         priority, created_at, updated_at, assigned_at,
-        assigned_to, created_by, pipeline_stage_id,
-        user_profiles!assigned_to(id, first_name, last_name)
+        assigned_to, created_by, pipeline_stage_id, account_id,
+        user_profiles!assigned_to(id, first_name, last_name),
+        accounts!account_id(id, name, website, industry)
       `)
       .eq('company_id', currentUser.company_id);
 
@@ -128,6 +129,10 @@ const getLeads = async (currentUser, page = 1, limit = 20, filters = {}) => {
         assigned_to: lead.assigned_to,
         created_by: lead.created_by,
         pipeline_stage_id: lead.pipeline_stage_id,
+        account_id: lead.account_id || null,
+        account_name: lead.accounts?.name || null,
+        account_website: lead.accounts?.website || null,
+        account_industry: lead.accounts?.industry || null,
         assigned_user_first_name: lead.user_profiles?.first_name || null,
         assigned_user_last_name: lead.user_profiles?.last_name || null
       };
@@ -158,7 +163,8 @@ const getLeadById = async (id) => {
       .from('leads')
       .select(`
         *,
-        user_profiles!assigned_to(id, first_name, last_name)
+        user_profiles!assigned_to(id, first_name, last_name),
+        accounts!account_id(id, name, website, industry)
       `)
       .eq('id', id)
       .single();
@@ -175,6 +181,10 @@ const getLeadById = async (id) => {
         last_name: lead.last_name || '',
         job_title: lead.title, // Map title to job_title for frontend
         lead_source: lead.source, // Map source to lead_source for frontend
+        account_id: lead.account_id || null,
+        account_name: lead.accounts?.name || null,
+        account_website: lead.accounts?.website || null,
+        account_industry: lead.accounts?.industry || null,
         assigned_user_first_name: lead.user_profiles?.first_name || null,
         assigned_user_last_name: lead.user_profiles?.last_name || null
       };
@@ -214,6 +224,7 @@ const createLead = async (leadData) => {
       priority: leadData.priority,
       assigned_to: leadData.assigned_to,
       pipeline_stage_id: leadData.pipeline_stage_id,
+      account_id: leadData.account_id || null, // Add account_id support
       created_by: leadData.created_by
     };
 
@@ -223,6 +234,7 @@ const createLead = async (leadData) => {
     // Convert empty strings to null for UUID fields
     if (cleanedData.assigned_to === '') cleanedData.assigned_to = null;
     if (cleanedData.created_by === '') cleanedData.created_by = null;
+    if (cleanedData.account_id === '') cleanedData.account_id = null;
 
     // If no pipeline stage is provided, assign the default first stage
     if (!cleanedData.pipeline_stage_id || cleanedData.pipeline_stage_id === '') {
@@ -320,6 +332,7 @@ const updateLead = async (id, leadData, currentUser) => {
     if (leadData.priority !== undefined) transformedData.priority = leadData.priority;
     if (leadData.assigned_to !== undefined) transformedData.assigned_to = leadData.assigned_to;
     if (leadData.pipeline_stage_id !== undefined) transformedData.pipeline_stage_id = leadData.pipeline_stage_id;
+    if (leadData.account_id !== undefined) transformedData.account_id = leadData.account_id;
 
     // Clean up empty strings for UUID and date fields
     const cleanedData = { ...transformedData };
@@ -327,6 +340,7 @@ const updateLead = async (id, leadData, currentUser) => {
     // Convert empty strings to null for UUID fields
     if (cleanedData.assigned_to === '') cleanedData.assigned_to = null;
     if (cleanedData.pipeline_stage_id === '') cleanedData.pipeline_stage_id = null;
+    if (cleanedData.account_id === '') cleanedData.account_id = null;
 
     // Convert empty strings to null for date fields
     if (cleanedData.expected_close_date === '') cleanedData.expected_close_date = null;

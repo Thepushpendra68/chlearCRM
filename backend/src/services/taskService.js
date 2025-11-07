@@ -34,6 +34,10 @@ class TaskService {
         query = query.eq('lead_id', filters.lead_id);
       }
 
+      if (filters.account_id) {
+        query = query.eq('account_id', filters.account_id);
+      }
+
       if (filters.status) {
         query = query.eq('status', filters.status);
       }
@@ -161,7 +165,7 @@ class TaskService {
         }
       }
 
-      // Validate that lead exists and belongs to company
+      // Validate that lead exists and belongs to company (if provided)
       if (taskData.lead_id) {
         const { data: lead, error: leadError } = await supabase
           .from('leads')
@@ -175,8 +179,23 @@ class TaskService {
         }
       }
 
+      // Validate that account exists and belongs to company (if provided)
+      if (taskData.account_id) {
+        const { data: account, error: accountError } = await supabase
+          .from('accounts')
+          .select('id')
+          .eq('id', taskData.account_id)
+          .eq('company_id', currentUser.company_id)
+          .single();
+
+        if (accountError || !account) {
+          throw new ApiError('Account not found', 404);
+        }
+      }
+
       const newTask = {
         lead_id: taskData.lead_id || null,
+        account_id: taskData.account_id || null,
         assigned_to: taskData.assigned_to,
         created_by: currentUser.id,
         company_id: currentUser.company_id,
@@ -241,7 +260,7 @@ class TaskService {
       }
 
       // Validate that lead exists and belongs to company if being updated
-      if (updateData.lead_id) {
+      if (updateData.lead_id !== undefined && updateData.lead_id !== null) {
         const { data: lead, error: leadError } = await supabase
           .from('leads')
           .select('id')
@@ -254,10 +273,25 @@ class TaskService {
         }
       }
 
+      // Validate that account exists and belongs to company if being updated
+      if (updateData.account_id !== undefined && updateData.account_id !== null) {
+        const { data: account, error: accountError } = await supabase
+          .from('accounts')
+          .select('id')
+          .eq('id', updateData.account_id)
+          .eq('company_id', currentUser.company_id)
+          .single();
+
+        if (accountError || !account) {
+          throw new ApiError('Account not found', 404);
+        }
+      }
+
       // Handle empty strings for foreign key fields
       const cleanedData = {
         ...updateData,
-        lead_id: updateData.lead_id || null,
+        lead_id: updateData.lead_id !== undefined ? (updateData.lead_id || null) : existingTask.lead_id,
+        account_id: updateData.account_id !== undefined ? (updateData.account_id || null) : existingTask.account_id,
         due_date: updateData.due_date || null,
         updated_at: new Date().toISOString()
       };

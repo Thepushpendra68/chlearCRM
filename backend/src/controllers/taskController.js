@@ -38,6 +38,7 @@ class TaskController {
       const filters = {
         assigned_to: req.query.assigned_to,
         lead_id: req.query.lead_id,
+        account_id: req.query.account_id,
         status: req.query.status,
         priority: req.query.priority,
         task_type: req.query.task_type,
@@ -100,6 +101,7 @@ class TaskController {
         companyId: task.company_id,
         details: {
           lead_id: task.lead_id,
+          account_id: task.account_id,
           assigned_to: task.assigned_to,
           due_date: task.due_date,
           priority: task.priority,

@@ -576,6 +576,9 @@ const Leads = () => {
                       Pipeline Stage
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      Account
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                       Created
                     </th>
                     <th className="relative px-6 py-4">
@@ -641,6 +644,26 @@ const Leads = () => {
                         <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${getStageColor(lead.pipeline_stage_id)} shadow-sm`}>
                           {getStageName(lead.pipeline_stage_id)}
                         </span>
+                      </td>
+                      <td className="px-6 py-5 whitespace-nowrap cursor-pointer" onClick={(e) => {
+                        if (lead.account_id) {
+                          e.stopPropagation()
+                          navigate(`/app/accounts/${lead.account_id}`)
+                        }
+                      }}>
+                        {lead.account_name ? (
+                          <button
+                            className="text-sm text-primary-600 hover:text-primary-800 font-medium"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              navigate(`/app/accounts/${lead.account_id}`)
+                            }}
+                          >
+                            {lead.account_name}
+                          </button>
+                        ) : (
+                          <span className="text-sm text-gray-400 italic">No account</span>
+                        )}
                       </td>
                       <td className="px-6 py-5 whitespace-nowrap text-sm text-gray-500 cursor-pointer" onClick={() => navigate(`/app/leads/${lead.id}`)}>
                         <div className="flex flex-col">
