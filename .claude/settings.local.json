@@ -6,7 +6,13 @@
       "Bash(git push origin main)",
       "Bash(git push --force origin main)",
       "Bash(find /c/Users/Vishaka/Downloads/CHLEAR CRM -name \"*.md\" -not -path \"*/node_modules/*\" -type f -delete)",
-      "Bash(git add .)"
+      "Bash(git add .)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nCleanup: Remove redundant documentation files and update core project files\n\n- Remove duplicate documentation files from root directory\n- Remove obsolete implementation guides and migration summaries  \n- Remove outdated troubleshooting and verification reports\n- Update CLAUDE.md with latest project status and features\n- Update README.md and AGENTS.md with current information\n\nThis cleanup maintains only essential project documentation and removes\nredundant files that were moved to docs/ directory.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "mcp__supabase__list_projects",
+      "mcp__supabase__apply_migration",
+      "mcp__supabase__list_migrations",
+      "mcp__supabase__execute_sql",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []
