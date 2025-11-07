@@ -53,6 +53,9 @@ const leadCaptureRoutes = require('./routes/leadCaptureRoutes');
 const apiClientRoutes = require('./routes/apiClientRoutes');
 const customFieldRoutes = require('./routes/customFieldRoutes');
 const emailRoutes = require('./routes/emailRoutes');
+console.log('📦 [APP] Loading account routes...');
+const accountRoutes = require('./routes/accountRoutes');
+console.log('✅ [APP] Account routes loaded successfully:', !!accountRoutes);
 
 // Import middleware
 const errorHandler = require('./middleware/errorMiddleware');
@@ -209,6 +212,9 @@ app.use('/api/api-clients', apiClientRoutes); // API client management (admin on
 app.use('/api/custom-fields', customFieldRoutes); // Custom field definitions management
 app.use('/api/v1/capture', leadCaptureRoutes); // Lead capture (public API with API key auth)
 app.use('/api/email', emailRoutes); // Email templates, sending, and automation
+console.log('🔗 [APP] Registering /api/accounts routes...');
+app.use('/api/accounts', accountRoutes); // Account management
+console.log('✅ [APP] /api/accounts routes registered');
 
 // 404 handler
 app.use('*', (req, res) => {

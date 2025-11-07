@@ -56,6 +56,7 @@ app.get('/api/health', (req, res) => {
 
 // Import and use routes from backend
 try {
+  console.log('📦 [API] Loading routes...');
   const authRoutes = require('../backend/src/routes/authRoutes');
   const supabaseAuthRoutes = require('../backend/src/routes/supabaseAuthRoutes');
   const userRoutes = require('../backend/src/routes/userRoutes');
@@ -70,6 +71,9 @@ try {
   const searchRoutes = require('../backend/src/routes/searchRoutes');
   const chatbotRoutes = require('../backend/src/routes/chatbotRoutes');
   const platformRoutes = require('../backend/src/routes/platformRoutes');
+  console.log('📦 [API] Loading account routes...');
+  const accountRoutes = require('../backend/src/routes/accountRoutes');
+  console.log('✅ [API] Account routes loaded:', !!accountRoutes);
   const picklistRoutes = require('../backend/src/routes/picklistRoutes');
   const apiClientRoutes = require('../backend/src/routes/apiClientRoutes');
   const configRoutes = require('../backend/src/routes/configRoutes');
@@ -92,6 +96,9 @@ try {
   app.use('/api/search', searchRoutes);
   app.use('/api/chatbot', chatbotRoutes);
   app.use('/api/platform', platformRoutes);
+  console.log('🔗 [API] Registering /api/accounts...');
+  app.use('/api/accounts', accountRoutes);
+  console.log('✅ [API] /api/accounts registered');
   app.use('/api/picklists', picklistRoutes);
   app.use('/api/config', configRoutes);
   app.use('/api/custom-fields', customFieldRoutes);

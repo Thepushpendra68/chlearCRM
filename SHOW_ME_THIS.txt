@@ -1,0 +1,24 @@
+PLEASE DO THIS AND SEND ME A SCREENSHOT:
+
+1. Open the page with the error
+2. Press F12 to open DevTools
+3. Click "Network" tab
+4. Refresh the page (F5)
+5. Click on the "accounts?page=1&limit=20" request
+6. Take a screenshot showing:
+   - The Status Code (top right)
+   - The Response tab content
+   
+OR copy and paste here:
+
+Status Code: [WHAT NUMBER DO YOU SEE?]
+
+Response Body: [COPY THE TEXT FROM THE RESPONSE TAB]
+
+Console Errors: [COPY ANY RED ERRORS FROM CONSOLE TAB]
+
+I CANNOT FIX THIS WITHOUT SEEING THE ACTUAL ERROR RESPONSE.
+
+The "Resource not found" message could mean many different things.
+I need to see what the server is actually returning.
+

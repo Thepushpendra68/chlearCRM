@@ -2,13 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import userService from '../../services/userService';
 import leadService from '../../services/leadService';
+import accountService from '../../services/accountService';
 
-const TaskForm = ({ task, onSave, onCancel, isOpen }) => {
+const TaskForm = ({ task, onSave, onCancel, isOpen, accountId, leadId }) => {
   const { user } = useAuth();
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     lead_id: '',
+    account_id: '',
     assigned_to: '',
     due_date: '',
     priority: 'medium',
@@ -17,6 +19,7 @@ const TaskForm = ({ task, onSave, onCancel, isOpen }) => {
   });
   const [users, setUsers] = useState([]);
   const [leads, setLeads] = useState([]);
+  const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
@@ -24,12 +27,14 @@ const TaskForm = ({ task, onSave, onCancel, isOpen }) => {
     if (isOpen) {
       loadUsers();
       loadLeads();
+      loadAccounts();
       
       if (task) {
         setFormData({
           title: task.title || '',
           description: task.description || '',
           lead_id: task.lead_id || '',
+          account_id: task.account_id || '',
           assigned_to: task.assigned_to || '',
           due_date: task.due_date ? new Date(task.due_date).toISOString().slice(0, 16) : '',
           priority: task.priority || 'medium',
@@ -40,7 +45,8 @@ const TaskForm = ({ task, onSave, onCancel, isOpen }) => {
         setFormData({
           title: '',
           description: '',
-          lead_id: '',
+          lead_id: leadId || '',
+          account_id: accountId || '',
           assigned_to: user?.id || '',
           due_date: '',
           priority: 'medium',
@@ -49,7 +55,7 @@ const TaskForm = ({ task, onSave, onCancel, isOpen }) => {
         });
       }
     }
-  }, [isOpen, task, user]);
+  }, [isOpen, task, user, accountId, leadId]);
 
   const loadUsers = async () => {
     try {
@@ -66,6 +72,15 @@ const TaskForm = ({ task, onSave, onCancel, isOpen }) => {
       setLeads(response.data);
     } catch (error) {
       console.error('Failed to load leads:', error);
+    }
+  };
+
+  const loadAccounts = async () => {
+    try {
+      const response = await accountService.getAccounts({ limit: 1000, status: 'active' });
+      setAccounts(response.data);
+    } catch (error) {
+      console.error('Failed to load accounts:', error);
     }
   };
 
@@ -115,6 +130,8 @@ const TaskForm = ({ task, onSave, onCancel, isOpen }) => {
     try {
       const taskData = {
         ...formData,
+        lead_id: formData.lead_id === '' ? null : formData.lead_id,
+        account_id: formData.account_id === '' ? null : formData.account_id,
         due_date: formData.due_date ? new Date(formData.due_date).toISOString() : null
       };
 
@@ -200,13 +217,43 @@ const TaskForm = ({ task, onSave, onCancel, isOpen }) => {
               <select
                 name="lead_id"
                 value={formData.lead_id}
-                onChange={handleChange}
+                onChange={(e) => {
+                  handleChange(e);
+                  if (e.target.value) {
+                    setFormData(prev => ({ ...prev, account_id: '' }));
+                  }
+                }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Select lead (optional)</option>
                 {leads.map(lead => (
                   <option key={lead.id} value={lead.id}>
                     {lead.first_name} {lead.last_name} - {lead.email}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Account */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Related Account
+              </label>
+              <select
+                name="account_id"
+                value={formData.account_id}
+                onChange={(e) => {
+                  handleChange(e);
+                  if (e.target.value) {
+                    setFormData(prev => ({ ...prev, lead_id: '' }));
+                  }
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select account (optional)</option>
+                {accounts.map(account => (
+                  <option key={account.id} value={account.id}>
+                    {account.name} {account.industry ? `(${account.industry})` : ''}
                   </option>
                 ))}
               </select>

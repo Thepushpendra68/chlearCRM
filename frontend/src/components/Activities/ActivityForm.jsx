@@ -2,13 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import activityService from '../../services/activityService';
 import leadService from '../../services/leadService';
+import accountService from '../../services/accountService';
 
 const ActivityForm = ({ 
   isOpen, 
   onClose, 
   onSubmit, 
   leadId, 
+  accountId,
   selectedLead = null,
+  selectedAccount = null,
   activity = null, 
   initialType = 'note' 
 }) => {
@@ -24,9 +27,13 @@ const ActivityForm = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [leads, setLeads] = useState([]);
+  const [accounts, setAccounts] = useState([]);
   const [loadingLeads, setLoadingLeads] = useState(false);
+  const [loadingAccounts, setLoadingAccounts] = useState(false);
   const [internalLeadId, setInternalLeadId] = useState(leadId);
+  const [internalAccountId, setInternalAccountId] = useState(accountId);
   const [internalSelectedLead, setInternalSelectedLead] = useState(selectedLead);
+  const [internalSelectedAccount, setInternalSelectedAccount] = useState(selectedAccount);
 
   const activityTypes = [
     { value: 'call', label: 'Phone Call', icon: '📞' },
@@ -48,17 +55,24 @@ const ActivityForm = ({
     { value: 'deal_closed', label: 'Deal Closed' }
   ];
 
-  // Fetch leads when component opens
+  // Fetch leads and accounts when component opens
   useEffect(() => {
-    if (isOpen && leads.length === 0) {
-      fetchLeads();
+    if (isOpen) {
+      if (leads.length === 0) {
+        fetchLeads();
+      }
+      if (accounts.length === 0) {
+        fetchAccounts();
+      }
     }
   }, [isOpen]);
 
   // Update internal state when props change
   useEffect(() => {
     setInternalLeadId(leadId);
+    setInternalAccountId(accountId);
     setInternalSelectedLead(selectedLead);
+    setInternalSelectedAccount(selectedAccount);
 
     // If we have an activity (editing mode) and no selectedLead, find it from leads
     if (activity && leadId && !selectedLead && leads.length > 0) {
@@ -67,7 +81,16 @@ const ActivityForm = ({
         setInternalSelectedLead(lead);
       }
     }
-  }, [leadId, selectedLead, activity, leads]);
+
+    // If we have an activity (editing mode) and no selectedAccount, find it from accounts
+    if (activity && activity.account_id && !selectedAccount && accounts.length > 0) {
+      const account = accounts.find(a => a.id === activity.account_id);
+      if (account) {
+        setInternalSelectedAccount(account);
+        setInternalAccountId(activity.account_id);
+      }
+    }
+  }, [leadId, accountId, selectedLead, selectedAccount, activity, leads, accounts]);
 
   useEffect(() => {
     if (activity) {
@@ -81,9 +104,12 @@ const ActivityForm = ({
         outcome: activity.outcome || '',
         is_completed: activity.is_completed || false
       });
-      // Ensure lead is set for editing
+      // Ensure lead and account are set for editing
       if (activity.lead_id) {
         setInternalLeadId(activity.lead_id);
+      }
+      if (activity.account_id) {
+        setInternalAccountId(activity.account_id);
       }
     } else {
       // Add mode: reset form to defaults
@@ -117,6 +143,20 @@ const ActivityForm = ({
     }
   };
 
+  const fetchAccounts = async () => {
+    try {
+      setLoadingAccounts(true);
+      const response = await accountService.getAccounts({ limit: 1000, status: 'active' });
+      if (response.success) {
+        setAccounts(response.data);
+      }
+    } catch (error) {
+      console.error('Error fetching accounts:', error);
+    } finally {
+      setLoadingAccounts(false);
+    }
+  };
+
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData(prev => ({
@@ -133,8 +173,9 @@ const ActivityForm = ({
       return;
     }
 
-    if (!internalLeadId || internalLeadId === '' || internalLeadId === 'null' || internalLeadId === 'undefined') {
-      setError('Please select a lead first');
+    if ((!internalLeadId || internalLeadId === '' || internalLeadId === 'null' || internalLeadId === 'undefined') &&
+        (!internalAccountId || internalAccountId === '' || internalAccountId === 'null' || internalAccountId === 'undefined')) {
+      setError('Please select either a lead or an account');
       return;
     }
 
@@ -144,7 +185,8 @@ const ActivityForm = ({
 
       const activityData = {
         ...formData,
-        lead_id: internalLeadId,
+        lead_id: internalLeadId && internalLeadId !== '' && internalLeadId !== 'null' ? internalLeadId : null,
+        account_id: internalAccountId && internalAccountId !== '' && internalAccountId !== 'null' ? internalAccountId : null,
         duration_minutes: formData.duration_minutes ? parseInt(formData.duration_minutes) : null,
         scheduled_at: formData.scheduled_at || null,
         is_completed: formData.is_completed || formData.activity_type === 'note'
@@ -197,8 +239,9 @@ const ActivityForm = ({
       return;
     }
 
-    if (!internalLeadId || internalLeadId === '' || internalLeadId === 'null' || internalLeadId === 'undefined') {
-      setError('Please select a lead first');
+    if ((!internalLeadId || internalLeadId === '' || internalLeadId === 'null' || internalLeadId === 'undefined') &&
+        (!internalAccountId || internalAccountId === '' || internalAccountId === 'null' || internalAccountId === 'undefined')) {
+      setError('Please select either a lead or an account');
       return;
     }
 
@@ -208,7 +251,8 @@ const ActivityForm = ({
 
       const activityData = {
         ...formData,
-        lead_id: internalLeadId,
+        lead_id: internalLeadId && internalLeadId !== '' && internalLeadId !== 'null' ? internalLeadId : null,
+        account_id: internalAccountId && internalAccountId !== '' && internalAccountId !== 'null' ? internalAccountId : null,
         is_completed: true,
         completed_at: new Date().toISOString(),
         duration_minutes: formData.duration_minutes ? parseInt(formData.duration_minutes) : null
@@ -266,41 +310,87 @@ const ActivityForm = ({
             </div>
           )}
 
-          {/* Lead Selection */}
+          {/* Lead or Account Selection */}
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Select Lead *
+              Select Lead or Account *
             </label>
-            {loadingLeads ? (
-              <div className="w-full px-3 py-2 text-gray-500">Loading leads...</div>
-            ) : (
-              <select
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                onChange={(e) => {
-                  const selectedLeadId = e.target.value;
-                  setInternalLeadId(selectedLeadId);
-                  const lead = leads.find(l => l.id === selectedLeadId);
-                  setInternalSelectedLead(lead);
-                  setError(null); // Clear any previous errors
-                }}
-                value={internalLeadId || ''}
-              >
-                <option value="">Choose a lead...</option>
-                {leads.map(lead => (
-                  <option key={lead.id} value={lead.id}>
-                    {lead.company || `${lead.first_name} ${lead.last_name}`} - {lead.email}
-                  </option>
-                ))}
-              </select>
-            )}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Lead</label>
+                {loadingLeads ? (
+                  <div className="w-full px-3 py-2 text-gray-500 text-sm">Loading...</div>
+                ) : (
+                  <select
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    onChange={(e) => {
+                      const selectedLeadId = e.target.value;
+                      setInternalLeadId(selectedLeadId);
+                      if (selectedLeadId) {
+                        setInternalAccountId(''); // Clear account if lead is selected
+                      }
+                      const lead = leads.find(l => l.id === selectedLeadId);
+                      setInternalSelectedLead(lead);
+                      setInternalSelectedAccount(null);
+                      setError(null);
+                    }}
+                    value={internalLeadId || ''}
+                  >
+                    <option value="">Choose a lead...</option>
+                    {leads.map(lead => (
+                      <option key={lead.id} value={lead.id}>
+                        {lead.company || `${lead.first_name} ${lead.last_name}`}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Account</label>
+                {loadingAccounts ? (
+                  <div className="w-full px-3 py-2 text-gray-500 text-sm">Loading...</div>
+                ) : (
+                  <select
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    onChange={(e) => {
+                      const selectedAccountId = e.target.value;
+                      setInternalAccountId(selectedAccountId);
+                      if (selectedAccountId) {
+                        setInternalLeadId(''); // Clear lead if account is selected
+                      }
+                      const account = accounts.find(a => a.id === selectedAccountId);
+                      setInternalSelectedAccount(account);
+                      setInternalSelectedLead(null);
+                      setError(null);
+                    }}
+                    value={internalAccountId || ''}
+                  >
+                    <option value="">Choose an account...</option>
+                    {accounts.map(account => (
+                      <option key={account.id} value={account.id}>
+                        {account.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            </div>
           </div>
 
-          {/* Lead Information */}
+          {/* Lead or Account Information */}
           {internalSelectedLead && (
             <div className="mb-4 bg-blue-50 border border-blue-200 rounded-md p-3">
               <h3 className="text-sm font-medium text-blue-900">Creating activity for:</h3>
               <p className="text-sm text-blue-800">
-                {internalSelectedLead.company || `${internalSelectedLead.first_name} ${internalSelectedLead.last_name}`} - {internalSelectedLead.email}
+                Lead: {internalSelectedLead.company || `${internalSelectedLead.first_name} ${internalSelectedLead.last_name}`} - {internalSelectedLead.email}
+              </p>
+            </div>
+          )}
+          {internalSelectedAccount && (
+            <div className="mb-4 bg-green-50 border border-green-200 rounded-md p-3">
+              <h3 className="text-sm font-medium text-green-900">Creating activity for:</h3>
+              <p className="text-sm text-green-800">
+                Account: {internalSelectedAccount.name} {internalSelectedAccount.industry ? `(${internalSelectedAccount.industry})` : ''}
               </p>
             </div>
           )}

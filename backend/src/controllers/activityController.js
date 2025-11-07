@@ -44,6 +44,7 @@ class ActivityController {
 
       const filters = {
         lead_id: req.query.lead_id,
+        account_id: req.query.account_id,
         user_id: req.query.user_id,
         activity_type: req.query.activity_type,
         is_completed: req.query.is_completed ? req.query.is_completed === 'true' : undefined,
@@ -124,6 +125,7 @@ class ActivityController {
         details: {
           activity_type: result.data?.activity_type,
           lead_id: result.data?.lead_id,
+          account_id: result.data?.account_id,
           user_id: result.data?.user_id,
           scheduled_at: result.data?.scheduled_at,
           is_completed: result.data?.is_completed

@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeftIcon, PencilIcon, TrashIcon, PhoneIcon, EnvelopeIcon, BuildingOfficeIcon } from '@heroicons/react/24/outline'
 import leadService from '../services/leadService'
+import accountService from '../services/accountService'
 import LeadForm from '../components/LeadForm'
 import ActivityForm from '../components/Activities/ActivityForm'
 import TaskForm from '../components/Tasks/TaskForm'
@@ -15,7 +16,9 @@ const LeadDetail = () => {
   const { id } = useParams()
   const navigate = useNavigate()
   const [lead, setLead] = useState(null)
+  const [account, setAccount] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [loadingAccount, setLoadingAccount] = useState(false)
   const [showEditForm, setShowEditForm] = useState(false)
   const [showActivityForm, setShowActivityForm] = useState(false)
   const [showTaskForm, setShowTaskForm] = useState(false)
@@ -45,6 +48,14 @@ const LeadDetail = () => {
     fetchLead()
   }, [id])
 
+  useEffect(() => {
+    if (lead?.account_id) {
+      fetchAccount(lead.account_id)
+    } else {
+      setAccount(null)
+    }
+  }, [lead?.account_id])
+
   const fetchLead = async () => {
     try {
       setLoading(true)
@@ -56,6 +67,19 @@ const LeadDetail = () => {
       navigate('/app/leads')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchAccount = async (accountId) => {
+    try {
+      setLoadingAccount(true)
+      const response = await accountService.getAccountById(accountId)
+      setAccount(response.data)
+    } catch (error) {
+      console.error('Failed to fetch account:', error)
+      setAccount(null)
+    } finally {
+      setLoadingAccount(false)
     }
   }
 
@@ -323,6 +347,25 @@ const LeadDetail = () => {
                       </div>
                     </div>
                   )}
+                  {account && (
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <BuildingOfficeIcon className="h-4 w-4 text-blue-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">Account</p>
+                        <button
+                          onClick={() => navigate(`/app/accounts/${account.id}`)}
+                          className="text-sm text-primary-600 hover:text-primary-800 font-medium"
+                        >
+                          {account.name}
+                        </button>
+                        {account.industry && (
+                          <p className="text-xs text-gray-500">{account.industry}</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -346,6 +389,17 @@ const LeadDetail = () => {
                       {getStatusLabel(lead.status)}
                     </span>
                   </div>
+                  {account && (
+                    <div>
+                      <p className="text-sm font-medium text-gray-500 mb-1">Account</p>
+                      <button
+                        onClick={() => navigate(`/app/accounts/${account.id}`)}
+                        className="text-sm text-primary-600 hover:text-primary-800 font-medium"
+                      >
+                        {account.name}
+                      </button>
+                    </div>
+                  )}
                   <div>
                     <p className="text-sm font-medium text-gray-500 mb-1">Priority</p>
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${

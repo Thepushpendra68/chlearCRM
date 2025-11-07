@@ -31,6 +31,10 @@ class ActivityService {
         query = query.eq('lead_id', filters.lead_id);
       }
 
+      if (filters.account_id) {
+        query = query.eq('account_id', filters.account_id);
+      }
+
       if (filters.user_id) {
         query = query.eq('user_id', filters.user_id);
       }
@@ -147,9 +151,9 @@ class ActivityService {
       // Map activity_type to type for backend compatibility
       const activityType = activityData.activity_type || activityData.type;
 
-      // Validate required fields
-      if (!activityData.lead_id || !activityData.user_id || !activityType) {
-        return { success: false, error: 'lead_id, user_id, and activity_type are required' };
+      // Validate required fields - either lead_id or account_id is required
+      if ((!activityData.lead_id && !activityData.account_id) || !activityData.user_id || !activityType) {
+        return { success: false, error: 'Either lead_id or account_id, user_id, and activity_type are required' };
       }
 
       // Validate activity type
@@ -158,21 +162,38 @@ class ActivityService {
         return { success: false, error: 'Invalid activity type' };
       }
 
-      // Check if lead belongs to user's company
-      const { data: lead, error: leadError } = await supabase
-        .from('leads')
-        .select('company_id')
-        .eq('id', activityData.lead_id)
-        .eq('company_id', currentUser.company_id)
-        .single();
+      // Check if lead belongs to user's company (if provided)
+      if (activityData.lead_id) {
+        const { data: lead, error: leadError } = await supabase
+          .from('leads')
+          .select('company_id')
+          .eq('id', activityData.lead_id)
+          .eq('company_id', currentUser.company_id)
+          .single();
 
-      if (leadError || !lead) {
-        return { success: false, error: 'Lead not found or access denied' };
+        if (leadError || !lead) {
+          return { success: false, error: 'Lead not found or access denied' };
+        }
+      }
+
+      // Check if account belongs to user's company (if provided)
+      if (activityData.account_id) {
+        const { data: account, error: accountError } = await supabase
+          .from('accounts')
+          .select('company_id')
+          .eq('id', activityData.account_id)
+          .eq('company_id', currentUser.company_id)
+          .single();
+
+        if (accountError || !account) {
+          return { success: false, error: 'Account not found or access denied' };
+        }
       }
 
       // Set default values with proper field mapping
       const newActivity = {
-        lead_id: activityData.lead_id,
+        lead_id: activityData.lead_id || null,
+        account_id: activityData.account_id || null,
         user_id: activityData.user_id,
         company_id: currentUser.company_id,
         type: activityType,
@@ -229,6 +250,8 @@ class ActivityService {
         subject: updateData.subject,
         description: updateData.description,
         activity_type: updateData.activity_type,
+        lead_id: updateData.lead_id !== undefined ? updateData.lead_id : existingActivity.lead_id,
+        account_id: updateData.account_id !== undefined ? updateData.account_id : existingActivity.account_id,
         scheduled_at: updateData.scheduled_at,
         completed_at: updateData.completed_at,
         is_completed: updateData.is_completed,

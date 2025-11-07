@@ -13,6 +13,8 @@ const RegisterCompany = lazy(() => import('./pages/RegisterCompany'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Leads = lazy(() => import('./pages/Leads'))
 const LeadDetail = lazy(() => import('./pages/LeadDetail'))
+const Accounts = lazy(() => import('./pages/Accounts'))
+const AccountDetail = lazy(() => import('./pages/AccountDetail'))
 const Pipeline = lazy(() => import('./pages/Pipeline'))
 const Activities = lazy(() => import('./pages/Activities'))
 const Assignments = lazy(() => import('./pages/Assignments'))
@@ -73,6 +75,8 @@ function App() {
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="leads" element={<Leads />} />
               <Route path="leads/:id" element={<LeadDetail />} />
+              <Route path="accounts" element={<Accounts />} />
+              <Route path="accounts/:id" element={<AccountDetail />} />
               <Route path="pipeline" element={<Pipeline />} />
               <Route path="activities" element={<Activities />} />
               <Route path="assignments" element={

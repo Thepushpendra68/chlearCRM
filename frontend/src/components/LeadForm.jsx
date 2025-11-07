@@ -5,6 +5,7 @@ import Modal from './Modal';
 import leadService from '../services/leadService';
 import userService from '../services/userService';
 import pipelineService from '../services/pipelineService';
+import accountService from '../services/accountService';
 import { useLeads } from '../context/LeadContext';
 import { usePicklists } from '../context/PicklistContext';
 import toast from 'react-hot-toast';
@@ -13,8 +14,10 @@ const LeadForm = ({ lead = null, onClose, onSuccess, initialStageId = null, onSu
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState([]);
   const [stages, setStages] = useState([]);
+  const [accounts, setAccounts] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [loadingStages, setLoadingStages] = useState(true);
+  const [loadingAccounts, setLoadingAccounts] = useState(true);
   
   // Use the global leads context
   const { addLead, updateLead } = useLeads();
@@ -46,7 +49,8 @@ const LeadForm = ({ lead = null, onClose, onSuccess, initialStageId = null, onSu
       deal_value: '',
       probability: 0,
       expected_close_date: '',
-      priority: 'medium'
+      priority: 'medium',
+      account_id: ''
     }
   });
 
@@ -123,26 +127,30 @@ const LeadForm = ({ lead = null, onClose, onSuccess, initialStageId = null, onSu
     setValue
   ]);
 
-  // Load users and stages for dropdowns
+  // Load users, stages, and accounts for dropdowns
   useEffect(() => {
     const loadData = async () => {
       try {
         setLoadingUsers(true);
         setLoadingStages(true);
+        setLoadingAccounts(true);
         
-        const [usersResponse, stagesResponse] = await Promise.all([
+        const [usersResponse, stagesResponse, accountsResponse] = await Promise.all([
           userService.getActiveUsers(),
-          pipelineService.getStages()
+          pipelineService.getStages(),
+          accountService.getAccounts({ limit: 1000, status: 'active' })
         ]);
         
         setUsers(usersResponse.data || []);
         setStages(stagesResponse.data || []);
+        setAccounts(accountsResponse.data || []);
       } catch (error) {
         console.error('Failed to load data:', error);
         toast.error('Failed to load form data');
       } finally {
         setLoadingUsers(false);
         setLoadingStages(false);
+        setLoadingAccounts(false);
       }
     };
 
@@ -170,6 +178,7 @@ const LeadForm = ({ lead = null, onClose, onSuccess, initialStageId = null, onSu
       setValue('probability', lead.probability || 0);
       setValue('expected_close_date', lead.expected_close_date ? format(new Date(lead.expected_close_date), 'yyyy-MM-dd') : '');
       setValue('priority', lead.priority || 'medium');
+      setValue('account_id', lead.account_id || '');
     } else if (initialStageId) {
       setValue('pipeline_stage_id', initialStageId);
     }
@@ -204,7 +213,8 @@ const LeadForm = ({ lead = null, onClose, onSuccess, initialStageId = null, onSu
         deal_value: data.deal_value === '' ? null : data.deal_value,
         expected_close_date: data.expected_close_date === '' ? null : data.expected_close_date,
         assigned_to: data.assigned_to === '' ? null : data.assigned_to,
-        pipeline_stage_id: data.pipeline_stage_id === '' ? null : data.pipeline_stage_id
+        pipeline_stage_id: data.pipeline_stage_id === '' ? null : data.pipeline_stage_id,
+        account_id: data.account_id === '' ? null : data.account_id
       };
 
       if (lead) {
@@ -648,6 +658,28 @@ const LeadForm = ({ lead = null, onClose, onSuccess, initialStageId = null, onSu
               </select>
               {loadingUsers && (
                 <p className="text-gray-500 text-xs mt-1">Loading users...</p>
+              )}
+            </div>
+
+            {/* Account */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Account
+              </label>
+              <select
+                {...register('account_id')}
+                className="input"
+                disabled={loadingAccounts}
+              >
+                <option value="">Select account (optional)</option>
+                {accounts.map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.name} {account.industry ? `(${account.industry})` : ''}
+                  </option>
+                ))}
+              </select>
+              {loadingAccounts && (
+                <p className="text-gray-500 text-xs mt-1">Loading accounts...</p>
               )}
             </div>
 
