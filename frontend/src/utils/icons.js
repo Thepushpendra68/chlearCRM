@@ -1,7 +1,7 @@
 import {
   FireIcon,
   BeakerIcon as WarmIcon,
-  SnowflakeIcon as ColdIcon
+  BoltIcon as ColdIcon
 } from '@heroicons/react/24/solid';
 
 // Scoring icons
