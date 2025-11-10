@@ -12,7 +12,11 @@
       "mcp__supabase__apply_migration",
       "mcp__supabase__list_migrations",
       "mcp__supabase__execute_sql",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git fetch:*)",
+      "Bash(git merge:*)",
+      "Bash(find:*)",
+      "mcp__supabase__list_tables"
     ],
     "deny": [],
     "ask": []

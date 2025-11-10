@@ -26,6 +26,7 @@ import {
   EnvelopeIcon,
   BoltIcon,
   BuildingOfficeIcon,
+  TrophyIcon,
 } from '@heroicons/react/24/outline'
 import api from '../../services/api'
 
@@ -82,6 +83,13 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, isCollapsed, setIsCollapsed }) =
       name: 'Custom Fields',
       href: '/app/custom-fields',
       icon: RectangleGroupIcon,
+      badge: null
+    }] : []),
+    // Scoring Rules - for managers and admins
+    ...(user?.role === 'manager' || user?.role === 'company_admin' || user?.role === 'super_admin' ? [{
+      name: 'Scoring Rules',
+      href: '/app/scoring',
+      icon: TrophyIcon,
       badge: null
     }] : []),
     // API Clients - only for company_admin and super_admin

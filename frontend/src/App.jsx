@@ -42,6 +42,7 @@ const EmailTemplateEditor = lazy(() => import('./pages/EmailTemplateEditor'))
 const EmailSequences = lazy(() => import('./pages/EmailSequences'))
 const EmailSequenceBuilder = lazy(() => import('./pages/EmailSequenceBuilder'))
 const EmailAnalytics = lazy(() => import('./pages/EmailAnalytics'))
+const ScoringRules = lazy(() => import('./pages/ScoringRules'))
 
 const RouteLoadingFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -106,6 +107,11 @@ function App() {
               <Route path="custom-fields" element={
                 <RoleProtectedRoute allowedRoles={['manager', 'company_admin', 'super_admin']}>
                   <CustomFields />
+                </RoleProtectedRoute>
+              } />
+              <Route path="scoring" element={
+                <RoleProtectedRoute allowedRoles={['manager', 'company_admin', 'super_admin']}>
+                  <ScoringRules />
                 </RoleProtectedRoute>
               } />
               <Route path="email/settings" element={
