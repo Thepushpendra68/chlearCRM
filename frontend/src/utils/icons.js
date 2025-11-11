@@ -1,7 +1,7 @@
 import {
   FireIcon,
   BeakerIcon as WarmIcon,
-  BoltIcon as ColdIcon
+  SnowflakeIcon as ColdIcon
 } from '@heroicons/react/24/solid';
 
 // Scoring icons
@@ -26,7 +26,5 @@ export {
   PlusIcon,
   XMarkIcon,
   CheckIcon,
-  InformationCircleIcon,
-  TrophyIcon,
-  ClockIcon
+  InformationCircleIcon
 } from '@heroicons/react/24/outline';

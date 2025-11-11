@@ -16,7 +16,9 @@
       "Bash(git fetch:*)",
       "Bash(git merge:*)",
       "Bash(find:*)",
-      "mcp__supabase__list_tables"
+      "mcp__supabase__list_tables",
+      "Bash(git add:*)",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "ask": []

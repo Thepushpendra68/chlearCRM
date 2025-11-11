@@ -59,6 +59,9 @@ console.log('✅ [APP] Account routes loaded successfully:', !!accountRoutes);
 console.log('📦 [APP] Loading contact routes...');
 const contactRoutes = require('./routes/contactRoutes');
 console.log('✅ [APP] Contact routes loaded successfully:', !!contactRoutes);
+console.log('📦 [APP] Loading scoring routes...');
+const scoringRoutes = require('./routes/scoringRoutes');
+console.log('✅ [APP] Scoring routes loaded successfully:', !!scoringRoutes);
 
 // Import middleware
 const errorHandler = require('./middleware/errorMiddleware');
@@ -221,6 +224,9 @@ console.log('✅ [APP] /api/accounts routes registered');
 console.log('🔗 [APP] Registering /api/contacts routes...');
 app.use('/api/contacts', contactRoutes); // Contact management
 console.log('✅ [APP] /api/contacts routes registered');
+console.log('🔗 [APP] Registering /api/scoring routes...');
+app.use('/api/scoring', scoringRoutes); // Lead scoring system
+console.log('✅ [APP] /api/scoring routes registered');
 
 // 404 handler
 app.use('*', (req, res) => {
