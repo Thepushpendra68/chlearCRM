@@ -5,7 +5,9 @@ import {
   Cog6ToothIcon,
   UserCircleIcon,
   SunIcon,
-  MoonIcon
+  MoonIcon,
+  ChevronDownIcon,
+  ChevronRightIcon
 } from '@heroicons/react/24/outline'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
@@ -36,6 +38,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, isCollapsed, setIsCollapsed }) =
   const navigate = useNavigate()
   const [isDarkMode, setIsDarkMode] = useState(false)
   const [isHovered, setIsHovered] = useState(false)
+  const [emailSectionExpanded, setEmailSectionExpanded] = useState(false)
   const [badgeCounts, setBadgeCounts] = useState({
     leads: 0,
     activities: 0,
@@ -61,6 +64,27 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, isCollapsed, setIsCollapsed }) =
     return () => clearInterval(interval)
   }, [])
 
+  // Auto-expand email section when navigating to email pages
+  useEffect(() => {
+    const currentPath = window.location.pathname
+    if (currentPath.startsWith('/app/email/')) {
+      setEmailSectionExpanded(true)
+    }
+  }, [])
+
+  // Email sub-navigation items
+  const emailSubItems = [
+    { name: 'Templates', href: '/app/email/templates', icon: EnvelopeIcon },
+    { name: 'Sequences', href: '/app/email/sequences', icon: BoltIcon },
+    { name: 'Analytics', href: '/app/email/analytics', icon: ChartBarIcon },
+    // Email Settings - only for company_admin and super_admin
+    ...(user?.role === 'company_admin' || user?.role === 'super_admin' ? [{
+      name: 'Settings',
+      href: '/app/email/settings',
+      icon: Cog6ToothIcon
+    }] : []),
+  ]
+
   // Main navigation items (top section)
   const mainNavigation = [
     { name: 'Dashboard', href: '/app/dashboard', icon: HomeIcon, badge: null },
@@ -69,9 +93,6 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, isCollapsed, setIsCollapsed }) =
     { name: 'Accounts', href: '/app/accounts', icon: BuildingOfficeIcon, badge: null },
     { name: 'Pipeline', href: '/app/pipeline', icon: Squares2X2Icon, badge: null },
     { name: 'Activities', href: '/app/activities', icon: ClockIcon, badge: badgeCounts.activities || null },
-    { name: 'Email Templates', href: '/app/email/templates', icon: EnvelopeIcon, badge: null },
-    { name: 'Email Sequences', href: '/app/email/sequences', icon: BoltIcon, badge: null },
-    { name: 'Email Analytics', href: '/app/email/analytics', icon: ChartBarIcon, badge: null },
   ]
 
   // Utility/admin navigation items (bottom section)
@@ -101,13 +122,6 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, isCollapsed, setIsCollapsed }) =
       icon: KeyIcon,
       badge: null
     }] : []),
-    // Email Settings - only for company_admin and super_admin
-    ...(user?.role === 'company_admin' || user?.role === 'super_admin' ? [{
-      name: 'Email Settings',
-      href: '/app/email/settings',
-      icon: Cog6ToothIcon,
-      badge: null
-    }] : []),
     // Platform Admin link - only for super_admin
     ...(user?.role === 'super_admin' ? [{
       name: 'Platform Admin',
@@ -130,6 +144,12 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, isCollapsed, setIsCollapsed }) =
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [isCollapsed, setIsCollapsed])
+
+  // Check if any email sub-item is active
+  const isEmailSectionActive = () => {
+    const currentPath = window.location.pathname
+    return emailSubItems.some(item => currentPath === item.href)
+  }
 
 
   // Navigation item component
@@ -240,6 +260,58 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, isCollapsed, setIsCollapsed }) =
                         onClick={() => setSidebarOpen(false)}
                       />
                     ))}
+                  </nav>
+
+                  {/* Email Section */}
+                  <nav className="px-2 space-y-1 mb-6">
+                    {/* Email Parent Item */}
+                    <div className="mb-1">
+                      <button
+                        onClick={() => setEmailSectionExpanded(!emailSectionExpanded)}
+                        className={`group relative w-full flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
+                          isEmailSectionActive()
+                            ? 'bg-primary-500 text-white shadow-sm'
+                            : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                        }`}
+                      >
+                        <EnvelopeIcon
+                          className="h-5 w-5 flex-shrink-0 mr-3"
+                          aria-hidden="true"
+                        />
+                        <span className="truncate">Email</span>
+                        {emailSectionExpanded ? (
+                          <ChevronDownIcon className="h-4 w-4 ml-auto" aria-hidden="true" />
+                        ) : (
+                          <ChevronRightIcon className="h-4 w-4 ml-auto" aria-hidden="true" />
+                        )}
+                      </button>
+
+                      {/* Email Sub-items */}
+                      {emailSectionExpanded && (
+                        <div className="ml-6 mt-1 space-y-1">
+                          {emailSubItems.map((subItem) => (
+                            <NavLink
+                              key={subItem.name}
+                              to={subItem.href}
+                              onClick={() => setSidebarOpen(false)}
+                              className={({ isActive }) =>
+                                `group relative flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+                                  isActive
+                                    ? 'bg-primary-100 text-primary-700'
+                                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                                }`
+                              }
+                            >
+                              <subItem.icon
+                                className="h-4 w-4 flex-shrink-0 mr-3"
+                                aria-hidden="true"
+                              />
+                              <span className="truncate">{subItem.name}</span>
+                            </NavLink>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </nav>
 
                   {/* Divider */}
@@ -370,6 +442,64 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, isCollapsed, setIsCollapsed }) =
                     isCollapsed={isCollapsed && !isHovered}
                   />
                 ))}
+              </nav>
+
+              {/* Email Section */}
+              <nav className="px-2 space-y-1 mb-6">
+                {/* Email Parent Item */}
+                <div className="mb-1">
+                  <button
+                    onClick={() => setEmailSectionExpanded(!emailSectionExpanded)}
+                    className={`group relative w-full flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
+                      isEmailSectionActive()
+                        ? 'bg-primary-500 text-white shadow-sm'
+                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                    } ${(isCollapsed && !isHovered) ? 'justify-center' : ''}`}
+                    title={(isCollapsed && !isHovered) ? 'Email' : undefined}
+                  >
+                    <EnvelopeIcon
+                      className={`h-5 w-5 flex-shrink-0 ${
+                        (isCollapsed && !isHovered) ? '' : 'mr-3'
+                      }`}
+                      aria-hidden="true"
+                    />
+                    {(!isCollapsed || isHovered) && (
+                      <>
+                        <span className="truncate">Email</span>
+                        {emailSectionExpanded ? (
+                          <ChevronDownIcon className="h-4 w-4 ml-auto" aria-hidden="true" />
+                        ) : (
+                          <ChevronRightIcon className="h-4 w-4 ml-auto" aria-hidden="true" />
+                        )}
+                      </>
+                    )}
+                  </button>
+
+                  {/* Email Sub-items */}
+                  {emailSectionExpanded && (!isCollapsed || isHovered) && (
+                    <div className="ml-6 mt-1 space-y-1">
+                      {emailSubItems.map((subItem) => (
+                        <NavLink
+                          key={subItem.name}
+                          to={subItem.href}
+                          className={({ isActive }) =>
+                            `group relative flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+                              isActive
+                                ? 'bg-primary-100 text-primary-700'
+                                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                            }`
+                          }
+                        >
+                          <subItem.icon
+                            className="h-4 w-4 flex-shrink-0 mr-3"
+                            aria-hidden="true"
+                          />
+                          <span className="truncate">{subItem.name}</span>
+                        </NavLink>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </nav>
 
               {/* Divider */}
