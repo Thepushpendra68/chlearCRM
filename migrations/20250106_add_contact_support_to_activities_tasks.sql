@@ -13,7 +13,7 @@ BEGIN;
 -- 1. ADD CONTACT_ID TO ACTIVITIES
 -- =====================================================
 
-ALTER TABLE activities 
+ALTER TABLE activities
 ADD COLUMN IF NOT EXISTS contact_id UUID REFERENCES contacts(id) ON DELETE SET NULL;
 
 -- Create index for contact-based queries
@@ -24,7 +24,7 @@ CREATE INDEX IF NOT EXISTS idx_activities_company_contact ON activities(company_
 -- 2. ADD CONTACT_ID TO TASKS
 -- =====================================================
 
-ALTER TABLE tasks 
+ALTER TABLE tasks
 ADD COLUMN IF NOT EXISTS contact_id UUID REFERENCES contacts(id) ON DELETE SET NULL;
 
 -- Create index for contact-based queries
@@ -41,16 +41,16 @@ RETURNS TRIGGER AS $$
 BEGIN
   -- Update contact's last_activity_at and last_contacted_at
   IF NEW.contact_id IS NOT NULL THEN
-    UPDATE contacts 
-    SET 
+    UPDATE contacts
+    SET
       last_activity_at = NEW.created_at,
-      last_contacted_at = CASE 
+      last_contacted_at = CASE
         WHEN NEW.type IN ('call', 'email', 'meeting') THEN NEW.created_at
         ELSE last_contacted_at
       END
     WHERE id = NEW.contact_id;
   END IF;
-  
+
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
@@ -67,7 +67,7 @@ CREATE TRIGGER activities_update_contact_trigger
 
 -- Now that contact_id exists in activities and tasks, update the view
 CREATE OR REPLACE VIEW contacts_with_details AS
-SELECT 
+SELECT
   c.*,
   a.name as account_name,
   a.industry as account_industry,

@@ -42,43 +42,43 @@ CREATE TYPE custom_field_data_type AS ENUM (
 CREATE TABLE IF NOT EXISTS custom_field_definitions (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
-  
+
   -- Field identification
   field_name TEXT NOT NULL, -- Internal name (e.g., "budget_range")
   field_label TEXT NOT NULL, -- Display name (e.g., "Budget Range")
   field_description TEXT,
-  
+
   -- Field configuration
   entity_type custom_field_entity_type NOT NULL,
   data_type custom_field_data_type NOT NULL,
-  
+
   -- Validation rules
   is_required BOOLEAN DEFAULT false,
   is_unique BOOLEAN DEFAULT false,
   is_searchable BOOLEAN DEFAULT true,
-  
+
   -- Options for select/multiselect
   field_options JSONB DEFAULT '[]'::JSONB, -- Array of options: ["Option 1", "Option 2"]
-  
+
   -- Validation rules
   validation_rules JSONB DEFAULT '{}'::JSONB, -- { "min": 0, "max": 100, "pattern": "regex", etc. }
-  
+
   -- Display settings
   display_order INTEGER DEFAULT 0,
   placeholder TEXT,
   help_text TEXT,
   default_value TEXT,
-  
+
   -- Status
   is_active BOOLEAN DEFAULT true,
   is_system_field BOOLEAN DEFAULT false, -- System fields cannot be deleted
-  
+
   -- Metadata
   created_by UUID REFERENCES user_profiles(id),
   updated_by UUID REFERENCES user_profiles(id),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
-  
+
   -- Constraints
   UNIQUE(company_id, entity_type, field_name)
 );
@@ -104,13 +104,13 @@ CREATE TABLE IF NOT EXISTS custom_field_audit (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   custom_field_id UUID REFERENCES custom_field_definitions(id) ON DELETE CASCADE,
   company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
-  
+
   action TEXT NOT NULL CHECK (action IN ('created', 'updated', 'deleted', 'activated', 'deactivated')),
-  
+
   -- Changed data
   old_values JSONB,
   new_values JSONB,
-  
+
   -- Audit metadata
   changed_by UUID REFERENCES user_profiles(id),
   changed_at TIMESTAMPTZ DEFAULT NOW(),
@@ -172,7 +172,7 @@ BEGIN
     ) VALUES (
       NEW.id,
       NEW.company_id,
-      CASE 
+      CASE
         WHEN OLD.is_active = true AND NEW.is_active = false THEN 'deactivated'
         WHEN OLD.is_active = false AND NEW.is_active = true THEN 'activated'
         ELSE 'updated'
@@ -228,8 +228,8 @@ CREATE POLICY custom_field_definitions_insert_policy ON custom_field_definitions
   FOR INSERT
   WITH CHECK (
     company_id IN (
-      SELECT company_id FROM user_profiles 
-      WHERE id = auth.uid() 
+      SELECT company_id FROM user_profiles
+      WHERE id = auth.uid()
       AND role IN ('super_admin', 'company_admin', 'manager')
     )
   );
@@ -239,8 +239,8 @@ CREATE POLICY custom_field_definitions_update_policy ON custom_field_definitions
   FOR UPDATE
   USING (
     company_id IN (
-      SELECT company_id FROM user_profiles 
-      WHERE id = auth.uid() 
+      SELECT company_id FROM user_profiles
+      WHERE id = auth.uid()
       AND role IN ('super_admin', 'company_admin', 'manager')
     )
     AND (is_system_field = false) -- System fields cannot be modified
@@ -251,8 +251,8 @@ CREATE POLICY custom_field_definitions_delete_policy ON custom_field_definitions
   FOR DELETE
   USING (
     company_id IN (
-      SELECT company_id FROM user_profiles 
-      WHERE id = auth.uid() 
+      SELECT company_id FROM user_profiles
+      WHERE id = auth.uid()
       AND role IN ('super_admin', 'company_admin')
     )
     AND (is_system_field = false) -- System fields cannot be deleted
@@ -272,7 +272,7 @@ CREATE POLICY custom_field_audit_select_policy ON custom_field_audit
 -- =====================================================
 
 CREATE OR REPLACE VIEW custom_field_usage_stats AS
-SELECT 
+SELECT
   cfd.id,
   cfd.company_id,
   cfd.field_name,
@@ -280,15 +280,15 @@ SELECT
   cfd.entity_type,
   cfd.data_type,
   cfd.is_active,
-  
+
   -- Count usage in leads (checking custom_fields JSONB)
   (
-    SELECT COUNT(*) 
-    FROM leads 
-    WHERE company_id = cfd.company_id 
+    SELECT COUNT(*)
+    FROM leads
+    WHERE company_id = cfd.company_id
     AND custom_fields ? cfd.field_name
   ) AS usage_count_leads,
-  
+
   -- Get unique values count
   (
     SELECT COUNT(DISTINCT custom_fields->>cfd.field_name)
@@ -296,7 +296,7 @@ SELECT
     WHERE company_id = cfd.company_id
     AND custom_fields ? cfd.field_name
   ) AS unique_values_count,
-  
+
   -- Last used timestamp
   (
     SELECT MAX(created_at)
@@ -304,7 +304,7 @@ SELECT
     WHERE company_id = cfd.company_id
     AND custom_fields ? cfd.field_name
   ) AS last_used_at,
-  
+
   cfd.created_at,
   cfd.updated_at
 FROM custom_field_definitions cfd
@@ -314,7 +314,7 @@ WHERE cfd.entity_type = 'lead';
 -- 8. INSERT DEFAULT CUSTOM FIELDS (OPTIONAL)
 -- =====================================================
 
--- Note: This section is commented out. 
+-- Note: This section is commented out.
 -- Uncomment and customize for your specific needs.
 
 /*

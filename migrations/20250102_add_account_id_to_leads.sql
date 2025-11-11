@@ -17,7 +17,7 @@ BEGIN;
 -- It's nullable to maintain backward compatibility.
 -- =====================================================
 
-ALTER TABLE leads 
+ALTER TABLE leads
 ADD COLUMN IF NOT EXISTS account_id UUID REFERENCES accounts(id) ON DELETE SET NULL;
 
 -- =====================================================

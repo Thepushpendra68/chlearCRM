@@ -17,7 +17,7 @@ BEGIN;
 -- in addition to (or instead of) leads.
 -- =====================================================
 
-ALTER TABLE activities 
+ALTER TABLE activities
 ADD COLUMN IF NOT EXISTS account_id UUID REFERENCES accounts(id) ON DELETE SET NULL;
 
 -- =====================================================

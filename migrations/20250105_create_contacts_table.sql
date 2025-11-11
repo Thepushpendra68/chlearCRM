@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS contacts (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   account_id UUID REFERENCES accounts(id) ON DELETE SET NULL,
-  
+
   -- Identity fields
   first_name TEXT NOT NULL,
   last_name TEXT NOT NULL,
@@ -31,51 +31,51 @@ CREATE TABLE IF NOT EXISTS contacts (
   mobile_phone TEXT,
   title TEXT,
   department TEXT,
-  
+
   -- Social/Web presence
   linkedin_url TEXT,
   twitter_handle TEXT,
-  
+
   -- Contact preferences
   preferred_contact_method TEXT CHECK (preferred_contact_method IN ('email', 'phone', 'mobile', 'linkedin')),
   do_not_call BOOLEAN DEFAULT false,
   do_not_email BOOLEAN DEFAULT false,
-  
+
   -- Address
   address JSONB DEFAULT '{}',
-  
+
   -- Relationship metadata
   is_primary BOOLEAN DEFAULT false,
   is_decision_maker BOOLEAN DEFAULT false,
   reporting_to UUID REFERENCES contacts(id) ON DELETE SET NULL,
-  
+
   -- Activity tracking
   last_contacted_at TIMESTAMPTZ,
   last_activity_at TIMESTAMPTZ,
-  
+
   -- Additional information
   notes TEXT,
   description TEXT,
-  
+
   -- Status and lifecycle
   status TEXT DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'bounced', 'unsubscribed', 'archived')),
   lifecycle_stage TEXT CHECK (lifecycle_stage IN ('lead', 'marketing_qualified', 'sales_qualified', 'opportunity', 'customer', 'evangelist')),
-  
+
   -- Assignment
   assigned_to UUID REFERENCES user_profiles(id),
-  
+
   -- Custom fields support
   custom_fields JSONB DEFAULT '{}',
-  
+
   -- Audit fields
   created_by UUID REFERENCES user_profiles(id),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
-  
+
   -- Business constraint: Must have at least one contact method
   CONSTRAINT contact_method_required CHECK (
-    email IS NOT NULL OR 
-    phone IS NOT NULL OR 
+    email IS NOT NULL OR
+    phone IS NOT NULL OR
     mobile_phone IS NOT NULL
   )
 );
@@ -93,15 +93,15 @@ CREATE TABLE IF NOT EXISTS lead_contacts (
   lead_id UUID NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
   contact_id UUID NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
   company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
-  
+
   -- Relationship metadata
   is_primary BOOLEAN DEFAULT false,
   role TEXT, -- Role of this contact for this lead (e.g., 'decision_maker', 'influencer', 'champion')
-  
+
   -- Audit
   created_by UUID REFERENCES user_profiles(id),
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  
+
   -- Ensure unique lead-contact pairs
   UNIQUE(lead_id, contact_id)
 );
@@ -158,7 +158,7 @@ CREATE POLICY "contacts_select_policy" ON contacts
     (
       public.get_user_role() IN ('super_admin', 'company_admin', 'manager') OR
       (
-        public.get_user_role() = 'sales_rep' AND 
+        public.get_user_role() = 'sales_rep' AND
         (
           assigned_to = public.user_id() OR
           -- Can see contacts from their assigned accounts
@@ -167,7 +167,7 @@ CREATE POLICY "contacts_select_policy" ON contacts
           ) OR
           -- Can see contacts from their assigned leads
           id IN (
-            SELECT contact_id FROM lead_contacts 
+            SELECT contact_id FROM lead_contacts
             WHERE lead_id IN (
               SELECT id FROM leads WHERE assigned_to = public.user_id()
             )
@@ -192,14 +192,14 @@ CREATE POLICY "contacts_update_policy" ON contacts
     (
       public.get_user_role() IN ('super_admin', 'company_admin', 'manager') OR
       (
-        public.get_user_role() = 'sales_rep' AND 
+        public.get_user_role() = 'sales_rep' AND
         (
           assigned_to = public.user_id() OR
           account_id IN (
             SELECT id FROM accounts WHERE assigned_to = public.user_id()
           ) OR
           id IN (
-            SELECT contact_id FROM lead_contacts 
+            SELECT contact_id FROM lead_contacts
             WHERE lead_id IN (
               SELECT id FROM leads WHERE assigned_to = public.user_id()
             )
@@ -268,7 +268,7 @@ CREATE TRIGGER contacts_updated_at_trigger
 -- View to get contact with full details including account and assignments
 -- Note: activities_count and tasks_count will be added after the next migration
 CREATE OR REPLACE VIEW contacts_with_details AS
-SELECT 
+SELECT
   c.*,
   a.name as account_name,
   a.industry as account_industry,
