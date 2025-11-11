@@ -27,6 +27,7 @@ import {
   BoltIcon,
   BuildingOfficeIcon,
   TrophyIcon,
+  IdentificationIcon,
 } from '@heroicons/react/24/outline'
 import api from '../../services/api'
 
@@ -64,6 +65,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, isCollapsed, setIsCollapsed }) =
   const mainNavigation = [
     { name: 'Dashboard', href: '/app/dashboard', icon: HomeIcon, badge: null },
     { name: 'Leads', href: '/app/leads', icon: UsersIcon, badge: badgeCounts.leads || null },
+    { name: 'Contacts', href: '/app/contacts', icon: IdentificationIcon, badge: null },
     { name: 'Accounts', href: '/app/accounts', icon: BuildingOfficeIcon, badge: null },
     { name: 'Pipeline', href: '/app/pipeline', icon: Squares2X2Icon, badge: null },
     { name: 'Activities', href: '/app/activities', icon: ClockIcon, badge: badgeCounts.activities || null },

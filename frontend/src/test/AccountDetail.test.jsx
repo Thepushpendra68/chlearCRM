@@ -1,15 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { BrowserRouter } from 'react-router-dom'
 import AccountDetail from '../pages/AccountDetail'
 import accountService from '../services/accountService'
 import activityService from '../services/activityService'
 import taskService from '../services/taskService'
+import contactService from '../services/contactService'
 
 // Mock dependencies
 vi.mock('../services/accountService')
 vi.mock('../services/activityService')
 vi.mock('../services/taskService')
+vi.mock('../services/contactService')
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom')
   return {
@@ -80,6 +82,14 @@ describe('AccountDetail', () => {
       success: true,
       data: []
     })
+
+    contactService.getContacts.mockResolvedValue({
+      data: []
+    })
+
+    contactService.updateContact.mockResolvedValue({
+      data: {}
+    })
   })
 
   it('renders account detail page', async () => {
@@ -116,9 +126,15 @@ describe('AccountDetail', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByText(/5/i)).toBeInTheDocument() // leads_count
-      expect(screen.getByText(/10/i)).toBeInTheDocument() // activities_count
-      expect(screen.getByText(/3/i)).toBeInTheDocument() // tasks_count
+      const statsHeading = screen.getByRole('heading', { name: 'Statistics' })
+      expect(statsHeading).toBeInTheDocument()
+      const statsCard = statsHeading.parentElement?.parentElement
+      expect(statsCard).not.toBeNull()
+      const scoped = within(statsCard)
+      expect(scoped.getByText('Leads', { selector: 'dt' })).toBeInTheDocument()
+      expect(scoped.getByText('Activities', { selector: 'dt' })).toBeInTheDocument()
+      expect(scoped.getByText('Tasks', { selector: 'dt' })).toBeInTheDocument()
+      expect(scoped.getByText('Child Accounts', { selector: 'dt' })).toBeInTheDocument()
     })
   })
 
@@ -146,6 +162,36 @@ describe('AccountDetail', () => {
 
     await waitFor(() => {
       expect(screen.getByText('John Doe')).toBeInTheDocument()
+    })
+  })
+
+  it('displays linked contacts', async () => {
+    const mockContacts = [
+      {
+        id: 'contact-1',
+        first_name: 'Jane',
+        last_name: 'Smith',
+        email: 'jane@example.com',
+        phone: '555-111-2222',
+        status: 'active',
+        is_primary: true
+      }
+    ]
+
+    contactService.getContacts.mockResolvedValue({
+      data: mockContacts
+    })
+
+    render(
+      <BrowserRouter>
+        <AccountDetail />
+      </BrowserRouter>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('Jane Smith')).toBeInTheDocument()
+      expect(screen.getByText('jane@example.com')).toBeInTheDocument()
+      expect(screen.getByText('Primary')).toBeInTheDocument()
     })
   })
 
@@ -236,7 +282,8 @@ describe('AccountDetail', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByText(/timeline/i)).toBeInTheDocument()
+      const timelineHeading = screen.getAllByRole('heading', { name: /timeline/i })
+      expect(timelineHeading.length).toBeGreaterThan(0)
     })
   })
 

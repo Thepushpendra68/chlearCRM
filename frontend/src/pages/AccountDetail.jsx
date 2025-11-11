@@ -1,14 +1,17 @@
 import { format } from 'date-fns'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeftIcon, PencilIcon, TrashIcon, PhoneIcon, EnvelopeIcon, BuildingOfficeIcon, GlobeAltIcon, UsersIcon, PlusIcon } from '@heroicons/react/24/outline'
+import { ArrowLeftIcon, PencilIcon, TrashIcon, PhoneIcon, EnvelopeIcon, BuildingOfficeIcon, GlobeAltIcon, UsersIcon, PlusIcon, UserPlusIcon, UserMinusIcon, UserIcon, LinkIcon } from '@heroicons/react/24/outline'
 import accountService from '../services/accountService'
 import activityService from '../services/activityService'
 import taskService from '../services/taskService'
+import contactService from '../services/contactService'
 import AccountForm from '../components/AccountForm'
 import AccountTimeline from '../components/AccountTimeline'
 import ActivityForm from '../components/Activities/ActivityForm'
 import TaskForm from '../components/Tasks/TaskForm'
+import ContactForm from '../components/Contacts/ContactForm'
+import Modal from '../components/Modal'
 import toast from 'react-hot-toast'
 import { useAuth } from '../context/AuthContext'
 
@@ -24,13 +27,31 @@ const AccountDetail = () => {
   const [accountActivities, setAccountActivities] = useState([])
   const [accountTasks, setAccountTasks] = useState([])
   const [accountTimeline, setAccountTimeline] = useState([])
+  const [accountContacts, setAccountContacts] = useState([])
   const [loadingLeads, setLoadingLeads] = useState(false)
   const [loadingStats, setLoadingStats] = useState(false)
   const [loadingActivities, setLoadingActivities] = useState(false)
   const [loadingTasks, setLoadingTasks] = useState(false)
   const [loadingTimeline, setLoadingTimeline] = useState(false)
+  const [loadingContacts, setLoadingContacts] = useState(false)
   const [showActivityForm, setShowActivityForm] = useState(false)
   const [showTaskForm, setShowTaskForm] = useState(false)
+
+  const linkedContactIds = useMemo(() => {
+    return new Set((accountContacts || []).map(contact => contact.id).filter(Boolean))
+  }, [accountContacts])
+
+  const [showContactModal, setShowContactModal] = useState(false)
+  const [selectedContact, setSelectedContact] = useState(null)
+  const [showExistingContactModal, setShowExistingContactModal] = useState(false)
+  const [contactSearchTerm, setContactSearchTerm] = useState('')
+  const [contactSearchResults, setContactSearchResults] = useState([])
+  const [searchingContacts, setSearchingContacts] = useState(false)
+  const [linkingContactId, setLinkingContactId] = useState(null)
+
+  const availableContactsToLink = useMemo(() => {
+    return (contactSearchResults || []).filter(contact => contact?.id && !linkedContactIds.has(contact.id))
+  }, [contactSearchResults, linkedContactIds])
 
   useEffect(() => {
     fetchAccount()
@@ -39,6 +60,7 @@ const AccountDetail = () => {
     fetchAccountActivities()
     fetchAccountTasks()
     fetchAccountTimeline()
+    fetchAccountContacts()
   }, [id])
 
   const fetchAccount = async () => {
@@ -103,6 +125,25 @@ const AccountDetail = () => {
     }
   }
 
+  const fetchAccountContacts = async () => {
+    try {
+      setLoadingContacts(true)
+      const params = {
+        account_id: id,
+        limit: 100,
+        sort_by: 'first_name',
+        sort_order: 'asc'
+      }
+      const response = await contactService.getContacts(params)
+      const contactsData = response?.data ?? response?.contacts ?? []
+      setAccountContacts(Array.isArray(contactsData) ? contactsData : [])
+    } catch (error) {
+      console.error('Failed to fetch account contacts:', error)
+      toast.error('Failed to load account contacts')
+    } finally {
+      setLoadingContacts(false)
+    }
+  }
 
   const handleTaskSaved = () => {
     fetchAccountTasks()
@@ -122,10 +163,156 @@ const AccountDetail = () => {
     }
   }
 
+  useEffect(() => {
+    if (!showExistingContactModal) {
+      setContactSearchTerm('')
+      setContactSearchResults([])
+      setSearchingContacts(false)
+      setLinkingContactId(null)
+    }
+  }, [showExistingContactModal])
+
   const handleActivitySaved = () => {
     fetchAccountActivities()
     fetchAccountStats()
     fetchAccountTimeline()
+  }
+
+  const handleOpenNewContactModal = () => {
+    setSelectedContact(null)
+    setShowContactModal(true)
+  }
+
+  const handleEditContact = (contact) => {
+    setSelectedContact(contact)
+    setShowContactModal(true)
+  }
+
+  const handleContactFormSuccess = async (savedContact) => {
+    try {
+      if (!selectedContact && accountContacts.length === 0 && savedContact?.id) {
+        try {
+          await contactService.updateContact(savedContact.id, { is_primary: true })
+        } catch (error) {
+          console.error('Failed to mark contact as primary:', error)
+        }
+      }
+      await fetchAccountContacts()
+      await fetchAccountStats()
+    } finally {
+      setShowContactModal(false)
+      setSelectedContact(null)
+    }
+  }
+
+  const performContactSearch = async (term = '') => {
+    setSearchingContacts(true)
+    try {
+      const params = {
+        limit: 25,
+        sort_by: 'created_at',
+        sort_order: 'desc'
+      }
+      if (term) {
+        params.search = term
+      }
+      const response = await contactService.getContacts(params)
+      const contactsData = response?.data ?? response?.contacts ?? []
+      setContactSearchResults(Array.isArray(contactsData) ? contactsData : [])
+    } catch (error) {
+      console.error('Failed to search contacts:', error)
+      toast.error('Failed to search contacts')
+    } finally {
+      setSearchingContacts(false)
+    }
+  }
+
+  const handleContactSearchSubmit = async (event) => {
+    event.preventDefault()
+    await performContactSearch(contactSearchTerm)
+  }
+
+  const handleOpenExistingContactModal = () => {
+    setShowExistingContactModal(true)
+    performContactSearch('')
+  }
+
+  const handleLinkExistingContact = async (contactId) => {
+    if (!contactId) {
+      return
+    }
+
+    setLinkingContactId(contactId)
+    try {
+      await contactService.updateContact(contactId, {
+        account_id: id,
+        is_primary: accountContacts.length === 0
+      })
+      toast.success('Contact linked to account')
+      setShowExistingContactModal(false)
+      await fetchAccountContacts()
+      await fetchAccountStats()
+    } catch (error) {
+      console.error('Failed to link contact:', error)
+      toast.error(error?.response?.data?.error?.message || 'Failed to link contact')
+    } finally {
+      setLinkingContactId(null)
+    }
+  }
+
+  const handleUnlinkContact = async (contactId) => {
+    if (!contactId) {
+      return
+    }
+    if (!window.confirm('Are you sure you want to unlink this contact from the account?')) {
+      return
+    }
+
+    try {
+      await contactService.updateContact(contactId, { account_id: null, is_primary: false })
+      toast.success('Contact unlinked from account')
+      await fetchAccountContacts()
+      await fetchAccountStats()
+    } catch (error) {
+      console.error('Failed to unlink contact:', error)
+      toast.error(error?.response?.data?.error?.message || 'Failed to unlink contact')
+    }
+  }
+
+  const handleSetPrimaryContact = async (contactId) => {
+    if (!contactId) {
+      return
+    }
+    try {
+      await contactService.updateContact(contactId, { is_primary: true, account_id: id })
+      const otherPrimaryContacts = accountContacts.filter(contact => contact.id !== contactId && contact.is_primary)
+      if (otherPrimaryContacts.length > 0) {
+        await Promise.all(
+          otherPrimaryContacts.map(contact => contactService.updateContact(contact.id, { is_primary: false }))
+        )
+      }
+      toast.success('Primary contact updated')
+      await fetchAccountContacts()
+      await fetchAccountStats()
+    } catch (error) {
+      console.error('Failed to set primary contact:', error)
+      toast.error(error?.response?.data?.error?.message || 'Failed to update contact')
+    }
+  }
+
+  const handleClearPrimaryContact = async (contactId) => {
+    if (!contactId) {
+      return
+    }
+    try {
+      await contactService.updateContact(contactId, { is_primary: false })
+      toast.success('Primary contact cleared')
+      await fetchAccountContacts()
+      await fetchAccountStats()
+    } catch (error) {
+      console.error('Failed to clear primary contact:', error)
+      toast.error(error?.response?.data?.error?.message || 'Failed to update contact')
+    }
   }
 
   const getStatusColor = (status) => {
@@ -149,6 +336,7 @@ const AccountDetail = () => {
     setShowEditForm(false)
     fetchAccount()
     fetchAccountStats()
+    fetchAccountContacts()
   }
 
   const handleDelete = async () => {
@@ -326,6 +514,167 @@ const AccountDetail = () => {
                     </div>
                   )}
                 </div>
+              </div>
+            </div>
+
+            {/* Account Contacts Card */}
+            <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900">Contacts</h2>
+                    <p className="text-sm text-gray-500">
+                      {loadingContacts
+                        ? 'Loading contacts...'
+                        : `${accountContacts.length} contact${accountContacts.length !== 1 ? 's' : ''} linked to this account`}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={handleOpenExistingContactModal}
+                      className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    >
+                      <LinkIcon className="mr-1.5 h-4 w-4" />
+                      Link Existing
+                    </button>
+                    <button
+                      onClick={handleOpenNewContactModal}
+                      className="inline-flex items-center rounded-md border border-transparent bg-primary-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    >
+                      <UserPlusIcon className="mr-1.5 h-4 w-4" />
+                      New Contact
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div className="px-6 py-6">
+                {loadingContacts ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-sm text-gray-500">
+                    <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-200 border-t-primary-600" />
+                    <p className="mt-3">Loading contacts...</p>
+                  </div>
+                ) : accountContacts.length > 0 ? (
+                  <div className="space-y-4">
+                    {accountContacts.map(contact => {
+                      const fullName = `${contact.first_name || ''} ${contact.last_name || ''}`.trim()
+                      const displayName = fullName || contact.email || 'Unnamed Contact'
+                      const initials = (contact.first_name?.[0] || '') + (contact.last_name?.[0] || '') || contact.email?.[0] || 'C'
+
+                      return (
+                        <div
+                          key={contact.id}
+                          className="flex flex-col gap-4 rounded-lg border border-gray-200 p-4 md:flex-row md:items-center md:justify-between"
+                        >
+                          <div className="flex flex-col gap-3">
+                            <div className="flex items-start gap-3">
+                              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-primary-100 text-sm font-medium text-primary-700">
+                                {initials.toUpperCase()}
+                              </div>
+                              <div>
+                                <p className="text-sm font-semibold text-gray-900">{displayName}</p>
+                                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                                  {contact.is_primary && (
+                                    <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 font-medium text-blue-800">
+                                      Primary
+                                    </span>
+                                  )}
+                                  {contact.is_decision_maker && (
+                                    <span className="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 font-medium text-purple-800">
+                                      Decision Maker
+                                    </span>
+                                  )}
+                                  {contact.status && (
+                                    <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 font-medium text-gray-600">
+                                      {contact.status}
+                                    </span>
+                                  )}
+                                  {contact.lifecycle_stage && (
+                                    <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-700">
+                                      {contact.lifecycle_stage.replace(/_/g, ' ')}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-gray-600">
+                              {contact.email && (
+                                <a href={`mailto:${contact.email}`} className="flex items-center gap-1 text-primary-600 hover:text-primary-800">
+                                  <EnvelopeIcon className="h-4 w-4 text-gray-400" />
+                                  {contact.email}
+                                </a>
+                              )}
+                              {contact.phone && (
+                                <a href={`tel:${contact.phone}`} className="flex items-center gap-1 text-primary-600 hover:text-primary-800">
+                                  <PhoneIcon className="h-4 w-4 text-gray-400" />
+                                  {contact.phone}
+                                </a>
+                              )}
+                              {contact.mobile_phone && (
+                                <span className="flex items-center gap-1">
+                                  <PhoneIcon className="h-4 w-4 text-gray-400" />
+                                  {contact.mobile_phone}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <button
+                              onClick={() => navigate(`/app/contacts/${contact.id}`)}
+                              className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                            >
+                              <UserIcon className="mr-1.5 h-4 w-4" /> View
+                            </button>
+                            <button
+                              onClick={() => handleEditContact(contact)}
+                              className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                            >
+                              <PencilIcon className="mr-1.5 h-4 w-4" /> Edit
+                            </button>
+                            {contact.is_primary ? (
+                              <button
+                                onClick={() => handleClearPrimaryContact(contact.id)}
+                                className="inline-flex items-center rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-100"
+                              >
+                                Remove Primary
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleSetPrimaryContact(contact.id)}
+                                className="inline-flex items-center rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-100"
+                              >
+                                Set Primary
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleUnlinkContact(contact.id)}
+                              className="inline-flex items-center rounded-md border border-red-200 bg-white px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50"
+                            >
+                              <UserMinusIcon className="mr-1.5 h-4 w-4" /> Unlink
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-gray-200 p-8 text-center text-sm text-gray-500">
+                    <p>No contacts linked to this account yet.</p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <button
+                        onClick={handleOpenNewContactModal}
+                        className="inline-flex items-center rounded-md border border-primary-600 bg-primary-50 px-3 py-1.5 text-sm font-medium text-primary-600 hover:bg-primary-100"
+                      >
+                        <UserPlusIcon className="mr-1.5 h-4 w-4" /> New Contact
+                      </button>
+                      <button
+                        onClick={handleOpenExistingContactModal}
+                        className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                      >
+                        <LinkIcon className="mr-1.5 h-4 w-4" /> Link Existing
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -757,6 +1106,102 @@ const AccountDetail = () => {
           accountId={id}
         />
       )}
+
+      <ContactForm
+        isOpen={showContactModal}
+        contact={selectedContact}
+        defaultAccountId={id}
+        lockAccountSelection={!selectedContact}
+        onClose={() => {
+          setShowContactModal(false)
+          setSelectedContact(null)
+        }}
+        onSuccess={handleContactFormSuccess}
+      />
+
+      <Modal
+        isOpen={showExistingContactModal}
+        onClose={() => setShowExistingContactModal(false)}
+        title="Link Existing Contact"
+        size="lg"
+      >
+        <div className="space-y-4">
+          <form onSubmit={handleContactSearchSubmit} className="flex flex-col gap-3 sm:flex-row">
+            <input
+              type="text"
+              value={contactSearchTerm}
+              onChange={(event) => setContactSearchTerm(event.target.value)}
+              placeholder="Search contacts by name, email, or phone"
+              className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
+            />
+            <button
+              type="submit"
+              className="inline-flex items-center justify-center rounded-md border border-transparent bg-primary-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            >
+              Search
+            </button>
+          </form>
+
+          <div className="max-h-80 space-y-3 overflow-y-auto rounded-lg border border-gray-200 p-3">
+            {searchingContacts ? (
+              <div className="flex items-center justify-center py-8 text-sm text-gray-500">
+                Searching contacts...
+              </div>
+            ) : availableContactsToLink.length > 0 ? (
+              availableContactsToLink.map(contact => (
+                  <div
+                    key={contact.id}
+                    className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">
+                        {`${contact.first_name || ''} ${contact.last_name || ''}`.trim() || contact.full_name || contact.email || 'Unnamed Contact'}
+                      </p>
+                      <div className="mt-1 flex flex-wrap gap-3 text-xs text-gray-500">
+                        {contact.email && <span>{contact.email}</span>}
+                        {contact.phone && <span>{contact.phone}</span>}
+                        {contact.mobile_phone && <span>Mobile: {contact.mobile_phone}</span>}
+                        {contact.account_name && contact.account_id && contact.account_id !== id && (
+                          <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-700">
+                            Linked to {contact.account_name}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/app/contacts/${contact.id}`)}
+                        className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                      >
+                        <UserIcon className="mr-1.5 h-4 w-4" /> View
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleLinkExistingContact(contact.id)}
+                        disabled={linkingContactId === contact.id}
+                        className="inline-flex items-center rounded-md border border-primary-600 bg-primary-50 px-3 py-1.5 text-sm font-medium text-primary-600 hover:bg-primary-100 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {linkingContactId === contact.id ? 'Linking...' : 'Link to Account'}
+                      </button>
+                    </div>
+                  </div>
+                ))
+            ) : (
+              <div className="flex flex-col items-center justify-center py-8 text-sm text-gray-500">
+                <p>No matching contacts found. Try a different search term.</p>
+                <button
+                  type="button"
+                  onClick={handleOpenNewContactModal}
+                  className="mt-3 inline-flex items-center rounded-md border border-primary-600 bg-primary-50 px-3 py-1.5 text-sm font-medium text-primary-600 hover:bg-primary-100"
+                >
+                  <UserPlusIcon className="mr-1.5 h-4 w-4" /> Create New Contact
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

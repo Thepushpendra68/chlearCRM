@@ -106,6 +106,29 @@ const getLeads = async (currentUser, page = 1, limit = 20, filters = {}) => {
     const totalItems = countResult.count || 0;
     const totalPages = Math.ceil(totalItems / limit);
 
+    // Fetch contact counts for the current page of leads
+    const leadIds = (leadsResult.data || []).map(lead => lead.id).filter(Boolean);
+    let contactCounts = {};
+
+    if (leadIds.length > 0) {
+      const { data: leadContactsData, error: leadContactsError } = await supabaseAdmin
+        .from('lead_contacts')
+        .select('lead_id, contact_id')
+        .in('lead_id', leadIds);
+
+      if (leadContactsError) {
+        console.error('Error fetching lead contact counts:', leadContactsError);
+      } else {
+        contactCounts = leadContactsData.reduce((acc, row) => {
+          if (!row?.lead_id) {
+            return acc;
+          }
+          acc[row.lead_id] = (acc[row.lead_id] || 0) + 1;
+          return acc;
+        }, {});
+      }
+    }
+
     // Format the data efficiently
     const formattedLeads = leadsResult.data.map(lead => {
       return {
@@ -134,7 +157,8 @@ const getLeads = async (currentUser, page = 1, limit = 20, filters = {}) => {
         account_website: lead.accounts?.website || null,
         account_industry: lead.accounts?.industry || null,
         assigned_user_first_name: lead.user_profiles?.first_name || null,
-        assigned_user_last_name: lead.user_profiles?.last_name || null
+        assigned_user_last_name: lead.user_profiles?.last_name || null,
+        contacts_count: contactCounts[lead.id] || 0
       };
     });
 
@@ -175,6 +199,75 @@ const getLeadById = async (id) => {
 
     // Transform database fields to frontend expected format
     if (lead) {
+      let leadContacts = [];
+      let contactsCount = 0;
+
+      const { data: leadContactRows, error: leadContactError } = await supabaseAdmin
+        .from('lead_contacts')
+        .select('id, lead_id, contact_id, is_primary, role')
+        .eq('lead_id', id)
+        .order('is_primary', { ascending: false });
+
+      if (leadContactError) {
+        console.error('Error fetching lead contacts:', leadContactError);
+      }
+
+      if (leadContactRows && leadContactRows.length > 0) {
+        const contactIds = leadContactRows
+          .map(row => row.contact_id)
+          .filter(Boolean);
+
+        contactsCount = leadContactRows.length;
+
+        if (contactIds.length > 0) {
+          const { data: contactsData, error: contactsError } = await supabaseAdmin
+            .from('contacts')
+            .select(`
+              id,
+              first_name,
+              last_name,
+              email,
+              phone,
+              mobile_phone,
+              status,
+              lifecycle_stage,
+              title,
+              account_id,
+              account:accounts!contacts_account_id_fkey(id, name)
+            `)
+            .in('id', contactIds);
+
+          if (contactsError) {
+            console.error('Error fetching contacts for lead:', contactsError);
+          } else {
+            const contactsById = (contactsData || []).reduce((acc, contactRow) => {
+              acc[contactRow.id] = {
+                id: contactRow.id,
+                first_name: contactRow.first_name,
+                last_name: contactRow.last_name,
+                email: contactRow.email,
+                phone: contactRow.phone,
+                mobile_phone: contactRow.mobile_phone,
+                status: contactRow.status,
+                lifecycle_stage: contactRow.lifecycle_stage,
+                job_title: contactRow.title,
+                account_id: contactRow.account_id || null,
+                account_name: contactRow.account?.name || null
+              };
+              return acc;
+            }, {});
+
+            leadContacts = leadContactRows.map(relation => ({
+              id: relation.id,
+              contact_id: relation.contact_id,
+              is_primary: relation.is_primary,
+              role: relation.role,
+              contact: contactsById[relation.contact_id] || null
+            }));
+          }
+        }
+      }
+
       return {
         ...lead,
         first_name: lead.first_name || '',
@@ -186,7 +279,9 @@ const getLeadById = async (id) => {
         account_website: lead.accounts?.website || null,
         account_industry: lead.accounts?.industry || null,
         assigned_user_first_name: lead.user_profiles?.first_name || null,
-        assigned_user_last_name: lead.user_profiles?.last_name || null
+        assigned_user_last_name: lead.user_profiles?.last_name || null,
+        contacts: leadContacts,
+        contacts_count: contactsCount
       };
     }
 

@@ -12,6 +12,8 @@ const Login = lazy(() => import('./pages/Login'))
 const RegisterCompany = lazy(() => import('./pages/RegisterCompany'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Leads = lazy(() => import('./pages/Leads'))
+const Contacts = lazy(() => import('./pages/Contacts'))
+const ContactDetail = lazy(() => import('./pages/ContactDetail'))
 const LeadDetail = lazy(() => import('./pages/LeadDetail'))
 const Accounts = lazy(() => import('./pages/Accounts'))
 const AccountDetail = lazy(() => import('./pages/AccountDetail'))
@@ -76,6 +78,8 @@ function App() {
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="leads" element={<Leads />} />
               <Route path="leads/:id" element={<LeadDetail />} />
+              <Route path="contacts" element={<Contacts />} />
+              <Route path="contacts/:id" element={<ContactDetail />} />
               <Route path="accounts" element={<Accounts />} />
               <Route path="accounts/:id" element={<AccountDetail />} />
               <Route path="pipeline" element={<Pipeline />} />

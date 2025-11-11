@@ -12,7 +12,8 @@ class ActivityService {
         .select(`
           *,
           leads!activities_lead_id_fkey(company, name),
-          user_profiles!activities_user_id_fkey(first_name, last_name)
+          user_profiles!activities_user_id_fkey(first_name, last_name),
+          contacts:contacts!activities_contact_id_fkey(id, first_name, last_name, email, phone, mobile_phone)
         `)
         .eq('company_id', currentUser.company_id);
 
@@ -33,6 +34,10 @@ class ActivityService {
 
       if (filters.account_id) {
         query = query.eq('account_id', filters.account_id);
+      }
+
+      if (filters.contact_id) {
+        query = query.eq('contact_id', filters.contact_id);
       }
 
       if (filters.user_id) {
@@ -70,17 +75,36 @@ class ActivityService {
       }
 
       // Format the data to match expected structure
-      const formattedActivities = (activities || []).map(activity => ({
-        ...activity,
-        company: activity.leads?.company,
-        contact_name: activity.leads?.name,
-        first_name: activity.user_profiles?.first_name,
-        last_name: activity.user_profiles?.last_name,
-        // Keep activity_type as is - no mapping needed
-        // Remove the nested objects
-        leads: undefined,
-        user_profiles: undefined
-      }));
+      const formattedActivities = (activities || []).map(activity => {
+        const contactData = activity.contacts
+          ? {
+              id: activity.contacts.id,
+              first_name: activity.contacts.first_name,
+              last_name: activity.contacts.last_name,
+              email: activity.contacts.email,
+              phone: activity.contacts.phone,
+              mobile_phone: activity.contacts.mobile_phone
+            }
+          : null;
+
+        const contactName = contactData
+          ? `${contactData.first_name || ''} ${contactData.last_name || ''}`.trim() || contactData.email || null
+          : null;
+
+        return {
+          ...activity,
+          company: activity.leads?.company,
+          contact_name: contactName || activity.leads?.name,
+          contact: contactData,
+          first_name: activity.user_profiles?.first_name,
+          last_name: activity.user_profiles?.last_name,
+          // Keep activity_type as is - no mapping needed
+          // Remove the nested objects
+          leads: undefined,
+          user_profiles: undefined,
+          contacts: undefined
+        };
+      });
 
       const hasMore = formattedActivities.length > sanitizedLimit;
       const paginatedActivities = hasMore
@@ -113,7 +137,8 @@ class ActivityService {
         .select(`
           *,
           leads!activities_lead_id_fkey(company, name),
-          user_profiles!activities_user_id_fkey(first_name, last_name)
+          user_profiles!activities_user_id_fkey(first_name, last_name),
+          contacts:contacts!activities_contact_id_fkey(id, first_name, last_name, email, phone, mobile_phone)
         `)
         .eq('id', activityId)
         .eq('company_id', currentUser.company_id)
@@ -124,16 +149,31 @@ class ActivityService {
       }
 
       // Format the data to match expected structure
+      const contactData = activity.contacts
+        ? {
+            id: activity.contacts.id,
+            first_name: activity.contacts.first_name,
+            last_name: activity.contacts.last_name,
+            email: activity.contacts.email,
+            phone: activity.contacts.phone,
+            mobile_phone: activity.contacts.mobile_phone
+          }
+        : null;
+
       const formattedActivity = {
         ...activity,
         company: activity.leads?.company,
-        contact_name: activity.leads?.name,
+        contact_name: contactData
+          ? `${contactData.first_name || ''} ${contactData.last_name || ''}`.trim() || contactData.email || null
+          : activity.leads?.name,
+        contact: contactData,
         first_name: activity.user_profiles?.first_name,
         last_name: activity.user_profiles?.last_name,
         // Keep activity_type as is - no mapping needed
         // Remove the nested objects
         leads: undefined,
-        user_profiles: undefined
+        user_profiles: undefined,
+        contacts: undefined
       };
 
       return { success: true, data: formattedActivity };
@@ -190,10 +230,24 @@ class ActivityService {
         }
       }
 
+      if (activityData.contact_id) {
+        const { data: contact, error: contactError } = await supabase
+          .from('contacts')
+          .select('company_id')
+          .eq('id', activityData.contact_id)
+          .eq('company_id', currentUser.company_id)
+          .single();
+
+        if (contactError || !contact) {
+          return { success: false, error: 'Contact not found or access denied' };
+        }
+      }
+
       // Set default values with proper field mapping
       const newActivity = {
         lead_id: activityData.lead_id || null,
         account_id: activityData.account_id || null,
+        contact_id: activityData.contact_id || null,
         user_id: activityData.user_id,
         company_id: currentUser.company_id,
         type: activityType,
@@ -213,7 +267,12 @@ class ActivityService {
       const { data: createdActivity, error } = await supabase
         .from('activities')
         .insert(newActivity)
-        .select()
+        .select(`
+          *,
+          leads!activities_lead_id_fkey(company, name),
+          user_profiles!activities_user_id_fkey(first_name, last_name),
+          contacts:contacts!activities_contact_id_fkey(id, first_name, last_name, email, phone, mobile_phone)
+        `)
         .single();
 
       if (error) {
@@ -221,7 +280,32 @@ class ActivityService {
         return { success: false, error: error.message };
       }
 
-      return { success: true, data: createdActivity };
+      const createdContactData = createdActivity.contacts
+        ? {
+            id: createdActivity.contacts.id,
+            first_name: createdActivity.contacts.first_name,
+            last_name: createdActivity.contacts.last_name,
+            email: createdActivity.contacts.email,
+            phone: createdActivity.contacts.phone,
+            mobile_phone: createdActivity.contacts.mobile_phone
+          }
+        : null;
+
+      const formattedActivity = {
+        ...createdActivity,
+        company: createdActivity.leads?.company,
+        contact_name: createdContactData
+          ? `${createdContactData.first_name || ''} ${createdContactData.last_name || ''}`.trim() || createdContactData.email || null
+          : createdActivity.leads?.name,
+        contact: createdContactData,
+        first_name: createdActivity.user_profiles?.first_name,
+        last_name: createdActivity.user_profiles?.last_name,
+        leads: undefined,
+        user_profiles: undefined,
+        contacts: undefined
+      };
+
+      return { success: true, data: formattedActivity };
     } catch (error) {
       console.error('Error creating activity:', error);
       return { success: false, error: error.message };
@@ -245,6 +329,23 @@ class ActivityService {
         return { success: false, error: 'Activity not found' };
       }
 
+      if (updateData.contact_id !== undefined) {
+        if (updateData.contact_id === '' || updateData.contact_id === null) {
+          existingActivity.contact_id = null; // for fallback usage below
+        } else {
+          const { data: contact, error: contactError } = await supabase
+            .from('contacts')
+            .select('company_id')
+            .eq('id', updateData.contact_id)
+            .eq('company_id', currentUser.company_id)
+            .single();
+
+          if (contactError || !contact) {
+            return { success: false, error: 'Contact not found or access denied' };
+          }
+        }
+      }
+
       // Prepare update data
       const updateFields = {
         subject: updateData.subject,
@@ -252,6 +353,9 @@ class ActivityService {
         activity_type: updateData.activity_type,
         lead_id: updateData.lead_id !== undefined ? updateData.lead_id : existingActivity.lead_id,
         account_id: updateData.account_id !== undefined ? updateData.account_id : existingActivity.account_id,
+        contact_id: updateData.contact_id !== undefined
+          ? (updateData.contact_id === '' ? null : updateData.contact_id)
+          : existingActivity.contact_id,
         scheduled_at: updateData.scheduled_at,
         completed_at: updateData.completed_at,
         is_completed: updateData.is_completed,
@@ -276,7 +380,8 @@ class ActivityService {
         .select(`
           *,
           leads!activities_lead_id_fkey(company, name),
-          user_profiles!activities_user_id_fkey(first_name, last_name)
+          user_profiles!activities_user_id_fkey(first_name, last_name),
+          contacts:contacts!activities_contact_id_fkey(id, first_name, last_name, email, phone, mobile_phone)
         `)
         .single();
 
@@ -303,14 +408,29 @@ class ActivityService {
       }
 
       // Format the data to match expected structure
+      const updatedContactData = updatedActivity.contacts
+        ? {
+            id: updatedActivity.contacts.id,
+            first_name: updatedActivity.contacts.first_name,
+            last_name: updatedActivity.contacts.last_name,
+            email: updatedActivity.contacts.email,
+            phone: updatedActivity.contacts.phone,
+            mobile_phone: updatedActivity.contacts.mobile_phone
+          }
+        : null;
+
       const formattedActivity = {
         ...updatedActivity,
         company: updatedActivity.leads?.company,
-        contact_name: updatedActivity.leads?.name,
+        contact_name: updatedContactData
+          ? `${updatedContactData.first_name || ''} ${updatedContactData.last_name || ''}`.trim() || updatedContactData.email || null
+          : updatedActivity.leads?.name,
+        contact: updatedContactData,
         first_name: updatedActivity.user_profiles?.first_name,
         last_name: updatedActivity.user_profiles?.last_name,
         leads: undefined,
-        user_profiles: undefined
+        user_profiles: undefined,
+        contacts: undefined
       };
 
       return {
@@ -396,7 +516,8 @@ class ActivityService {
         .select(`
           *,
           leads!activities_lead_id_fkey(company, name),
-          user_profiles!activities_user_id_fkey(first_name, last_name)
+          user_profiles!activities_user_id_fkey(first_name, last_name),
+          contacts:contacts!activities_contact_id_fkey(id, first_name, last_name, email, phone, mobile_phone)
         `)
         .single();
 
@@ -422,14 +543,29 @@ class ActivityService {
       }
 
       // Format the data to match expected structure
+      const completedContactData = updatedActivity.contacts
+        ? {
+            id: updatedActivity.contacts.id,
+            first_name: updatedActivity.contacts.first_name,
+            last_name: updatedActivity.contacts.last_name,
+            email: updatedActivity.contacts.email,
+            phone: updatedActivity.contacts.phone,
+            mobile_phone: updatedActivity.contacts.mobile_phone
+          }
+        : null;
+
       const formattedActivity = {
         ...updatedActivity,
         company: updatedActivity.leads?.company,
-        contact_name: updatedActivity.leads?.name,
+        contact_name: completedContactData
+          ? `${completedContactData.first_name || ''} ${completedContactData.last_name || ''}`.trim() || completedContactData.email || null
+          : updatedActivity.leads?.name,
+        contact: completedContactData,
         first_name: updatedActivity.user_profiles?.first_name,
         last_name: updatedActivity.user_profiles?.last_name,
         leads: undefined,
-        user_profiles: undefined
+        user_profiles: undefined,
+        contacts: undefined
       };
 
       return {
@@ -450,7 +586,8 @@ class ActivityService {
         .from('activities')
         .select(`
           *,
-          user_profiles!activities_user_id_fkey(first_name, last_name, email)
+          user_profiles!activities_user_id_fkey(first_name, last_name, email),
+          contacts:contacts!activities_contact_id_fkey(id, first_name, last_name, email, phone, mobile_phone)
         `)
         .eq('lead_id', leadId)
         .order('created_at', { ascending: false })
@@ -462,13 +599,31 @@ class ActivityService {
       }
 
       // Format the response to match expected structure
-      const formattedActivities = activities.map(activity => ({
-        ...activity,
-        first_name: activity.user_profiles?.first_name || '',
-        last_name: activity.user_profiles?.last_name || '',
-        user_email: activity.user_profiles?.email || '',
-        user_profiles: undefined // Remove nested object
-      }));
+      const formattedActivities = (activities || []).map(activity => {
+        const contactData = activity.contacts
+          ? {
+              id: activity.contacts.id,
+              first_name: activity.contacts.first_name,
+              last_name: activity.contacts.last_name,
+              email: activity.contacts.email,
+              phone: activity.contacts.phone,
+              mobile_phone: activity.contacts.mobile_phone
+            }
+          : null;
+
+        return {
+          ...activity,
+          first_name: activity.user_profiles?.first_name || '',
+          last_name: activity.user_profiles?.last_name || '',
+          user_email: activity.user_profiles?.email || '',
+          contact: contactData,
+          contact_name: contactData
+            ? `${contactData.first_name || ''} ${contactData.last_name || ''}`.trim() || contactData.email || null
+            : null,
+          user_profiles: undefined,
+          contacts: undefined
+        };
+      });
 
       return { success: true, data: formattedActivities };
     } catch (error) {
@@ -507,6 +662,8 @@ class ActivityService {
 
         activities.push({
           lead_id: activityData.lead_id,
+          account_id: activityData.account_id || null,
+          contact_id: activityData.contact_id || null,
           user_id: activityData.user_id,
           company_id: activityData.company_id,
           type: activityData.activity_type,
@@ -582,6 +739,10 @@ class ActivityService {
 
       if (filters.lead_id) {
         query = query.eq('lead_id', filters.lead_id);
+      }
+
+      if (filters.contact_id) {
+        query = query.eq('contact_id', filters.contact_id);
       }
 
       if (filters.date_from) {

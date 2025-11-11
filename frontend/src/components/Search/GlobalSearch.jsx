@@ -125,6 +125,7 @@ const GlobalSearch = ({
     const allItems = [
       ...(recentSearches || []),
       ...(results?.leads || []),
+      ...(results?.contacts || []),
       ...(results?.activities || []),
       ...(results?.tasks || []),
       ...(results?.users || [])
@@ -183,6 +184,7 @@ const GlobalSearch = ({
   const getResultIcon = (type) => {
     switch (type) {
       case 'lead': return <UsersIcon className="h-4 w-4" />
+      case 'contact': return <UserIcon className="h-4 w-4" />
       case 'activity': return <ClockIcon className="h-4 w-4" />
       case 'task': return <ClipboardDocumentListIcon className="h-4 w-4" />
       case 'user': return <UserIcon className="h-4 w-4" />
@@ -193,6 +195,7 @@ const GlobalSearch = ({
   const getResultColor = (type) => {
     switch (type) {
       case 'lead': return 'text-blue-500'
+      case 'contact': return 'text-teal-500'
       case 'activity': return 'text-green-500'
       case 'task': return 'text-purple-500'
       case 'user': return 'text-gray-500'
@@ -307,6 +310,35 @@ const GlobalSearch = ({
                 </div>
               )}
 
+              {results.contacts && results.contacts.length > 0 && (
+                <div>
+                  <div className="px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide border-b border-gray-100">
+                    Contacts ({results.contacts.length})
+                  </div>
+                  {results.contacts.map((contact, index) => (
+                    <button
+                      key={contact.id}
+                      onClick={() => handleResultClick(contact)}
+                      className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center ${
+                        selectedIndex === recentSearches.length + (results.leads?.length || 0) + index ? 'bg-gray-50' : ''
+                      }`}
+                    >
+                      <div className={`${getResultColor('contact')} mr-3`}>
+                        {getResultIcon('contact')}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-gray-900 truncate">
+                          {contact.name || `${contact.first_name || ''} ${contact.last_name || ''}`.trim() || contact.email || 'Contact'}
+                        </p>
+                        <p className="text-gray-500 text-xs truncate">
+                          {contact.email || contact.phone || contact.account_name}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
               {results.activities && results.activities.length > 0 && (
                 <div>
                   <div className="px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide border-b border-gray-100">
@@ -317,7 +349,7 @@ const GlobalSearch = ({
                       key={activity.id}
                       onClick={() => handleResultClick(activity)}
                       className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center ${
-                        selectedIndex === recentSearches.length + (results.leads?.length || 0) + index ? 'bg-gray-50' : ''
+                        selectedIndex === recentSearches.length + (results.leads?.length || 0) + (results.contacts?.length || 0) + index ? 'bg-gray-50' : ''
                       }`}
                     >
                       <div className={`${getResultColor('activity')} mr-3`}>
@@ -346,7 +378,7 @@ const GlobalSearch = ({
                       key={task.id}
                       onClick={() => handleResultClick(task)}
                       className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center ${
-                        selectedIndex === recentSearches.length + (results.leads?.length || 0) + (results.activities?.length || 0) + index ? 'bg-gray-50' : ''
+                        selectedIndex === recentSearches.length + (results.leads?.length || 0) + (results.contacts?.length || 0) + (results.activities?.length || 0) + index ? 'bg-gray-50' : ''
                       }`}
                     >
                       <div className={`${getResultColor('task')} mr-3`}>
@@ -375,7 +407,7 @@ const GlobalSearch = ({
                       key={user.id}
                       onClick={() => handleResultClick(user)}
                       className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center ${
-                        selectedIndex === recentSearches.length + (results.leads?.length || 0) + (results.activities?.length || 0) + (results.tasks?.length || 0) + index ? 'bg-gray-50' : ''
+                        selectedIndex === recentSearches.length + (results.leads?.length || 0) + (results.contacts?.length || 0) + (results.activities?.length || 0) + (results.tasks?.length || 0) + index ? 'bg-gray-50' : ''
                       }`}
                     >
                       <div className={`${getResultColor('user')} mr-3`}>
