@@ -26,5 +26,6 @@ export {
   PlusIcon,
   XMarkIcon,
   CheckIcon,
-  InformationCircleIcon
+  InformationCircleIcon,
+  TrophyIcon
 } from '@heroicons/react/24/outline';
