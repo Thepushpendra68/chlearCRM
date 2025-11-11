@@ -56,6 +56,9 @@ const emailRoutes = require('./routes/emailRoutes');
 console.log('📦 [APP] Loading account routes...');
 const accountRoutes = require('./routes/accountRoutes');
 console.log('✅ [APP] Account routes loaded successfully:', !!accountRoutes);
+console.log('📦 [APP] Loading contact routes...');
+const contactRoutes = require('./routes/contactRoutes');
+console.log('✅ [APP] Contact routes loaded successfully:', !!contactRoutes);
 
 // Import middleware
 const errorHandler = require('./middleware/errorMiddleware');
@@ -215,6 +218,9 @@ app.use('/api/email', emailRoutes); // Email templates, sending, and automation
 console.log('🔗 [APP] Registering /api/accounts routes...');
 app.use('/api/accounts', accountRoutes); // Account management
 console.log('✅ [APP] /api/accounts routes registered');
+console.log('🔗 [APP] Registering /api/contacts routes...');
+app.use('/api/contacts', contactRoutes); // Contact management
+console.log('✅ [APP] /api/contacts routes registered');
 
 // 404 handler
 app.use('*', (req, res) => {

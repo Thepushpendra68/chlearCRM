@@ -102,15 +102,57 @@ const getAccounts = async (currentUser, page = 1, limit = 20, filters = {}) => {
     const totalItems = countResult.count || 0;
     const totalPages = Math.ceil(totalItems / limit);
 
+    const accountsData = accountsResult.data || [];
+    const accountIds = accountsData.map(account => account.id).filter(Boolean);
+
+    const contactSummaryByAccount = {};
+
+    if (accountIds.length > 0) {
+      const { data: contactRows, error: contactError } = await supabaseAdmin
+        .from('contacts')
+        .select('id, account_id, first_name, last_name, email, is_primary')
+        .in('account_id', accountIds);
+
+      if (contactError) {
+        console.error('Error fetching contact summary for accounts:', contactError);
+      } else {
+        (contactRows || []).forEach(row => {
+          if (!row?.account_id) {
+            return;
+          }
+          if (!contactSummaryByAccount[row.account_id]) {
+            contactSummaryByAccount[row.account_id] = {
+              total: 0,
+              primary: null
+            };
+          }
+          contactSummaryByAccount[row.account_id].total += 1;
+          if (row.is_primary && !contactSummaryByAccount[row.account_id].primary) {
+            contactSummaryByAccount[row.account_id].primary = row;
+          }
+        });
+      }
+    }
+
     // Format the data
-    const formattedAccounts = (accountsResult.data || []).map(account => ({
-      ...account,
-      assigned_user_first_name: account.user_profiles?.first_name || null,
-      assigned_user_last_name: account.user_profiles?.last_name || null,
-      parent_account_name: account.parent_account?.name || null,
-      user_profiles: undefined, // Remove nested object
-      parent_account: undefined // Remove nested object
-    }));
+    const formattedAccounts = accountsData.map(account => {
+      const contactSummary = contactSummaryByAccount[account.id] || { total: 0, primary: null };
+      const primaryContact = contactSummary.primary;
+
+      return {
+        ...account,
+        assigned_user_first_name: account.user_profiles?.first_name || null,
+        assigned_user_last_name: account.user_profiles?.last_name || null,
+        parent_account_name: account.parent_account?.name || null,
+        contacts_count: contactSummary.total,
+        primary_contact_id: primaryContact?.id || null,
+        primary_contact_name: primaryContact
+          ? `${primaryContact.first_name || ''} ${primaryContact.last_name || ''}`.trim() || primaryContact.email || null
+          : null,
+        user_profiles: undefined, // Remove nested object
+        parent_account: undefined // Remove nested object
+      };
+    });
 
     return {
       accounts: formattedAccounts,
@@ -164,6 +206,22 @@ const getAccountById = async (id, currentUser) => {
       console.error('Error fetching child accounts:', childError);
     }
 
+    let contactsCount = 0;
+    let primaryContact = null;
+
+    const { data: accountContacts, error: accountContactsError } = await supabaseAdmin
+      .from('contacts')
+      .select('id, first_name, last_name, email, phone, mobile_phone, is_primary')
+      .eq('account_id', id)
+      .eq('company_id', currentUser.company_id);
+
+    if (accountContactsError) {
+      console.error('Error fetching account contacts:', accountContactsError);
+    } else {
+      contactsCount = (accountContacts || []).length;
+      primaryContact = (accountContacts || []).find(contact => contact.is_primary) || null;
+    }
+
     // Format the response
     return {
       ...account,
@@ -171,6 +229,8 @@ const getAccountById = async (id, currentUser) => {
       assigned_user_last_name: account.user_profiles?.last_name || null,
       parent_account_name: account.parent_account?.name || null,
       child_accounts: childAccounts || [],
+      contacts_count: contactsCount,
+      primary_contact: primaryContact,
       user_profiles: undefined,
       parent_account: undefined
     };

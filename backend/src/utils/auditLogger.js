@@ -38,6 +38,13 @@ const AuditActions = Object.freeze({
   ACCOUNT_STATUS_CHANGED: 'account_status_changed',
   ACCOUNT_OWNER_CHANGED: 'account_owner_changed',
 
+  // Contact lifecycle
+  CONTACT_CREATED: 'contact_created',
+  CONTACT_UPDATED: 'contact_updated',
+  CONTACT_DELETED: 'contact_deleted',
+  CONTACT_STATUS_CHANGED: 'contact_status_changed',
+  CONTACT_OWNER_CHANGED: 'contact_owner_changed',
+
   // Pipeline & activities
   PIPELINE_STAGE_CREATED: 'pipeline_stage_created',
   PIPELINE_STAGE_UPDATED: 'pipeline_stage_updated',

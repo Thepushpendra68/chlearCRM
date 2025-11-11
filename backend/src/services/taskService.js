@@ -15,8 +15,9 @@ class TaskService {
         .select(`
           *,
           leads(name),
-          assigned_user:user_profiles!tasks_assigned_to_fkey(first_name, last_name),
-          created_user:user_profiles!tasks_created_by_fkey(first_name, last_name)
+          contacts:contacts!tasks_contact_id_fkey(id, first_name, last_name, email, phone, mobile_phone),
+          assigned_user:user_profiles!tasks_assigned_to_fkey(first_name, last_name, email),
+          created_user:user_profiles!tasks_created_by_fkey(first_name, last_name, email)
         `)
         .eq('company_id', currentUser.company_id);
 
@@ -36,6 +37,10 @@ class TaskService {
 
       if (filters.account_id) {
         query = query.eq('account_id', filters.account_id);
+      }
+
+      if (filters.contact_id) {
+        query = query.eq('contact_id', filters.contact_id);
       }
 
       if (filters.status) {
@@ -78,19 +83,38 @@ class TaskService {
       }
 
       // Format the data to match expected structure
-      const formattedTasks = tasks.map(task => ({
-        ...task,
-        lead_name: task.leads?.name,
-        assigned_first_name: task.assigned_user?.first_name,
-        assigned_last_name: task.assigned_user?.last_name,
-        assigned_email: task.assigned_user?.email,
-        created_first_name: task.created_user?.first_name,
-        created_last_name: task.created_user?.last_name,
-        // Remove the nested objects
-        leads: undefined,
-        assigned_user: undefined,
-        created_user: undefined
-      }));
+      const formattedTasks = (tasks || []).map(task => {
+        const contactData = task.contacts
+          ? {
+              id: task.contacts.id,
+              first_name: task.contacts.first_name,
+              last_name: task.contacts.last_name,
+              email: task.contacts.email,
+              phone: task.contacts.phone,
+              mobile_phone: task.contacts.mobile_phone
+            }
+          : null;
+
+        return {
+          ...task,
+          lead_name: task.leads?.name,
+          contact: contactData,
+          contact_name: contactData
+            ? `${contactData.first_name || ''} ${contactData.last_name || ''}`.trim() || contactData.email || null
+            : null,
+          assigned_first_name: task.assigned_user?.first_name,
+          assigned_last_name: task.assigned_user?.last_name,
+          assigned_email: task.assigned_user?.email,
+          created_first_name: task.created_user?.first_name,
+          created_last_name: task.created_user?.last_name,
+          created_email: task.created_user?.email,
+          // Remove the nested objects
+          leads: undefined,
+          contacts: undefined,
+          assigned_user: undefined,
+          created_user: undefined
+        };
+      });
 
       return formattedTasks || [];
     } catch (error) {
@@ -111,8 +135,9 @@ class TaskService {
         .select(`
           *,
           leads!tasks_lead_id_fkey(name),
+          contacts:contacts!tasks_contact_id_fkey(id, first_name, last_name, email, phone, mobile_phone),
           assigned_user:user_profiles!tasks_assigned_to_fkey(first_name, last_name, email),
-          created_user:user_profiles!tasks_created_by_fkey(first_name, last_name)
+          created_user:user_profiles!tasks_created_by_fkey(first_name, last_name, email)
         `)
         .eq('id', taskId)
         .eq('company_id', currentUser.company_id)
@@ -123,16 +148,33 @@ class TaskService {
       }
 
       // Format the data to match expected structure
+      const contactData = task.contacts
+        ? {
+            id: task.contacts.id,
+            first_name: task.contacts.first_name,
+            last_name: task.contacts.last_name,
+            email: task.contacts.email,
+            phone: task.contacts.phone,
+            mobile_phone: task.contacts.mobile_phone
+          }
+        : null;
+
       const formattedTask = {
         ...task,
         lead_name: task.leads?.name,
+        contact: contactData,
+        contact_name: contactData
+          ? `${contactData.first_name || ''} ${contactData.last_name || ''}`.trim() || contactData.email || null
+          : null,
         assigned_first_name: task.assigned_user?.first_name,
         assigned_last_name: task.assigned_user?.last_name,
         assigned_email: task.assigned_user?.email,
         created_first_name: task.created_user?.first_name,
         created_last_name: task.created_user?.last_name,
+        created_email: task.created_user?.email,
         // Remove the nested objects
         leads: undefined,
+        contacts: undefined,
         assigned_user: undefined,
         created_user: undefined
       };
@@ -193,9 +235,23 @@ class TaskService {
         }
       }
 
+      if (taskData.contact_id) {
+        const { data: contact, error: contactError } = await supabase
+          .from('contacts')
+          .select('id')
+          .eq('id', taskData.contact_id)
+          .eq('company_id', currentUser.company_id)
+          .single();
+
+        if (contactError || !contact) {
+          throw new ApiError('Contact not found', 404);
+        }
+      }
+
       const newTask = {
         lead_id: taskData.lead_id || null,
         account_id: taskData.account_id || null,
+        contact_id: taskData.contact_id || null,
         assigned_to: taskData.assigned_to,
         created_by: currentUser.id,
         company_id: currentUser.company_id,
@@ -211,7 +267,13 @@ class TaskService {
       const { data: task, error } = await supabase
         .from('tasks')
         .insert(newTask)
-        .select()
+        .select(`
+          *,
+          leads!tasks_lead_id_fkey(name),
+          contacts:contacts!tasks_contact_id_fkey(id, first_name, last_name, email, phone, mobile_phone),
+          assigned_user:user_profiles!tasks_assigned_to_fkey(first_name, last_name, email),
+          created_user:user_profiles!tasks_created_by_fkey(first_name, last_name, email)
+        `)
         .single();
 
       if (error) {
@@ -219,7 +281,34 @@ class TaskService {
         throw new ApiError('Failed to create task', 500);
       }
 
-      return task;
+      const contactData = task.contacts
+        ? {
+            id: task.contacts.id,
+            first_name: task.contacts.first_name,
+            last_name: task.contacts.last_name,
+            email: task.contacts.email,
+            phone: task.contacts.phone,
+            mobile_phone: task.contacts.mobile_phone
+          }
+        : null;
+
+      return {
+        ...task,
+        lead_name: task.leads?.name,
+        contact: contactData,
+        contact_name: contactData
+          ? `${contactData.first_name || ''} ${contactData.last_name || ''}`.trim() || contactData.email || null
+          : null,
+        assigned_first_name: task.assigned_user?.first_name,
+        assigned_last_name: task.assigned_user?.last_name,
+        assigned_email: task.assigned_user?.email,
+        created_first_name: task.created_user?.first_name,
+        created_last_name: task.created_user?.last_name,
+        leads: undefined,
+        contacts: undefined,
+        assigned_user: undefined,
+        created_user: undefined
+      };
     } catch (error) {
       console.error('Task creation error:', error);
       if (error instanceof ApiError) throw error;
@@ -274,7 +363,7 @@ class TaskService {
       }
 
       // Validate that account exists and belongs to company if being updated
-      if (updateData.account_id !== undefined && updateData.account_id !== null) {
+      if (updateData.account_id !== undefined && updateData.account_id !== null && updateData.account_id !== '') {
         const { data: account, error: accountError } = await supabase
           .from('accounts')
           .select('id')
@@ -287,11 +376,29 @@ class TaskService {
         }
       }
 
+      if (updateData.contact_id !== undefined) {
+        if (updateData.contact_id === '' || updateData.contact_id === null) {
+          // allow null
+        } else {
+          const { data: contact, error: contactError } = await supabase
+            .from('contacts')
+            .select('id')
+            .eq('id', updateData.contact_id)
+            .eq('company_id', currentUser.company_id)
+            .single();
+
+          if (contactError || !contact) {
+            throw new ApiError('Contact not found', 404);
+          }
+        }
+      }
+
       // Handle empty strings for foreign key fields
       const cleanedData = {
         ...updateData,
         lead_id: updateData.lead_id !== undefined ? (updateData.lead_id || null) : existingTask.lead_id,
         account_id: updateData.account_id !== undefined ? (updateData.account_id || null) : existingTask.account_id,
+        contact_id: updateData.contact_id !== undefined ? (updateData.contact_id || null) : existingTask.contact_id,
         due_date: updateData.due_date || null,
         updated_at: new Date().toISOString()
       };
@@ -301,16 +408,50 @@ class TaskService {
         .update(cleanedData)
         .eq('id', taskId)
         .eq('company_id', currentUser.company_id)
-        .select()
+        .select(`
+          *,
+          leads!tasks_lead_id_fkey(name),
+          contacts:contacts!tasks_contact_id_fkey(id, first_name, last_name, email, phone, mobile_phone),
+          assigned_user:user_profiles!tasks_assigned_to_fkey(first_name, last_name, email),
+          created_user:user_profiles!tasks_created_by_fkey(first_name, last_name, email)
+        `)
         .single();
 
       if (error || !task) {
         throw new ApiError('Task not found', 404);
       }
 
+      const contactData = task.contacts
+        ? {
+            id: task.contacts.id,
+            first_name: task.contacts.first_name,
+            last_name: task.contacts.last_name,
+            email: task.contacts.email,
+            phone: task.contacts.phone,
+            mobile_phone: task.contacts.mobile_phone
+          }
+        : null;
+
       return {
         previousTask: existingTask,
-        updatedTask: task
+        updatedTask: {
+          ...task,
+          lead_name: task.leads?.name,
+          contact: contactData,
+          contact_name: contactData
+            ? `${contactData.first_name || ''} ${contactData.last_name || ''}`.trim() || contactData.email || null
+            : null,
+          assigned_first_name: task.assigned_user?.first_name,
+          assigned_last_name: task.assigned_user?.last_name,
+          assigned_email: task.assigned_user?.email,
+          created_first_name: task.created_user?.first_name,
+          created_last_name: task.created_user?.last_name,
+          created_email: task.created_user?.email,
+          leads: undefined,
+          contacts: undefined,
+          assigned_user: undefined,
+          created_user: undefined
+        }
       };
     } catch (error) {
       if (error instanceof ApiError) throw error;
@@ -410,7 +551,8 @@ class TaskService {
         .select(`
           *,
           leads!tasks_lead_id_fkey(name),
-          assigned_user:user_profiles!tasks_assigned_to_fkey(first_name, last_name)
+          contacts:contacts!tasks_contact_id_fkey(id, first_name, last_name, email, phone, mobile_phone),
+          assigned_user:user_profiles!tasks_assigned_to_fkey(first_name, last_name, email)
         `)
         .eq('company_id', currentUser.company_id)
         .lt('due_date', new Date().toISOString())
@@ -434,15 +576,33 @@ class TaskService {
       }
 
       // Format the data to match expected structure
-      const formattedTasks = overdueTasks.map(task => ({
-        ...task,
-        lead_name: task.leads?.name,
-        assigned_first_name: task.assigned_user?.first_name,
-        assigned_last_name: task.assigned_user?.last_name,
-        // Remove the nested objects
-        leads: undefined,
-        assigned_user: undefined
-      }));
+      const formattedTasks = (overdueTasks || []).map(task => {
+        const contactData = task.contacts
+          ? {
+              id: task.contacts.id,
+              first_name: task.contacts.first_name,
+              last_name: task.contacts.last_name,
+              email: task.contacts.email,
+              phone: task.contacts.phone,
+              mobile_phone: task.contacts.mobile_phone
+            }
+          : null;
+
+        return {
+          ...task,
+          lead_name: task.leads?.name,
+          contact: contactData,
+          contact_name: contactData
+            ? `${contactData.first_name || ''} ${contactData.last_name || ''}`.trim() || contactData.email || null
+            : null,
+          assigned_first_name: task.assigned_user?.first_name,
+          assigned_last_name: task.assigned_user?.last_name,
+          assigned_email: task.assigned_user?.email,
+          leads: undefined,
+          contacts: undefined,
+          assigned_user: undefined
+        };
+      });
 
       return formattedTasks || [];
     } catch (error) {
@@ -512,8 +672,9 @@ class TaskService {
         .from('tasks')
         .select(`
           *,
-          assigned_user:user_profiles!tasks_assigned_to_fkey(first_name, last_name),
-          created_user:user_profiles!tasks_created_by_fkey(first_name, last_name)
+          contacts:contacts!tasks_contact_id_fkey(id, first_name, last_name, email, phone, mobile_phone),
+          assigned_user:user_profiles!tasks_assigned_to_fkey(first_name, last_name, email),
+          created_user:user_profiles!tasks_created_by_fkey(first_name, last_name, email)
         `)
         .eq('lead_id', leadId)
         .eq('company_id', currentUser.company_id)
@@ -524,16 +685,35 @@ class TaskService {
       }
 
       // Format the data to match expected structure
-      const formattedTasks = tasks.map(task => ({
-        ...task,
-        assigned_first_name: task.assigned_user?.first_name,
-        assigned_last_name: task.assigned_user?.last_name,
-        created_first_name: task.created_user?.first_name,
-        created_last_name: task.created_user?.last_name,
-        // Remove the nested objects
-        assigned_user: undefined,
-        created_user: undefined
-      }));
+      const formattedTasks = (tasks || []).map(task => {
+        const contactData = task.contacts
+          ? {
+              id: task.contacts.id,
+              first_name: task.contacts.first_name,
+              last_name: task.contacts.last_name,
+              email: task.contacts.email,
+              phone: task.contacts.phone,
+              mobile_phone: task.contacts.mobile_phone
+            }
+          : null;
+
+        return {
+          ...task,
+          contact: contactData,
+          contact_name: contactData
+            ? `${contactData.first_name || ''} ${contactData.last_name || ''}`.trim() || contactData.email || null
+            : null,
+          assigned_first_name: task.assigned_user?.first_name,
+          assigned_last_name: task.assigned_user?.last_name,
+          assigned_email: task.assigned_user?.email,
+          created_first_name: task.created_user?.first_name,
+          created_last_name: task.created_user?.last_name,
+          created_email: task.created_user?.email,
+          assigned_user: undefined,
+          created_user: undefined,
+          contacts: undefined
+        };
+      });
 
       return formattedTasks || [];
     } catch (error) {

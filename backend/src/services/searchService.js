@@ -14,11 +14,12 @@ class SearchService {
   async globalSearch(query, limit = 10, currentUser = null) {
     try {
       // Search all modules in parallel
-      const [leads, activities, tasks, users] = await Promise.all([
+      const [leads, activities, tasks, users, contacts] = await Promise.all([
         this.searchLeads(query, limit, currentUser),
         this.searchActivities(query, limit, currentUser),
         this.searchTasks(query, limit, currentUser),
-        this.searchUsers(query, limit, currentUser)
+        this.searchUsers(query, limit, currentUser),
+        this.searchContacts(query, limit, currentUser)
       ]);
 
       return {
@@ -32,6 +33,15 @@ class SearchService {
           phone: lead.phone,
           status: lead.status,
           href: `/app/leads/${lead.id}`
+        })),
+        contacts: contacts.map(contact => ({
+          id: contact.id,
+          name: `${contact.first_name || ''} ${contact.last_name || ''}`.trim() || contact.email || 'Contact',
+          email: contact.email,
+          phone: contact.phone || contact.mobile_phone,
+          account_name: contact.account_name,
+          status: contact.status,
+          href: `/app/contacts/${contact.id}`
         })),
         activities: activities.map(activity => ({
           id: activity.id,
@@ -204,6 +214,50 @@ class SearchService {
       }));
     } catch (error) {
       console.error('Tasks search error:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Search contacts
+   * @param {string} searchTerm
+   * @param {number} limit
+   * @param {Object|null} currentUser
+   * @returns {Array}
+   */
+  async searchContacts(searchTerm, limit, currentUser = null) {
+    try {
+      let query = supabaseAdmin
+        .from('contacts')
+        .select(`
+          *,
+          account:accounts!account_id(id, name)
+        `);
+
+      if (currentUser) {
+        query = query.eq('company_id', currentUser.company_id);
+      }
+
+      const searchFilter = `%${searchTerm}%`;
+      query = query.or(`first_name.ilike.${searchFilter},last_name.ilike.${searchFilter},email.ilike.${searchFilter},phone.ilike.${searchFilter},mobile_phone.ilike.${searchFilter},notes.ilike.${searchFilter},title.ilike.${searchFilter}`);
+
+      query = query.limit(limit);
+
+      const { data: contacts, error } = await query;
+
+      if (error) {
+        console.error('Contacts search error:', error);
+        return [];
+      }
+
+      return contacts.map(contact => ({
+        ...contact,
+        account_name: contact.account?.name || null,
+        account_id: contact.account?.id || contact.account_id || null,
+        account: undefined
+      }));
+    } catch (error) {
+      console.error('Contacts search error:', error);
       return [];
     }
   }
