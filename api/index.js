@@ -74,6 +74,9 @@ try {
   console.log('📦 [API] Loading account routes...');
   const accountRoutes = require('../backend/src/routes/accountRoutes');
   console.log('✅ [API] Account routes loaded:', !!accountRoutes);
+  console.log('📦 [API] Loading contact routes...');
+  const contactRoutes = require('../backend/src/routes/contactRoutes');
+  console.log('✅ [API] Contact routes loaded:', !!contactRoutes);
   const picklistRoutes = require('../backend/src/routes/picklistRoutes');
   const apiClientRoutes = require('../backend/src/routes/apiClientRoutes');
   const configRoutes = require('../backend/src/routes/configRoutes');
@@ -100,6 +103,9 @@ try {
   console.log('🔗 [API] Registering /api/accounts...');
   app.use('/api/accounts', accountRoutes);
   console.log('✅ [API] /api/accounts registered');
+  console.log('🔗 [API] Registering /api/contacts...');
+  app.use('/api/contacts', contactRoutes);
+  console.log('✅ [API] /api/contacts registered');
   app.use('/api/picklists', picklistRoutes);
   app.use('/api/config', configRoutes);
   app.use('/api/custom-fields', customFieldRoutes);
