@@ -82,19 +82,31 @@ const Sidebar = ({
 
   // Email sub-navigation items
   const emailSubItems = [
-    { name: "Templates", href: "/app/email/templates", icon: EnvelopeIcon },
-    { name: "Sequences", href: "/app/email/sequences", icon: BoltIcon },
     {
-      name: "Workflow Library",
+      name: t("navigation:menu.email.templates"),
+      href: "/app/email/templates",
+      icon: EnvelopeIcon,
+    },
+    {
+      name: t("navigation:menu.email.sequences"),
+      href: "/app/email/sequences",
+      icon: BoltIcon,
+    },
+    {
+      name: t("navigation:menu.email.workflowLibrary"),
       href: "/app/email/workflow-library",
       icon: BookOpenIcon,
     },
-    { name: "Analytics", href: "/app/email/analytics", icon: ChartBarIcon },
+    {
+      name: t("navigation:menu.email.analytics"),
+      href: "/app/email/analytics",
+      icon: ChartBarIcon,
+    },
     // Email Settings - only for company_admin and super_admin
     ...(user?.role === "company_admin" || user?.role === "super_admin"
       ? [
           {
-            name: "Settings",
+            name: t("navigation:menu.email.settings"),
             href: "/app/email/settings",
             icon: Cog6ToothIcon,
           },
@@ -104,33 +116,38 @@ const Sidebar = ({
 
   // Main navigation items (top section)
   const mainNavigation = [
-    { name: "Dashboard", href: "/app/dashboard", icon: HomeIcon, badge: null },
     {
-      name: "Leads",
+      name: t("navigation:menu.dashboard"),
+      href: "/app/dashboard",
+      icon: HomeIcon,
+      badge: null,
+    },
+    {
+      name: t("navigation:menu.leads"),
       href: "/app/leads",
       icon: UsersIcon,
       badge: badgeCounts.leads || null,
     },
     {
-      name: "Contacts",
+      name: t("navigation:menu.contacts"),
       href: "/app/contacts",
       icon: IdentificationIcon,
       badge: null,
     },
     {
-      name: "Accounts",
+      name: t("navigation:menu.accounts"),
       href: "/app/accounts",
       icon: BuildingOfficeIcon,
       badge: null,
     },
     {
-      name: "Pipeline",
+      name: t("navigation:menu.pipeline"),
       href: "/app/pipeline",
       icon: Squares2X2Icon,
       badge: null,
     },
     {
-      name: "Activities",
+      name: t("navigation:menu.activities"),
       href: "/app/activities",
       icon: ClockIcon,
       badge: badgeCounts.activities || null,
@@ -140,20 +157,25 @@ const Sidebar = ({
   // Utility/admin navigation items (bottom section)
   const utilityNavigation = [
     {
-      name: "Assignments",
+      name: t("navigation:menu.assignments"),
       href: "/app/assignments",
       icon: UserPlusIcon,
       badge: null,
     },
     {
-      name: "Tasks",
+      name: t("navigation:menu.tasks"),
       href: "/app/tasks",
       icon: ClipboardDocumentListIcon,
       badge: badgeCounts.tasks || null,
     },
-    { name: "Users", href: "/app/users", icon: UserGroupIcon, badge: null },
     {
-      name: "Reports",
+      name: t("navigation:menu.users"),
+      href: "/app/users",
+      icon: UserGroupIcon,
+      badge: null,
+    },
+    {
+      name: t("navigation:menu.reports"),
       href: "/app/reports",
       icon: DocumentChartBarIcon,
       badge: null,
@@ -164,7 +186,7 @@ const Sidebar = ({
     user?.role === "super_admin"
       ? [
           {
-            name: "Custom Fields",
+            name: t("navigation:menu.customFields"),
             href: "/app/custom-fields",
             icon: RectangleGroupIcon,
             badge: null,

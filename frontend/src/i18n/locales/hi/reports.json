@@ -1,0 +1,117 @@
+{
+  "pageTitle": "रिपोर्ट्स",
+  "title": "रिपोर्ट्स",
+  "subtitle": "अपने व्यापार डेटा का विश्लेषण करें",
+  "createReport": "रिपोर्ट बनाएं",
+  "fields": {
+    "name": "रिपोर्ट का नाम",
+    "description": "विवरण",
+    "type": "रिपोर्ट का प्रकार",
+    "category": "श्रेणी",
+    "source": "डेटा स्रोत",
+    "dateRange": "तारीख सीमा",
+    "filters": "फ़िल्टर्स",
+    "groupBy": "समूहित करें",
+    "sortBy": "क्रमबद्ध करें",
+    "createdAt": "बनाया गया",
+    "updatedAt": "अपडेट किया गया",
+    "createdBy": "द्वारा बनाया गया"
+  },
+  "types": {
+    "leadReport": "लीड रिपोर्ट",
+    "salesReport": "सेल्स रिपोर्ट",
+    "activityReport": "एक्टिविटी रिपोर्ट",
+    "taskReport": "टास्क रिपोर्ट",
+    "userReport": "उपयोगकर्ता रिपोर्ट",
+    "conversionReport": "कन्वर्जन रिपोर्ट",
+    "pipelineReport": "पाइपलाइन रिपोर्ट",
+    "revenueReport": "राजस्व रिपोर्ट",
+    "performanceReport": "प्रदर्शन रिपोर्ट",
+    "customReport": "कस्टम रिपोर्ट"
+  },
+  "categories": {
+    "sales": "सेल्स",
+    "marketing": "मार्केटिंग",
+    "operations": "ऑपरेशंस",
+    "finance": "वित्त",
+    "performance": "प्रदर्शन",
+    "activity": "एक्टिविटी"
+  },
+  "chartTypes": {
+    "bar": "बार चार्ट",
+    "line": "लाइन चार्ट",
+    "pie": "पाई चार्ट",
+    "area": "एरिया चार्ट",
+    "scatter": "स्कैटर प्लॉट",
+    "table": "टेबल",
+    "number": "नंबर कार्ड्स"
+  },
+  "actions": {
+    "view": "देखें",
+    "edit": "संपादित करें",
+    "delete": "डिलीट करें",
+    "duplicate": "डुप्लीकेट करें",
+    "export": "एक्सपोर्ट करें",
+    "schedule": "शेड्यूल करें",
+    "share": "शेयर करें",
+    "favorite": "पसंदीदा में जोड़ें",
+    "unfavorite": "पसंदीदा से हटाएं"
+  },
+  "modals": {
+    "create": {
+      "title": "नई रिपोर्ट बनाएं",
+      "editTitle": "रिपोर्ट संपादित करें",
+      "submit": "रिपोर्ट बनाएं",
+      "update": "रिपोर्ट अपडेट करें"
+    },
+    "delete": {
+      "title": "रिपोर्ट डिलीट करें",
+      "message": "क्या आप वाकई इस रिपोर्ट को डिलीट करना चाहते हैं?",
+      "confirm": "रिपोर्ट डिलीट करें"
+    },
+    "schedule": {
+      "title": "रिपोर्ट शेड्यूल करें",
+      "submit": "रिपोर्ट शेड्यूल करें"
+    }
+  },
+  "filters": {
+    "title": "रिपोर्ट फ़िल्टर्स",
+    "dateRange": "तारीख सीमा",
+    "category": "श्रेणी",
+    "createdBy": "द्वारा बनाया गया",
+    "status": "स्थिति",
+    "clear": "फ़िल्टर्स साफ़ करें",
+    "apply": "फ़िल्टर्स लागू करें"
+  },
+  "presets": {
+    "title": "त्वरित रिपोर्ट्स",
+    "leadsThisMonth": "इस महीने के लीड्स",
+    "salesThisQuarter": "इस तिमाही के सेल्स",
+    "activitiesToday": "आज की एक्टिविटीज",
+    "topPerformers": "टॉप परफॉर्मर्स",
+    "pipelineSummary": "पाइपलाइन सारांश"
+  },
+  "metrics": {
+    "title": "मुख्य मैट्रिक्स",
+    "totalLeads": "कुल लीड्स",
+    "newLeads": "नए लीड्स",
+    "qualifiedLeads": "योग्य लीड्स",
+    "conversionRate": "कन्वर्जन रेट",
+    "totalRevenue": "कुल राजस्व",
+    "averageDealSize": "औसत डील साइज",
+    "activitiesCount": "एक्टिविटीज की संख्या",
+    "tasksCompleted": "पूर्ण टास्क्स"
+  },
+  "emptyState": {
+    "title": "अभी तक कोई रिपोर्ट नहीं",
+    "description": "अपने डेटा का विश्लेषण करने के लिए अपनी पहली रिपोर्ट बनाएं",
+    "action": "रिपोर्ट बनाएं"
+  },
+  "messages": {
+    "created": "रिपोर्ट सफलतापूर्वक बनाई गई",
+    "updated": "रिपोर्ट सफलतापूर्वक अपडेट की गई",
+    "deleted": "रिपोर्ट सफलतापूर्वक डिलीट की गई",
+    "exported": "रिपोर्ट सफलतापूर्वक एक्सपोर्ट की गई",
+    "scheduled": "रिपोर्ट सफलतापूर्वक शेड्यूल की गई"
+  }
+}
