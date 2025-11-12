@@ -1,179 +1,186 @@
-import { useState, useEffect, useRef } from 'react'
-import { Dialog, Transition, Tab } from '@headlessui/react'
-import { Fragment } from 'react'
+import { useState, useEffect, useRef } from "react";
+import { Dialog, Transition, Tab } from "@headlessui/react";
+import { Fragment } from "react";
 import {
   XMarkIcon,
   MagnifyingGlassIcon,
   MicrophoneIcon,
   ClockIcon,
   FireIcon,
-} from '@heroicons/react/24/outline'
-import { useNavigate } from 'react-router-dom'
-import { useDebounce } from '../../hooks/useDebounce'
-import searchService from '../../services/searchService'
-import api from '../../services/api'
-import toast from 'react-hot-toast'
+} from "@heroicons/react/24/outline";
+import { useNavigate } from "react-router-dom";
+import useDebounce from "../../hooks/useDebounce";
+import searchService from "../../services/searchService";
+import api from "../../services/api";
+import toast from "react-hot-toast";
 
 const MobileSearchModal = ({ isOpen, onClose }) => {
-  const navigate = useNavigate()
-  const [query, setQuery] = useState('')
-  const [isSearching, setIsSearching] = useState(false)
-  const [results, setResults] = useState([])
-  const [recentSearches, setRecentSearches] = useState([])
+  const navigate = useNavigate();
+  const [query, setQuery] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
+  const [results, setResults] = useState([]);
+  const [recentSearches, setRecentSearches] = useState([]);
   const [popularSearches, setPopularSearches] = useState([
-    'New leads this week',
-    'High priority tasks',
-    'Completed activities',
-    'Qualified leads',
-    'Email templates',
-  ])
-  const [selectedTab, setSelectedTab] = useState(0)
-  const searchInputRef = useRef(null)
-  const debouncedQuery = useDebounce(query, 300)
+    "New leads this week",
+    "High priority tasks",
+    "Completed activities",
+    "Qualified leads",
+    "Email templates",
+  ]);
+  const [selectedTab, setSelectedTab] = useState(0);
+  const searchInputRef = useRef(null);
+  const debouncedQuery = useDebounce(query, 300);
 
   // Focus input when modal opens
   useEffect(() => {
     if (isOpen && searchInputRef.current) {
-      setTimeout(() => searchInputRef.current.focus(), 100)
+      setTimeout(() => searchInputRef.current.focus(), 100);
     }
-  }, [isOpen])
+  }, [isOpen]);
 
   // Load recent searches from localStorage
   useEffect(() => {
-    const saved = localStorage.getItem('recentSearches')
+    const saved = localStorage.getItem("recentSearches");
     if (saved) {
       try {
-        setRecentSearches(JSON.parse(saved))
+        setRecentSearches(JSON.parse(saved));
       } catch (e) {
-        console.error('Failed to parse recent searches')
+        console.error("Failed to parse recent searches");
       }
     }
-  }, [])
+  }, []);
 
   // Perform search when query changes
   useEffect(() => {
     if (debouncedQuery.trim().length < 2) {
-      setResults([])
-      return
+      setResults([]);
+      return;
     }
 
     const performSearch = async () => {
-      setIsSearching(true)
+      setIsSearching(true);
       try {
-        const response = await api.get(`/search?q=${encodeURIComponent(debouncedQuery)}`)
+        const response = await api.get(
+          `/search?q=${encodeURIComponent(debouncedQuery)}`,
+        );
         if (response.data.success) {
-          setResults(response.data.data || [])
+          setResults(response.data.data || []);
         }
       } catch (error) {
-        console.error('Search failed:', error)
-        toast.error('Search failed. Please try again.')
+        console.error("Search failed:", error);
+        toast.error("Search failed. Please try again.");
       } finally {
-        setIsSearching(false)
+        setIsSearching(false);
       }
-    }
+    };
 
-    performSearch()
-  }, [debouncedQuery])
+    performSearch();
+  }, [debouncedQuery]);
 
   // Save search to recent searches
   const saveRecentSearch = (searchQuery) => {
-    if (!searchQuery.trim()) return
+    if (!searchQuery.trim()) return;
 
-    const updated = [searchQuery, ...recentSearches.filter(s => s !== searchQuery)].slice(0, 10)
-    setRecentSearches(updated)
-    localStorage.setItem('recentSearches', JSON.stringify(updated))
-  }
+    const updated = [
+      searchQuery,
+      ...recentSearches.filter((s) => s !== searchQuery),
+    ].slice(0, 10);
+    setRecentSearches(updated);
+    localStorage.setItem("recentSearches", JSON.stringify(updated));
+  };
 
   const handleSearch = (searchQuery) => {
-    if (!searchQuery.trim()) return
+    if (!searchQuery.trim()) return;
 
-    saveRecentSearch(searchQuery)
+    saveRecentSearch(searchQuery);
     // Navigate to search results page
-    navigate(`/app/search?q=${encodeURIComponent(searchQuery)}`)
-    onClose()
-    setQuery('')
-  }
+    navigate(`/app/search?q=${encodeURIComponent(searchQuery)}`);
+    onClose();
+    setQuery("");
+  };
 
   const handleKeyPress = (e) => {
-    if (e.key === 'Enter') {
-      handleSearch(query)
+    if (e.key === "Enter") {
+      handleSearch(query);
     }
-  }
+  };
 
   const clearRecentSearches = () => {
-    setRecentSearches([])
-    localStorage.removeItem('recentSearches')
-    toast.success('Recent searches cleared')
-  }
+    setRecentSearches([]);
+    localStorage.removeItem("recentSearches");
+    toast.success("Recent searches cleared");
+  };
 
   const tabs = [
-    { name: 'All', count: results.length },
-    { name: 'Leads', count: results.leads?.length || 0 },
-    { name: 'Activities', count: results.activities?.length || 0 },
-    { name: 'Tasks', count: results.tasks?.length || 0 },
-  ]
+    { name: "All", count: results.length },
+    { name: "Leads", count: results.leads?.length || 0 },
+    { name: "Activities", count: results.activities?.length || 0 },
+    { name: "Tasks", count: results.tasks?.length || 0 },
+  ];
 
   const handleResultClick = (result) => {
-    saveRecentSearch(query)
+    saveRecentSearch(query);
 
     // Navigate based on result type
-    const type = result.type || result.entity_type
-    const id = result.id
+    const type = result.type || result.entity_type;
+    const id = result.id;
 
     switch (type) {
-      case 'lead':
-        navigate(`/app/leads/${id}`)
-        break
-      case 'activity':
-        navigate(`/app/activities`)
-        break
-      case 'task':
-        navigate(`/app/tasks`)
-        break
-      case 'contact':
-        navigate(`/app/contacts/${id}`)
-        break
-      case 'account':
-        navigate(`/app/accounts/${id}`)
-        break
+      case "lead":
+        navigate(`/app/leads/${id}`);
+        break;
+      case "activity":
+        navigate(`/app/activities`);
+        break;
+      case "task":
+        navigate(`/app/tasks`);
+        break;
+      case "contact":
+        navigate(`/app/contacts/${id}`);
+        break;
+      case "account":
+        navigate(`/app/accounts/${id}`);
+        break;
       default:
-        navigate(`/app/search?q=${encodeURIComponent(query)}`)
+        navigate(`/app/search?q=${encodeURIComponent(query)}`);
     }
-    onClose()
-    setQuery('')
-  }
+    onClose();
+    setQuery("");
+  };
 
   const getResultIcon = (type) => {
     switch (type) {
-      case 'lead':
-        return '👤'
-      case 'activity':
-        return '⏰'
-      case 'task':
-        return '✓'
-      case 'contact':
-        return '👥'
-      case 'account':
-        return '🏢'
+      case "lead":
+        return "👤";
+      case "activity":
+        return "⏰";
+      case "task":
+        return "✓";
+      case "contact":
+        return "👥";
+      case "account":
+        return "🏢";
       default:
-        return '📄'
+        return "📄";
     }
-  }
+  };
 
   const renderSearchResults = () => {
     const allResults = [
       ...(results.leads || []),
       ...(results.activities || []),
       ...(results.tasks || []),
-    ]
+    ];
 
     if (allResults.length === 0 && debouncedQuery.trim().length >= 2) {
       return (
         <div className="flex flex-col items-center justify-center py-12 px-4">
           <MagnifyingGlassIcon className="h-12 w-12 text-gray-300 mb-4" />
-          <p className="text-gray-500 text-center">No results found for "{debouncedQuery}"</p>
+          <p className="text-gray-500 text-center">
+            No results found for "{debouncedQuery}"
+          </p>
         </div>
-      )
+      );
     }
 
     return (
@@ -187,7 +194,9 @@ const MobileSearchModal = ({ isOpen, onClose }) => {
             <span className="text-2xl">{getResultIcon(result.type)}</span>
             <div className="flex-1 text-left">
               <div className="text-sm font-medium text-gray-900">
-                {result.name || result.title || result.first_name + ' ' + result.last_name}
+                {result.name ||
+                  result.title ||
+                  result.first_name + " " + result.last_name}
               </div>
               {(result.description || result.email) && (
                 <div className="text-xs text-gray-500 truncate">
@@ -195,12 +204,14 @@ const MobileSearchModal = ({ isOpen, onClose }) => {
                 </div>
               )}
             </div>
-            <span className="text-xs text-gray-400 capitalize">{result.type}</span>
+            <span className="text-xs text-gray-400 capitalize">
+              {result.type}
+            </span>
           </button>
         ))}
       </div>
-    )
-  }
+    );
+  };
 
   return (
     <Transition.Root show={isOpen} as={Fragment}>
@@ -289,7 +300,9 @@ const MobileSearchModal = ({ isOpen, onClose }) => {
                                     className="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-gray-50 active:bg-gray-100 rounded-lg transition-colors"
                                   >
                                     <ClockIcon className="h-4 w-4 text-gray-400" />
-                                    <span className="text-sm text-gray-700">{search}</span>
+                                    <span className="text-sm text-gray-700">
+                                      {search}
+                                    </span>
                                   </button>
                                 ))}
                               </div>
@@ -310,7 +323,9 @@ const MobileSearchModal = ({ isOpen, onClose }) => {
                                   className="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-gray-50 active:bg-gray-100 rounded-lg transition-colors"
                                 >
                                   <FireIcon className="h-4 w-4 text-orange-400" />
-                                  <span className="text-sm text-gray-700">{search}</span>
+                                  <span className="text-sm text-gray-700">
+                                    {search}
+                                  </span>
                                 </button>
                               ))}
                             </div>
@@ -320,7 +335,10 @@ const MobileSearchModal = ({ isOpen, onClose }) => {
                         <div className="py-2">
                           {/* Tabs */}
                           <div className="border-b border-gray-200 px-4">
-                            <Tab.Group selectedIndex={selectedTab} onChange={setSelectedTab}>
+                            <Tab.Group
+                              selectedIndex={selectedTab}
+                              onChange={setSelectedTab}
+                            >
                               <Tab.List className="flex space-x-6">
                                 {tabs.map((tab) => (
                                   <Tab
@@ -328,8 +346,8 @@ const MobileSearchModal = ({ isOpen, onClose }) => {
                                     className={({ selected }) =>
                                       `py-3 px-1 text-sm font-medium border-b-2 transition-colors ${
                                         selected
-                                          ? 'text-primary-600 border-primary-600'
-                                          : 'text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300'
+                                          ? "text-primary-600 border-primary-600"
+                                          : "text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300"
                                       }`
                                     }
                                   >
@@ -365,7 +383,7 @@ const MobileSearchModal = ({ isOpen, onClose }) => {
         </div>
       </Dialog>
     </Transition.Root>
-  )
-}
+  );
+};
 
-export default MobileSearchModal
+export default MobileSearchModal;
