@@ -12,15 +12,18 @@ import {
 } from "@heroicons/react/24/outline";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import Breadcrumbs from "./Breadcrumbs";
 import GlobalSearch from "../Search/GlobalSearch";
 import MobileSearchModal from "../MobileSearch/MobileSearchModal";
 import { MobileOnly } from "../ResponsiveUtils";
 import { Button } from "../ui/button";
+import LanguageSwitcher from "../UI/LanguageSwitcher";
 
 const Header = ({ setSidebarOpen, isCollapsed, currentPath }) => {
   const { user, logout, chatPanelOpen, toggleChatPanel } = useAuth();
   const navigate = useNavigate();
+  const { t } = useTranslation(["navigation", "common"]);
   const [showQuickActions, setShowQuickActions] = useState(false);
   const [showMobileSearch, setShowMobileSearch] = useState(false);
 
@@ -30,10 +33,18 @@ const Header = ({ setSidebarOpen, isCollapsed, currentPath }) => {
   };
 
   const quickActions = [
-    { name: "New Lead", to: "/app/leads?action=create-lead", icon: "👤" },
-    { name: "New Task", to: "/app/tasks?action=create-task", icon: "📋" },
     {
-      name: "New Activity",
+      name: t("navigation:header.newLead"),
+      to: "/app/leads?action=create-lead",
+      icon: "👤",
+    },
+    {
+      name: t("navigation:header.newTask"),
+      to: "/app/tasks?action=create-task",
+      icon: "📋",
+    },
+    {
+      name: t("navigation:header.newActivity"),
       to: "/app/activities?action=create-activity",
       icon: "⏰",
     },
@@ -111,16 +122,19 @@ const Header = ({ setSidebarOpen, isCollapsed, currentPath }) => {
           >
             <SparklesIcon className="h-4 w-4" />
             <span className="hidden sm:inline text-xs md:text-sm">
-              AI Assistant
+              {t("navigation:header.aiAssistant")}
             </span>
           </Button>
+
+          {/* Language Switcher */}
+          <LanguageSwitcher />
 
           {/* Quick Actions */}
           <Menu as="div" className="relative">
             <Menu.Button
               onClick={() => setShowQuickActions(!showQuickActions)}
               className="p-2.5 min-h-11 min-w-11 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-lg transition-colors"
-              title="Quick Actions"
+              title={t("navigation:header.quickActions")}
             >
               <PlusIcon className="h-5 w-5" />
             </Menu.Button>

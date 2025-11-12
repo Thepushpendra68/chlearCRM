@@ -1,0 +1,62 @@
+{
+  "menu": {
+    "dashboard": "Dashboard",
+    "leads": "Leads",
+    "contacts": "Contacts",
+    "accounts": "Accounts",
+    "pipeline": "Pipeline",
+    "activities": "Activities",
+    "assignments": "Assignments",
+    "tasks": "Tasks",
+    "users": "Users",
+    "reports": "Reports",
+    "customFields": "Custom Fields",
+    "scoringRules": "Scoring Rules",
+    "apiClients": "API Clients",
+    "platformAdmin": "Platform Admin",
+    "email": {
+      "main": "Email",
+      "templates": "Templates",
+      "sequences": "Sequences",
+      "workflowLibrary": "Workflow Library",
+      "analytics": "Analytics",
+      "settings": "Settings"
+    },
+    "custom": {
+      "fields": "Custom Fields",
+      "apiClients": "API Clients",
+      "emailSettings": "Email Settings"
+    }
+  },
+  "profileMenu": {
+    "yourProfile": "Your Profile",
+    "settings": "Settings",
+    "signOut": "Sign out"
+  },
+  "header": {
+    "openSidebar": "Open sidebar",
+    "closeSidebar": "Close sidebar",
+    "search": "Search",
+    "searchPlaceholder": "Search leads, contacts, activities...",
+    "quickActions": "Quick Actions",
+    "newLead": "New Lead",
+    "newTask": "New Task",
+    "newActivity": "New Activity",
+    "viewNotifications": "View notifications",
+    "openUserMenu": "Open user menu",
+    "aiAssistant": "AI Assistant"
+  },
+  "sidebar": {
+    "collapse": "Collapse sidebar",
+    "expand": "Expand sidebar",
+    "toggle": "Toggle sidebar (Ctrl+B)"
+  },
+  "quickNavigation": {
+    "home": "Home",
+    "backToTop": "Back to top"
+  },
+  "footer": {
+    "copyright": "© {{year}} Sakha CRM. All rights reserved.",
+    "poweredBy": "Powered by Sakha"
+  }
+}

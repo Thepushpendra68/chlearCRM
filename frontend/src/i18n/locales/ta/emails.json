@@ -1,0 +1,146 @@
+{
+  "pageTitle": "Emails",
+  "title": "Email",
+  "subtitle": "Manage your email campaigns and templates",
+  "sendEmail": "Send Email",
+  "fields": {
+    "subject": "Subject",
+    "body": "Body",
+    "template": "Template",
+    "fromName": "From Name",
+    "fromEmail": "From Email",
+    "to": "To",
+    "cc": "CC",
+    "bcc": "BCC",
+    "attachments": "Attachments",
+    "scheduledAt": "Scheduled At",
+    "status": "Status",
+    "sentAt": "Sent At",
+    "openedAt": "Opened At",
+    "clickedAt": "Clicked At",
+    "repliedAt": "Replied At",
+    "deliveredAt": "Delivered At",
+    "bouncedAt": "Bounced At",
+    "opened": "Opened",
+    "clicked": "Clicked",
+    "replied": "Replied",
+    "bounced": "Bounced",
+    "unsubscribed": "Unsubscribed"
+  },
+  "types": {
+    "transactional": "Transactional",
+    "marketing": "Marketing",
+    "newsletter": "Newsletter",
+    "announcement": "Announcement",
+    "followUp": "Follow-up",
+    "welcome": "Welcome",
+    "reminder": "Reminder"
+  },
+  "statuses": {
+    "draft": "Draft",
+    "scheduled": "Scheduled",
+    "sending": "Sending",
+    "sent": "Sent",
+    "delivered": "Delivered",
+    "opened": "Opened",
+    "clicked": "Clicked",
+    "replied": "Replied",
+    "bounced": "Bounced",
+    "failed": "Failed",
+    "cancelled": "Cancelled"
+  },
+  "templates": {
+    "title": "Email Templates",
+    "subject": "Subject Line",
+    "htmlContent": "HTML Content",
+    "textContent": "Text Content",
+    "variables": "Variables",
+    "preview": "Preview",
+    "testSend": "Send Test"
+  },
+  "sequences": {
+    "title": "Email Sequences",
+    "steps": "Steps",
+    "delay": "Delay",
+    "trigger": "Trigger",
+    "conditions": "Conditions",
+    "active": "Active",
+    "paused": "Paused",
+    "completed": "Completed",
+    "enrollments": "Enrollments"
+  },
+  "campaigns": {
+    "title": "Email Campaigns",
+    "recipients": "Recipients",
+    "sent": "Sent",
+    "delivered": "Delivered",
+    "opened": "Opened",
+    "clicked": "Clicked",
+    "replied": "Replied",
+    "bounced": "Bounced",
+    "unsubscribed": "Unsubscribed",
+    "openRate": "Open Rate",
+    "clickRate": "Click Rate",
+    "replyRate": "Reply Rate",
+    "bounceRate": "Bounce Rate"
+  },
+  "automation": {
+    "title": "Automation",
+    "triggers": "Triggers",
+    "actions": "Actions",
+    "conditions": "Conditions",
+    "workflows": "Workflows"
+  },
+  "settings": {
+    "title": "Email Settings",
+    "provider": "Email Provider",
+    "smtpSettings": "SMTP Settings",
+    "fromName": "Default From Name",
+    "fromEmail": "Default From Email",
+    "replyTo": "Reply To",
+    "signature": "Email Signature",
+    "testConnection": "Test Connection"
+  },
+  "actions": {
+    "view": "View",
+    "edit": "Edit",
+    "delete": "Delete",
+    "send": "Send",
+    "schedule": "Schedule",
+    "duplicate": "Duplicate",
+    "pause": "Pause",
+    "resume": "Resume",
+    "activate": "Activate",
+    "deactivate": "Deactivate"
+  },
+  "modals": {
+    "compose": {
+      "title": "Compose Email",
+      "send": "Send Email",
+      "save": "Save Draft",
+      "schedule": "Schedule Email"
+    },
+    "template": {
+      "title": "Create Template",
+      "editTitle": "Edit Template",
+      "submit": "Create Template",
+      "update": "Update Template"
+    },
+    "sequence": {
+      "title": "Create Sequence",
+      "editTitle": "Edit Sequence",
+      "submit": "Create Sequence",
+      "update": "Update Sequence"
+    }
+  },
+  "messages": {
+    "sent": "Email sent successfully",
+    "scheduled": "Email scheduled successfully",
+    "saved": "Draft saved successfully",
+    "created": "Template created successfully",
+    "updated": "Template updated successfully",
+    "deleted": "Template deleted successfully",
+    "sequenceCreated": "Sequence created successfully",
+    "sequenceUpdated": "Sequence updated successfully"
+  }
+}

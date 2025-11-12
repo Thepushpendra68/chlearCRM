@@ -1,0 +1,156 @@
+{
+  "pageTitle": "लीड्स",
+  "title": "लीड्स",
+  "subtitle": "अपने सेल्स लीड्स और अवसरों का प्रबंधन करें",
+  "addLead": "लीड जोड़ें",
+  "importLeads": "लीड्स इम्पोर्ट करें",
+  "exportLeads": "लीड्स एक्सपोर्ट करें",
+  "viewMode": {
+    "grid": "ग्रिड व्यू",
+    "list": "लिस्ट व्यू",
+    "kanban": "कंबन व्यू"
+  },
+  "fields": {
+    "firstName": "पहला नाम",
+    "lastName": "अंतिम नाम",
+    "fullName": "पूरा नाम",
+    "email": "ईमेल",
+    "phone": "फ़ोन",
+    "company": "कंपनी",
+    "position": "पद",
+    "status": "स्थिति",
+    "source": "स्रोत",
+    "assignedTo": "को असाइन किया गया",
+    "owner": "मालिक",
+    "tags": "टैग्स",
+    "notes": "नोट्स",
+    "value": "डील वैल्यू",
+    "expectedCloseDate": "अपेक्षित बंद होने की तारीख",
+    "actualCloseDate": "वास्तविक बंद होने की तारीख",
+    "priority": "प्राथमिकता",
+    "stage": "चरण",
+    "createdAt": "बनाया गया",
+    "updatedAt": "अपडेट किया गया",
+    "lastActivity": "अंतिम गतिविधि",
+    "nextFollowUp": "अगला फ़ॉलो-अप",
+    "address": "पता",
+    "city": "शहर",
+    "state": "राज्य",
+    "country": "देश",
+    "zipCode": "पिन कोड",
+    "website": "वेबसाइट",
+    "linkedin": "लिंक्डइन",
+    "twitter": "ट्विटर"
+  },
+  "statuses": {
+    "new": "नया",
+    "contacted": "संपर्क किया गया",
+    "qualified": "योग्य",
+    "proposal": "प्रस्ताव",
+    "negotiation": "बातचीत",
+    "closedWon": "बंद हुआ (जीता)",
+    "closedLost": "बंद हुआ (हारा)",
+    "onHold": "रोके गए",
+    "disqualified": "अयोग्य"
+  },
+  "sources": {
+    "website": "वेबसाइट",
+    "referral": "रिफरल",
+    "socialMedia": "सोशल मीडिया",
+    "email": "ईमेल कैंपेन",
+    "coldCall": "कोल्ड कॉल",
+    "tradeShow": "ट्रेड शो",
+    "advertisement": "विज्ञापन",
+    "partner": "पार्टनर",
+    "other": "अन्य"
+  },
+  "stages": {
+    "prospecting": "संभावनाएं खोजना",
+    "qualification": "योग्यता",
+    "needsAnalysis": "आवश्यकताओं का विश्लेषण",
+    "valueProposition": "मूल्य प्रस्ताव",
+    "negotiation": "बातचीत",
+    "closedWon": "बंद हुआ (जीता)",
+    "closedLost": "बंद हुआ (हारा)"
+  },
+  "actions": {
+    "view": "देखें",
+    "edit": "संपादित करें",
+    "delete": "डिलीट करें",
+    "convert": "कॉन्टैक्ट में कन्वर्ट करें",
+    "assign": "असाइन करें",
+    "updateStatus": "स्थिति अपडेट करें",
+    "addNote": "नोट जोड़ें",
+    "scheduleCall": "कॉल शेड्यूल करें",
+    "sendEmail": "ईमेल भेजें",
+    "createTask": "टास्क बनाएं",
+    "duplicate": "डुप्लीकेट करें",
+    "archive": "संग्रहीत करें",
+    "merge": "मर्ज करें"
+  },
+  "modals": {
+    "add": {
+      "title": "नया लीड जोड़ें",
+      "editTitle": "लीड संपादित करें",
+      "submit": "लीड बनाएं",
+      "update": "लीड अपडेट करें"
+    },
+    "delete": {
+      "title": "लीड डिलीट करें",
+      "message": "क्या आप वाकई इस लीड को डिलीट करना चाहते हैं?",
+      "confirm": "लीड डिलीट करें"
+    },
+    "merge": {
+      "title": "लीड्स मर्ज करें",
+      "message": "क्या आप वाकई इन लीड्स को मर्ज करना चाहते हैं?",
+      "primary": "प्राथमिक लीड",
+      "secondary": "द्वितीयक लीड",
+      "confirm": "लीड्स मर्ज करें"
+    }
+  },
+  "filters": {
+    "title": "लीड्स फ़िल्टर करें",
+    "search": "लीड्स खोजें...",
+    "status": "स्थिति",
+    "source": "स्रोत",
+    "assignedTo": "को असाइन किया गया",
+    "stage": "चरण",
+    "dateRange": "तारीख सीमा",
+    "tags": "टैग्स",
+    "value": "डील वैल्यू",
+    "priority": "प्राथमिकता",
+    "clear": "फ़िल्टर्स साफ़ करें",
+    "apply": "फ़िल्टर्स लागू करें"
+  },
+  "bulkActions": {
+    "title": "बल्क एक्शन्स",
+    "assign": "असाइन करें",
+    "updateStatus": "स्थिति अपडेट करें",
+    "updateStage": "चरण अपडेट करें",
+    "addTags": "टैग्स जोड़ें",
+    "removeTags": "टैग्स हटाएं",
+    "delete": "डिलीट करें",
+    "export": "एक्सपोर्ट करें",
+    "merge": "मर्ज करें",
+    "selected": "{{count}} चुने गए"
+  },
+  "lists": {
+    "allLeads": "सभी लीड्स",
+    "myLeads": "मेरे लीड्स",
+    "recent": "हाल के लीड्स",
+    "favorites": "पसंदीदा",
+    "archived": "संग्रहीत लीड्स"
+  },
+  "emptyState": {
+    "title": "अभी तक कोई लीड नहीं",
+    "description": "अपना पहला लीड जोड़कर शुरुआत करें",
+    "action": "लीड जोड़ें"
+  },
+  "messages": {
+    "created": "लीड सफलतापूर्वक बनाया गया",
+    "updated": "लीड सफलतापूर्वक अपडेट किया गया",
+    "deleted": "लीड सफलतापूर्वक डिलीट किया गया",
+    "assigned": "लीड सफलतापूर्वक असाइन किया गया",
+    "statusUpdated": "लीड स्थिति सफलतापूर्वक अपडेट की गई"
+  }
+}

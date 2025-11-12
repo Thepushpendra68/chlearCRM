@@ -1,0 +1,62 @@
+{
+  "menu": {
+    "dashboard": "डैशबोर्ड",
+    "leads": "लीड्स",
+    "contacts": "कॉन्टैक्ट्स",
+    "accounts": "अकाउंट्स",
+    "pipeline": "पाइपलाइन",
+    "activities": "एक्टिविटीज",
+    "assignments": "असाइनमेंट्स",
+    "tasks": "टास्क्स",
+    "users": "उपयोगकर्ता",
+    "reports": "रिपोर्ट्स",
+    "customFields": "कस्टम फ़ील्ड्स",
+    "scoringRules": "स्कोरिंग रूल्स",
+    "apiClients": "API क्लाइंट्स",
+    "platformAdmin": "प्लेटफ़ॉर्म एडमिन",
+    "email": {
+      "main": "ईमेल",
+      "templates": "टेम्प्लेट्स",
+      "sequences": "सीक्वेंस",
+      "workflowLibrary": "वर्कफ़्लो लाइब्रेरी",
+      "analytics": "एनालिटिक्स",
+      "settings": "सेटिंग्स"
+    },
+    "custom": {
+      "fields": "कस्टम फ़ील्ड्स",
+      "apiClients": "API क्लाइंट्स",
+      "emailSettings": "ईमेल सेटिंग्स"
+    }
+  },
+  "profileMenu": {
+    "yourProfile": "आपकी प्रोफ़ाइल",
+    "settings": "सेटिंग्स",
+    "signOut": "साइन आउट करें"
+  },
+  "header": {
+    "openSidebar": "साइडबार खोलें",
+    "closeSidebar": "साइडबार बंद करें",
+    "search": "खोज",
+    "searchPlaceholder": "लीड्स, कॉन्टैक्ट्स, एक्टिविटीज खोजें...",
+    "quickActions": "क्विक एक्शन्स",
+    "newLead": "नया लीड",
+    "newTask": "नया टास्क",
+    "newActivity": "नई एक्टिविटी",
+    "viewNotifications": "नोटिफिकेशन्स देखें",
+    "openUserMenu": "यूज़र मेन्यू खोलें",
+    "aiAssistant": "AI असिस्टेंट"
+  },
+  "sidebar": {
+    "collapse": "साइडबार संकुचित करें",
+    "expand": "साइडबार विस्तृत करें",
+    "toggle": "साइडबार टॉगल करें (Ctrl+B)"
+  },
+  "quickNavigation": {
+    "home": "होम",
+    "backToTop": "शीर्ष पर वापस जाएं"
+  },
+  "footer": {
+    "copyright": "© {{year}} सखा CRM. सभी अधिकार सुरक्षित।",
+    "poweredBy": "सखा द्वारा संचालित"
+  }
+}
