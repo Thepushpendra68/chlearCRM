@@ -385,7 +385,9 @@ const Dashboard = () => {
               </div>
             ) : (
               <div className="text-center py-4">
-                <p className="text-gray-500">No recent leads</p>
+                <p className="text-gray-500">
+                  {t("dashboard:topLeads.noLeads")}
+                </p>
               </div>
             )}
           </div>
@@ -393,7 +395,9 @@ const Dashboard = () => {
 
         <div className="card">
           <div className="card-header">
-            <h3 className="text-lg font-medium text-gray-900">Lead Sources</h3>
+            <h3 className="text-lg font-medium text-gray-900">
+              {t("dashboard:performance.conversionFunnel")}
+            </h3>
           </div>
           <div className="card-body">
             {loading ? (
@@ -446,7 +450,7 @@ const Dashboard = () => {
               </div>
             ) : (
               <div className="text-center py-4">
-                <p className="text-gray-500">No lead source data</p>
+                <p className="text-gray-500">{t("dashboard:info.noData")}</p>
               </div>
             )}
           </div>

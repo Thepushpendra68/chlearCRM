@@ -199,7 +199,7 @@ const Sidebar = ({
     user?.role === "super_admin"
       ? [
           {
-            name: "Scoring Rules",
+            name: t("navigation:menu.scoringRules"),
             href: "/app/scoring",
             icon: TrophyIcon,
             badge: null,
@@ -210,7 +210,7 @@ const Sidebar = ({
     ...(user?.role === "company_admin" || user?.role === "super_admin"
       ? [
           {
-            name: "API Clients",
+            name: t("navigation:menu.apiClients"),
             href: "/app/api-clients",
             icon: KeyIcon,
             badge: null,
@@ -221,7 +221,7 @@ const Sidebar = ({
     ...(user?.role === "super_admin"
       ? [
           {
-            name: "Platform Admin",
+            name: t("navigation:menu.platformAdmin"),
             href: "/platform",
             icon: CommandLineIcon,
             badge: null,
