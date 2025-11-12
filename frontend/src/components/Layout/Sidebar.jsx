@@ -30,6 +30,7 @@ import {
   BuildingOfficeIcon,
   TrophyIcon,
   IdentificationIcon,
+  BookOpenIcon,
 } from '@heroicons/react/24/outline'
 import api from '../../services/api'
 
@@ -76,6 +77,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, isCollapsed, setIsCollapsed }) =
   const emailSubItems = [
     { name: 'Templates', href: '/app/email/templates', icon: EnvelopeIcon },
     { name: 'Sequences', href: '/app/email/sequences', icon: BoltIcon },
+    { name: 'Workflow Library', href: '/app/email/workflow-library', icon: BookOpenIcon },
     { name: 'Analytics', href: '/app/email/analytics', icon: ChartBarIcon },
     // Email Settings - only for company_admin and super_admin
     ...(user?.role === 'company_admin' || user?.role === 'super_admin' ? [{

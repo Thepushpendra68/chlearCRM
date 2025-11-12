@@ -28,7 +28,21 @@
       "mcp__vercel__get_project",
       "mcp__vercel__list_deployments",
       "Bash(curl:*)",
-      "mcp__supabase__get_project"
+      "mcp__supabase__get_project",
+      "Bash(git stash:*)",
+      "Bash(git remote add:*)",
+      "Bash(/tmp/workflowTemplateController.js)",
+      "Bash(/tmp/workflowTemplateService.js)",
+      "Bash(/tmp/emailAiService.js)",
+      "Bash(/tmp/populateTemplatePacks.js:*)",
+      "Bash(/tmp/WorkflowLibrary.jsx)",
+      "Bash(/tmp/EmailAiToolbar.jsx)",
+      "Bash(/tmp/20251101_workflow_library.sql)",
+      "Bash(/tmp/emailRoutes_feature.js)",
+      "Bash(/tmp/App_feature.jsx)",
+      "Bash(/tmp/EMAIL_AUTOMATION_IMPLEMENTATION.md)",
+      "Bash(/tmp/WORKFLOW_LIBRARY_SETUP.md)",
+      "Bash(/tmp/CHATBOT_DOCUMENTATION_INDEX.md)"
     ],
     "deny": [],
     "ask": []

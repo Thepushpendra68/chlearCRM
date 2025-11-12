@@ -44,6 +44,7 @@ const EmailTemplateEditor = lazy(() => import('./pages/EmailTemplateEditor'))
 const EmailSequences = lazy(() => import('./pages/EmailSequences'))
 const EmailSequenceBuilder = lazy(() => import('./pages/EmailSequenceBuilder'))
 const EmailAnalytics = lazy(() => import('./pages/EmailAnalytics'))
+const WorkflowLibrary = lazy(() => import('./pages/WorkflowLibrary'))
 const ScoringRules = lazy(() => import('./pages/ScoringRules'))
 
 const RouteLoadingFallback = () => (
@@ -128,6 +129,7 @@ function App() {
               <Route path="email/sequences" element={<EmailSequences />} />
               <Route path="email/sequences/:id" element={<EmailSequenceBuilder />} />
               <Route path="email/analytics" element={<EmailAnalytics />} />
+              <Route path="email/workflow-library" element={<WorkflowLibrary />} />
             </Route>
 
             {/* Platform routes - Super Admin only */}

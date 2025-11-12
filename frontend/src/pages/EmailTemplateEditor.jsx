@@ -3,8 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom';
 import emailService from '../services/emailService';
 import toast from 'react-hot-toast';
 import Editor from '@monaco-editor/react';
+import { getCurrentUserProfile, uploadFile } from '../config/supabase';
+import supabase from '../config/supabase';
 // GrapesJS styles for visual editor
 import 'grapesjs/dist/css/grapes.min.css';
+import EmailAiToolbar from '../components/EmailAiToolbar';
 import {
   CodeBracketIcon,
   PaintBrushIcon,
@@ -214,6 +217,12 @@ const EmailTemplateEditor = () => {
   };
 
   const isFullHtml = (content) => /<\s*html[\s>]/i.test(content || '');
+
+  const insertHtmlIntoVisual = (html) => {
+    if (grapesEditorRef.current) {
+      grapesEditorRef.current.setComponents(html);
+    }
+  };
 
   const handleCompileMJML = async () => {
     try {
@@ -505,6 +514,16 @@ const EmailTemplateEditor = () => {
                 <span>Visual</span>
               </button>
             </div>
+
+            <EmailAiToolbar
+              templateData={templateData}
+              setTemplateData={setTemplateData}
+              mjmlContent={mjmlContent}
+              setMjmlContent={setMjmlContent}
+              htmlContent={htmlContent}
+              editorMode={editorMode}
+              onInsertVisualHtml={insertHtmlIntoVisual}
+            />
 
             <button type="button" onClick={handlePreview} className="btn-secondary">
               <EyeIcon className="h-5 w-5 mr-2" />
