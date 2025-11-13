@@ -268,7 +268,9 @@ const Leads = () => {
   const handleDeleteLead = async (lead) => {
     if (
       !window.confirm(
-        `Are you sure you want to delete ${lead.first_name} ${lead.last_name}?`,
+        t("leads:confirmations.deleteLead", {
+          name: `${lead.first_name} ${lead.last_name}`,
+        }),
       )
     ) {
       return;
@@ -278,11 +280,13 @@ const Leads = () => {
       await leadService.deleteLead(lead.id);
       deleteLead(lead.id);
       toast.success(
-        `${lead.first_name} ${lead.last_name} deleted successfully`,
+        t("leads:success.deleted", {
+          name: `${lead.first_name} ${lead.last_name}`,
+        }),
       );
     } catch (error) {
       console.error("Failed to delete lead:", error);
-      toast.error("Failed to delete lead");
+      toast.error(t("leads:errors.deleteFailed"));
     }
   };
 
@@ -313,7 +317,7 @@ const Leads = () => {
   const handleBulkDelete = async () => {
     if (
       !window.confirm(
-        `Are you sure you want to delete ${selectedLeads.length} lead(s)?`,
+        t("leads:confirmations.bulkDelete", { count: selectedLeads.length }),
       )
     ) {
       return;
@@ -330,10 +334,12 @@ const Leads = () => {
       selectedLeads.forEach((id) => deleteLead(id));
       setSelectedLeads([]);
       setShowBulkActions(false);
-      toast.success(`${selectedLeads.length} lead(s) deleted successfully`);
+      toast.success(
+        t("leads:success.bulkDeleted", { count: selectedLeads.length }),
+      );
     } catch (error) {
       console.error("Failed to delete leads:", error);
-      toast.error("Failed to delete leads");
+      toast.error(t("leads:errors.bulkDeleteFailed"));
     }
   };
 
@@ -411,11 +417,10 @@ const Leads = () => {
               </div>
               <div className="flex-1 min-w-0">
                 <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-gray-900">
-                  Leads
+                  {t("leads:title")}
                 </h1>
                 <p className="mt-1 text-xs md:text-sm text-gray-600">
-                  Manage your leads and track their progress through the sales
-                  pipeline
+                  {t("leads:subtitle")}
                 </p>
               </div>
             </div>
@@ -430,14 +435,18 @@ const Leads = () => {
                     <span className="text-gray-900 font-medium">
                       {pagination?.total_items || leads.length}
                     </span>
-                    <span className="text-gray-500">total leads</span>
+                    <span className="text-gray-500">
+                      {t("leads:stats.total")}
+                    </span>
                   </span>
                   <span className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-blue-400 rounded-full flex-shrink-0"></div>
                     <span className="text-gray-900 font-medium">
                       {leads.filter((lead) => lead.status === "new").length}
                     </span>
-                    <span className="text-gray-500">new</span>
+                    <span className="text-gray-500">
+                      {t("leads:stats.new")}
+                    </span>
                   </span>
                   <span className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-yellow-400 rounded-full flex-shrink-0"></div>
@@ -447,7 +456,9 @@ const Leads = () => {
                           .length
                       }
                     </span>
-                    <span className="text-gray-500">qualified</span>
+                    <span className="text-gray-500">
+                      {t("leads:stats.qualified")}
+                    </span>
                   </span>
                 </div>
               )}
@@ -472,7 +483,9 @@ const Leads = () => {
                       d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
                     />
                   </svg>
-                  <span className="hidden md:inline">Refresh</span>
+                  <span className="hidden md:inline">
+                    {t("common:actions.refresh")}
+                  </span>
                 </button>
                 <button
                   type="button"
@@ -480,7 +493,9 @@ const Leads = () => {
                   className="inline-flex items-center justify-center px-3 md:px-4 py-2 border border-gray-300 shadow-sm text-xs md:text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all duration-200"
                 >
                   <ArrowUpTrayIcon className="h-4 w-4 md:mr-2 flex-shrink-0" />
-                  <span className="hidden md:inline">Import</span>
+                  <span className="hidden md:inline">
+                    {t("common:actions.import")}
+                  </span>
                 </button>
                 <button
                   type="button"
@@ -488,7 +503,9 @@ const Leads = () => {
                   className="inline-flex items-center justify-center px-3 md:px-4 py-2 border border-gray-300 shadow-sm text-xs md:text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all duration-200"
                 >
                   <ArrowDownTrayIcon className="h-4 w-4 md:mr-2 flex-shrink-0" />
-                  <span className="hidden md:inline">Export</span>
+                  <span className="hidden md:inline">
+                    {t("common:actions.export")}
+                  </span>
                 </button>
                 <button
                   type="button"
@@ -496,7 +513,7 @@ const Leads = () => {
                   className="col-span-2 sm:col-span-1 inline-flex items-center justify-center px-4 md:px-6 py-2 border border-transparent text-xs md:text-sm font-medium rounded-lg shadow-sm text-white bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all duration-200"
                 >
                   <PlusIcon className="h-4 w-4 mr-2 flex-shrink-0" />
-                  Add Lead
+                  {t("leads:actions.addLead")}
                 </button>
               </div>
             </div>
@@ -511,7 +528,7 @@ const Leads = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <span className="text-sm font-medium text-blue-800">
-                  {selectedLeads.length} lead(s) selected
+                  {t("leads:bulk.selected", { count: selectedLeads.length })}
                 </span>
               </div>
               <div className="flex items-center space-x-2">
@@ -520,13 +537,13 @@ const Leads = () => {
                   className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
                 >
                   <TrashIcon className="h-4 w-4 mr-1" />
-                  Delete Selected
+                  {t("common:actions.deleteSelected")}
                 </button>
                 <button
                   onClick={clearSelection}
                   className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 >
-                  Clear Selection
+                  {t("common:actions.clearSelection")}
                 </button>
               </div>
             </div>
@@ -546,13 +563,13 @@ const Leads = () => {
                 <input
                   type="text"
                   className="block w-full pl-10 pr-3 py-2 sm:py-3 border border-gray-300 rounded-lg text-sm leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200"
-                  placeholder="Search leads by name, company, or email..."
+                  placeholder={t("leads:search.placeholder")}
                 />
               </div>
             </div>
             <div className="flex flex-wrap gap-2 sm:gap-3">
               <select className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200">
-                <option>All Statuses</option>
+                <option>{t("leads:filters.allStatuses")}</option>
                 {leadStatuses.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label || formatPicklistValue(option.value)}
@@ -560,7 +577,7 @@ const Leads = () => {
                 ))}
               </select>
               <select className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200">
-                <option>All Sources</option>
+                <option>{t("leads:filters.allSources")}</option>
                 {leadSources.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label || formatPicklistValue(option.value)}
@@ -568,7 +585,7 @@ const Leads = () => {
                 ))}
               </select>
               <select className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200">
-                <option>All Stages</option>
+                <option>{t("leads:filters.allStages")}</option>
                 {pipelineStages.map((stage) => (
                   <option key={stage.id} value={stage.id}>
                     {stage.name}
@@ -617,10 +634,10 @@ const Leads = () => {
                     </div>
                   </div>
                   <p className="mt-4 text-lg font-medium text-gray-900">
-                    Loading leads...
+                    {t("leads:loading.title")}
                   </p>
                   <p className="mt-1 text-sm text-gray-500">
-                    Please wait while we fetch your data
+                    {t("leads:loading.subtitle")}
                   </p>
                 </div>
               </div>
@@ -641,28 +658,30 @@ const Leads = () => {
                         />
                       </th>
                       <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Contact
+                        {t("leads:table.headers.contact")}
                       </th>
                       <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Company
+                        {t("leads:table.headers.company")}
                       </th>
                       <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Status
+                        {t("leads:table.headers.status")}
                       </th>
                       <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Source
+                        {t("leads:table.headers.source")}
                       </th>
                       <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Pipeline Stage
+                        {t("leads:table.headers.pipelineStage")}
                       </th>
                       <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Account
+                        {t("leads:table.headers.account")}
                       </th>
                       <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Created
+                        {t("leads:table.headers.created")}
                       </th>
                       <th className="relative px-6 py-4">
-                        <span className="sr-only">Actions</span>
+                        <span className="sr-only">
+                          {t("common:actions.actions")}
+                        </span>
                       </th>
                     </tr>
                   </thead>
@@ -716,7 +735,7 @@ const Leads = () => {
                           <div className="text-sm font-medium text-gray-900">
                             {lead.company || (
                               <span className="text-gray-400 italic">
-                                No company
+                                {t("leads:table.noCompany")}
                               </span>
                             )}
                           </div>
@@ -780,7 +799,7 @@ const Leads = () => {
                             </button>
                           ) : (
                             <span className="text-sm text-gray-400 italic">
-                              No account
+                              {t("leads:table.noAccount")}
                             </span>
                           )}
                         </td>
@@ -808,7 +827,7 @@ const Leads = () => {
                                 e.stopPropagation();
                                 handleEditLead(lead);
                               }}
-                              title="Edit lead"
+                              title={t("common:actions.edit")}
                             >
                               <svg
                                 className="h-4 w-4"
@@ -830,7 +849,7 @@ const Leads = () => {
                                 e.stopPropagation();
                                 handleDeleteLead(lead);
                               }}
-                              title="Delete lead"
+                              title={t("common:actions.delete")}
                             >
                               <svg
                                 className="h-4 w-4"
@@ -862,7 +881,7 @@ const Leads = () => {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3 sm:p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-4">
           <div className="flex items-center space-x-2 text-sm">
             <span className="text-gray-600 whitespace-nowrap">
-              Rows per page:
+              {t("common:pagination.rowsPerPage")}
             </span>
             <select
               className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200"
@@ -879,16 +898,18 @@ const Leads = () => {
 
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 text-xs sm:text-sm text-gray-600">
             <span className="whitespace-nowrap">
-              Page{" "}
+              {t("common:pagination.page")}{" "}
               <span className="font-medium text-gray-900">{currentPage}</span>{" "}
-              of <span className="font-medium text-gray-900">{totalPages}</span>
+              {t("common:pagination.of")}{" "}
+              <span className="font-medium text-gray-900">{totalPages}</span>
             </span>
             <span className="whitespace-nowrap">
               <span className="font-medium text-gray-900">
                 {startItemIndex}
               </span>
               –<span className="font-medium text-gray-900">{endItemIndex}</span>{" "}
-              of <span className="font-medium text-gray-900">{totalItems}</span>
+              {t("common:pagination.of")}{" "}
+              <span className="font-medium text-gray-900">{totalItems}</span>
             </span>
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <button
@@ -900,7 +921,7 @@ const Leads = () => {
                 onClick={() => handlePageChange(currentPage - 1)}
                 disabled={loading || isPageChanging || !hasPrevPage}
               >
-                Prev
+                {t("common:pagination.previous")}
               </button>
               <button
                 className={`flex-1 sm:flex-none px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white hover:bg-gray-50 transition-all duration-200 whitespace-nowrap ${
@@ -911,7 +932,7 @@ const Leads = () => {
                 onClick={() => handlePageChange(currentPage + 1)}
                 disabled={loading || isPageChanging || !hasNextPage}
               >
-                Next
+                {t("common:pagination.next")}
               </button>
             </div>
           </div>
@@ -926,11 +947,10 @@ const Leads = () => {
               <PlusIcon className="h-12 w-12 text-primary-600" />
             </div>
             <h3 className="text-2xl font-bold text-gray-900 mb-2">
-              No leads yet
+              {t("leads:emptyState.title")}
             </h3>
             <p className="text-lg text-gray-600 mb-8 max-w-md mx-auto">
-              Start building your sales pipeline by adding your first lead. You
-              can import leads from a file or create them manually.
+              {t("leads:emptyState.description")}
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <button
@@ -939,7 +959,7 @@ const Leads = () => {
                 className="inline-flex items-center px-8 py-3 border border-transparent text-base font-medium rounded-lg shadow-sm text-white bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all duration-200 transform hover:scale-105"
               >
                 <PlusIcon className="h-5 w-5 mr-2" />
-                Create Your First Lead
+                {t("leads:emptyState.createFirst")}
               </button>
               <button
                 type="button"
@@ -947,7 +967,7 @@ const Leads = () => {
                 className="inline-flex items-center px-8 py-3 border border-gray-300 text-base font-medium rounded-lg shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all duration-200"
               >
                 <ArrowUpTrayIcon className="h-5 w-5 mr-2" />
-                Import Leads
+                {t("leads:emptyState.importLeads")}
               </button>
             </div>
             <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
@@ -968,10 +988,10 @@ const Leads = () => {
                   </svg>
                 </div>
                 <h4 className="text-sm font-semibold text-gray-900 mb-2">
-                  Track Contacts
+                  {t("leads:features.trackContacts.title")}
                 </h4>
                 <p className="text-sm text-gray-600">
-                  Keep all your potential customers organized in one place
+                  {t("leads:features.trackContacts.description")}
                 </p>
               </div>
               <div className="text-center">
@@ -991,10 +1011,10 @@ const Leads = () => {
                   </svg>
                 </div>
                 <h4 className="text-sm font-semibold text-gray-900 mb-2">
-                  Monitor Progress
+                  {t("leads:features.monitorProgress.title")}
                 </h4>
                 <p className="text-sm text-gray-600">
-                  Follow leads through your sales pipeline stages
+                  {t("leads:features.monitorProgress.description")}
                 </p>
               </div>
               <div className="text-center">
@@ -1014,10 +1034,10 @@ const Leads = () => {
                   </svg>
                 </div>
                 <h4 className="text-sm font-semibold text-gray-900 mb-2">
-                  Boost Sales
+                  {t("leads:features.boostSales.title")}
                 </h4>
                 <p className="text-sm text-gray-600">
-                  Convert more leads into paying customers
+                  {t("leads:features.boostSales.description")}
                 </p>
               </div>
             </div>

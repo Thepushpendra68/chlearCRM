@@ -37,7 +37,10 @@
     "download": "Download",
     "upload": "Upload",
     "signOut": "Sign out",
-    "signIn": "Sign in"
+    "signIn": "Sign in",
+    "actions": "Actions",
+    "deleteSelected": "Delete Selected",
+    "clearSelection": "Clear Selection"
   },
   "placeholders": {
     "search": "Search...",
@@ -173,11 +176,12 @@
     "of": "of",
     "entries": "entries",
     "perPage": "per page",
+    "rowsPerPage": "Rows per page:",
     "page": "Page",
     "ofPages": "of {{total}} pages",
     "first": "First",
     "last": "Last",
-    "previous": "Previous",
+    "previous": "Prev",
     "next": "Next"
   },
   "permissions": {

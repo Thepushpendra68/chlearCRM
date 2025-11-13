@@ -1,10 +1,24 @@
 {
   "pageTitle": "Activities",
   "title": "Activities",
-  "subtitle": "Track and manage your activities",
+  "subtitle": "Track and manage all your lead activities",
   "addActivity": "Add Activity",
   "logActivity": "Log Activity",
   "viewCalendar": "View Calendar",
+  "actions": {
+    "addActivity": "Add Activity"
+  },
+  "quickActions": {
+    "logCall": "Log Call",
+    "sendEmail": "Send Email",
+    "scheduleMeeting": "Schedule Meeting",
+    "addNote": "Add Note",
+    "createTask": "Create Task"
+  },
+  "sections": {
+    "allActivities": "All Activities",
+    "allActivitiesDescription": "View and manage all activities across your leads"
+  },
   "fields": {
     "type": "Type",
     "subject": "Subject",

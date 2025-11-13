@@ -1,8 +1,17 @@
 {
   "pageTitle": "Tasks",
   "title": "Tasks",
-  "subtitle": "Manage your tasks and to-dos",
+  "subtitle": "Manage and track your tasks",
   "addTask": "Add Task",
+  "actions": {
+    "createTask": "Create Task"
+  },
+  "stats": {
+    "total": "Total Tasks",
+    "pending": "Pending",
+    "completed": "Completed",
+    "overdue": "Overdue"
+  },
   "myTasks": "My Tasks",
   "allTasks": "All Tasks",
   "overdueTasks": "Overdue Tasks",

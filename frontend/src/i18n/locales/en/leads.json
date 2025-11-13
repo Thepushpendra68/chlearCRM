@@ -1,7 +1,7 @@
 {
   "pageTitle": "Leads",
   "title": "Leads",
-  "subtitle": "Manage your sales leads and opportunities",
+  "subtitle": "Manage your leads and track their progress through the sales pipeline",
   "addLead": "Add Lead",
   "importLeads": "Import Leads",
   "exportLeads": "Export Leads",
@@ -141,10 +141,73 @@
     "favorites": "Favorites",
     "archived": "Archived Leads"
   },
+  "stats": {
+    "total": "total leads",
+    "new": "new",
+    "qualified": "qualified"
+  },
+  "search": {
+    "placeholder": "Search leads by name, company, or email..."
+  },
+  "filters": {
+    "allStatuses": "All Statuses",
+    "allSources": "All Sources",
+    "allStages": "All Stages"
+  },
+  "table": {
+    "headers": {
+      "contact": "Contact",
+      "company": "Company",
+      "status": "Status",
+      "source": "Source",
+      "pipelineStage": "Pipeline Stage",
+      "account": "Account",
+      "created": "Created"
+    },
+    "noCompany": "No company",
+    "noAccount": "No account"
+  },
+  "loading": {
+    "title": "Loading leads...",
+    "subtitle": "Please wait while we fetch your data"
+  },
   "emptyState": {
     "title": "No leads yet",
-    "description": "Get started by adding your first lead",
-    "action": "Add Lead"
+    "description": "Start building your sales pipeline by adding your first lead. You can import leads from a file or create them manually.",
+    "createFirst": "Create Your First Lead",
+    "importLeads": "Import Leads"
+  },
+  "features": {
+    "trackContacts": {
+      "title": "Track Contacts",
+      "description": "Keep all your potential customers organized in one place"
+    },
+    "monitorProgress": {
+      "title": "Monitor Progress",
+      "description": "Follow leads through your sales pipeline stages"
+    },
+    "boostSales": {
+      "title": "Boost Sales",
+      "description": "Convert more leads into paying customers"
+    }
+  },
+  "confirmations": {
+    "deleteLead": "Are you sure you want to delete {{name}}?",
+    "bulkDelete": "Are you sure you want to delete {{count}} lead(s)?"
+  },
+  "success": {
+    "deleted": "{{name}} deleted successfully",
+    "bulkDeleted": "{{count}} lead(s) deleted successfully"
+  },
+  "errors": {
+    "deleteFailed": "Failed to delete lead",
+    "bulkDeleteFailed": "Failed to delete leads"
+  },
+  "actions": {
+    "addLead": "Add Lead"
+  },
+  "bulk": {
+    "selected": "{{count}} lead(s) selected"
   },
   "messages": {
     "created": "Lead created successfully",

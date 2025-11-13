@@ -1,10 +1,24 @@
 {
   "pageTitle": "एक्टिविटीज",
   "title": "एक्टिविटीज",
-  "subtitle": "अपनी एक्टिविटीज को ट्रैक और प्रबंधित करें",
+  "subtitle": "अपनी लीड एक्टिविटीज को ट्रैक और प्रबंधित करें",
   "addActivity": "एक्टिविटी जोड़ें",
   "logActivity": "एक्टिविटी लॉग करें",
   "viewCalendar": "कैलेंडर देखें",
+  "actions": {
+    "addActivity": "एक्टिविटी जोड़ें"
+  },
+  "quickActions": {
+    "logCall": "कॉल लॉग करें",
+    "sendEmail": "ईमेल भेजें",
+    "scheduleMeeting": "मीटिंग शेड्यूल करें",
+    "addNote": "नोट जोड़ें",
+    "createTask": "टास्क बनाएं"
+  },
+  "sections": {
+    "allActivities": "सभी एक्टिविटीज",
+    "allActivitiesDescription": "अपनी लीड्स की सभी एक्टिविटीज को देखें और प्रबंधित करें"
+  },
   "fields": {
     "type": "प्रकार",
     "subject": "विषय",

@@ -37,7 +37,10 @@
     "download": "डाउनलोड करें",
     "upload": "अपलोड करें",
     "signOut": "साइन आउट करें",
-    "signIn": "साइन इन करें"
+    "signIn": "साइन इन करें",
+    "actions": "कार्य",
+    "deleteSelected": "चुने गए को डिलीट करें",
+    "clearSelection": "चयन साफ़ करें"
   },
   "placeholders": {
     "search": "खोजें...",
@@ -173,6 +176,7 @@
     "of": "के",
     "entries": "एंट्री",
     "perPage": "प्रति पेज",
+    "rowsPerPage": "प्रति पेज पंक्तियां:",
     "page": "पेज",
     "ofPages": "{{total}} पेजों का",
     "first": "पहला",

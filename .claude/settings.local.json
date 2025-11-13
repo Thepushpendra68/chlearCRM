@@ -50,7 +50,8 @@
       "Bash(test:*)",
       "Bash(node -c:*)",
       "Bash(npx --yes jest@29.7.0:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(mkdir -p archive/legacy-custom-fields archive/legacy-2025-migrations archive/legacy-import-system archive/legacy-lead-features archive/utility-files)"
     ],
     "deny": [],
     "ask": []
