@@ -53,12 +53,16 @@ const leadCaptureRoutes = require('./routes/leadCaptureRoutes');
 const apiClientRoutes = require('./routes/apiClientRoutes');
 const customFieldRoutes = require('./routes/customFieldRoutes');
 const emailRoutes = require('./routes/emailRoutes');
+const whatsappRoutes = require('./routes/whatsappRoutes');
 console.log('📦 [APP] Loading account routes...');
 const accountRoutes = require('./routes/accountRoutes');
 console.log('✅ [APP] Account routes loaded successfully:', !!accountRoutes);
 console.log('📦 [APP] Loading contact routes...');
 const contactRoutes = require('./routes/contactRoutes');
 console.log('✅ [APP] Contact routes loaded successfully:', !!contactRoutes);
+console.log('📦 [APP] Loading scoring routes...');
+const scoringRoutes = require('./routes/scoringRoutes');
+console.log('✅ [APP] Scoring routes loaded successfully:', !!scoringRoutes);
 
 // Import middleware
 const errorHandler = require('./middleware/errorMiddleware');
@@ -215,12 +219,16 @@ app.use('/api/api-clients', apiClientRoutes); // API client management (admin on
 app.use('/api/custom-fields', customFieldRoutes); // Custom field definitions management
 app.use('/api/v1/capture', leadCaptureRoutes); // Lead capture (public API with API key auth)
 app.use('/api/email', emailRoutes); // Email templates, sending, and automation
+app.use('/api/whatsapp', whatsappRoutes); // WhatsApp Business API integration
 console.log('🔗 [APP] Registering /api/accounts routes...');
 app.use('/api/accounts', accountRoutes); // Account management
 console.log('✅ [APP] /api/accounts routes registered');
 console.log('🔗 [APP] Registering /api/contacts routes...');
 app.use('/api/contacts', contactRoutes); // Contact management
 console.log('✅ [APP] /api/contacts routes registered');
+console.log('🔗 [APP] Registering /api/scoring routes...');
+app.use('/api/scoring', scoringRoutes); // Lead scoring system
+console.log('✅ [APP] /api/scoring routes registered');
 
 // 404 handler
 app.use('*', (req, res) => {

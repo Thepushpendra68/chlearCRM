@@ -157,7 +157,7 @@ const getContactById = async (id, currentUser) => {
     if (currentUser.role === 'sales_rep') {
       const hasAccess = contact.assigned_to === currentUser.id ||
         (contact.account_id && await checkAccountAccess(contact.account_id, currentUser.id));
-      
+
       if (!hasAccess) {
         throw new ApiError('Access denied', 403);
       }
@@ -212,7 +212,7 @@ const getContactById = async (id, currentUser) => {
       assigned_user_first_name: contact.user_profiles?.first_name || null,
       assigned_user_last_name: contact.user_profiles?.last_name || null,
       account_name: contact.account?.name || null,
-      reporting_to_name: contact.reporting_to_contact ? 
+      reporting_to_name: contact.reporting_to_contact ?
         `${contact.reporting_to_contact.first_name} ${contact.reporting_to_contact.last_name}` : null,
       leads: (leadRelations || []).map(lr => ({
         ...lr.lead,
@@ -385,7 +385,7 @@ const updateContact = async (id, contactData, currentUser) => {
     }
     if (contactData.account_id !== undefined) {
       updateData.account_id = contactData.account_id === '' ? null : contactData.account_id;
-      
+
       // Validate account
       if (updateData.account_id) {
         const { data: account, error: accountError } = await supabaseAdmin
@@ -458,7 +458,7 @@ const updateContact = async (id, contactData, currentUser) => {
 const deleteContact = async (id, currentUser) => {
   try {
     // Check permissions (only admins can delete)
-    if (currentUser.role !== 'company_admin' && 
+    if (currentUser.role !== 'company_admin' &&
         currentUser.role !== 'super_admin' &&
         currentUser.role !== 'manager') {
       throw new ApiError('Access denied. Only administrators and managers can delete contacts.', 403);
@@ -679,13 +679,13 @@ const getContactStats = async (currentUser) => {
     contacts?.forEach(contact => {
       // Count by status
       stats.by_status[contact.status] = (stats.by_status[contact.status] || 0) + 1;
-      
+
       // Count by lifecycle stage
       if (contact.lifecycle_stage) {
-        stats.by_lifecycle_stage[contact.lifecycle_stage] = 
+        stats.by_lifecycle_stage[contact.lifecycle_stage] =
           (stats.by_lifecycle_stage[contact.lifecycle_stage] || 0) + 1;
       }
-      
+
       // Count decision makers
       if (contact.is_decision_maker) {
         stats.decision_makers++;
