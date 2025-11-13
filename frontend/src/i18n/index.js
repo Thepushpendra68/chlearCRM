@@ -1,6 +1,11 @@
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
-import { supportedLanguages, defaultLanguage, fallbackLanguage, namespaces } from "./config";
+import {
+  supportedLanguages,
+  defaultLanguage,
+  fallbackLanguage,
+  namespaces,
+} from "./config";
 
 // Import translation files
 import en_common from "./locales/en/common.json";
@@ -15,6 +20,19 @@ import en_users from "./locales/en/users.json";
 import en_auth from "./locales/en/auth.json";
 import en_errors from "./locales/en/errors.json";
 import en_emails from "./locales/en/emails.json";
+
+import hi_common from "./locales/hi/common.json";
+import hi_navigation from "./locales/hi/navigation.json";
+import hi_dashboard from "./locales/hi/dashboard.json";
+import hi_leads from "./locales/hi/leads.json";
+import hi_activities from "./locales/hi/activities.json";
+import hi_tasks from "./locales/hi/tasks.json";
+import hi_pipeline from "./locales/hi/pipeline.json";
+import hi_reports from "./locales/hi/reports.json";
+import hi_users from "./locales/hi/users.json";
+import hi_auth from "./locales/hi/auth.json";
+import hi_errors from "./locales/hi/errors.json";
+import hi_emails from "./locales/hi/emails.json";
 
 // Initialize translations object
 const resources = {
@@ -32,10 +50,24 @@ const resources = {
     errors: en_errors,
     emails: en_emails,
   },
+  hi: {
+    common: hi_common,
+    navigation: hi_navigation,
+    dashboard: hi_dashboard,
+    leads: hi_leads,
+    activities: hi_activities,
+    tasks: hi_tasks,
+    pipeline: hi_pipeline,
+    reports: hi_reports,
+    users: hi_users,
+    auth: hi_auth,
+    errors: hi_errors,
+    emails: hi_emails,
+  },
 };
 
-// Add other languages (hi, ta, te, bn, mr) as they are created
-// For now, they fall back to English
+// TODO: Add more languages (ta, te, bn, mr) as they are completed
+// They will automatically fall back to English until added
 
 i18n
   .use({
