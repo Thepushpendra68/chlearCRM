@@ -1,0 +1,117 @@
+{
+  "pageTitle": "Reports",
+  "title": "Reports",
+  "subtitle": "Analyze your business data",
+  "createReport": "Create Report",
+  "fields": {
+    "name": "Report Name",
+    "description": "Description",
+    "type": "Report Type",
+    "category": "Category",
+    "source": "Data Source",
+    "dateRange": "Date Range",
+    "filters": "Filters",
+    "groupBy": "Group By",
+    "sortBy": "Sort By",
+    "createdAt": "Created At",
+    "updatedAt": "Updated At",
+    "createdBy": "Created By"
+  },
+  "types": {
+    "leadReport": "Lead Report",
+    "salesReport": "Sales Report",
+    "activityReport": "Activity Report",
+    "taskReport": "Task Report",
+    "userReport": "User Report",
+    "conversionReport": "Conversion Report",
+    "pipelineReport": "Pipeline Report",
+    "revenueReport": "Revenue Report",
+    "performanceReport": "Performance Report",
+    "customReport": "Custom Report"
+  },
+  "categories": {
+    "sales": "Sales",
+    "marketing": "Marketing",
+    "operations": "Operations",
+    "finance": "Finance",
+    "performance": "Performance",
+    "activity": "Activity"
+  },
+  "chartTypes": {
+    "bar": "Bar Chart",
+    "line": "Line Chart",
+    "pie": "Pie Chart",
+    "area": "Area Chart",
+    "scatter": "Scatter Plot",
+    "table": "Table",
+    "number": "Number Cards"
+  },
+  "actions": {
+    "view": "View",
+    "edit": "Edit",
+    "delete": "Delete",
+    "duplicate": "Duplicate",
+    "export": "Export",
+    "schedule": "Schedule",
+    "share": "Share",
+    "favorite": "Add to Favorites",
+    "unfavorite": "Remove from Favorites"
+  },
+  "modals": {
+    "create": {
+      "title": "Create New Report",
+      "editTitle": "Edit Report",
+      "submit": "Create Report",
+      "update": "Update Report"
+    },
+    "delete": {
+      "title": "Delete Report",
+      "message": "Are you sure you want to delete this report?",
+      "confirm": "Delete Report"
+    },
+    "schedule": {
+      "title": "Schedule Report",
+      "submit": "Schedule Report"
+    }
+  },
+  "filters": {
+    "title": "Report Filters",
+    "dateRange": "Date Range",
+    "category": "Category",
+    "createdBy": "Created By",
+    "status": "Status",
+    "clear": "Clear Filters",
+    "apply": "Apply Filters"
+  },
+  "presets": {
+    "title": "Quick Reports",
+    "leadsThisMonth": "Leads This Month",
+    "salesThisQuarter": "Sales This Quarter",
+    "activitiesToday": "Activities Today",
+    "topPerformers": "Top Performers",
+    "pipelineSummary": "Pipeline Summary"
+  },
+  "metrics": {
+    "title": "Key Metrics",
+    "totalLeads": "Total Leads",
+    "newLeads": "New Leads",
+    "qualifiedLeads": "Qualified Leads",
+    "conversionRate": "Conversion Rate",
+    "totalRevenue": "Total Revenue",
+    "averageDealSize": "Average Deal Size",
+    "activitiesCount": "Activities Count",
+    "tasksCompleted": "Tasks Completed"
+  },
+  "emptyState": {
+    "title": "No reports yet",
+    "description": "Create your first report to analyze your data",
+    "action": "Create Report"
+  },
+  "messages": {
+    "created": "Report created successfully",
+    "updated": "Report updated successfully",
+    "deleted": "Report deleted successfully",
+    "exported": "Report exported successfully",
+    "scheduled": "Report scheduled successfully"
+  }
+}

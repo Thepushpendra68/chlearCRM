@@ -42,7 +42,16 @@
       "Bash(/tmp/App_feature.jsx)",
       "Bash(/tmp/EMAIL_AUTOMATION_IMPLEMENTATION.md)",
       "Bash(/tmp/WORKFLOW_LIBRARY_SETUP.md)",
-      "Bash(/tmp/CHATBOT_DOCUMENTATION_INDEX.md)"
+      "Bash(/tmp/CHATBOT_DOCUMENTATION_INDEX.md)",
+      "Bash(cat:*)",
+      "Bash(npm install:*)",
+      "Bash(npx jest:*)",
+      "Bash(timeout 60 npm install:*)",
+      "Bash(test:*)",
+      "Bash(node -c:*)",
+      "Bash(npx --yes jest@29.7.0:*)",
+      "Bash(node:*)",
+      "Bash(mkdir -p archive/legacy-custom-fields archive/legacy-2025-migrations archive/legacy-import-system archive/legacy-lead-features archive/utility-files)"
     ],
     "deny": [],
     "ask": []

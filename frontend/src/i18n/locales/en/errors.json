@@ -1,0 +1,102 @@
+{
+  "pageTitle": "Errors",
+  "messages": {
+    "generic": "Something went wrong. Please try again.",
+    "network": "Network error. Please check your connection and try again.",
+    "server": "Server error. Please try again later.",
+    "unauthorized": "You are not authorized to perform this action.",
+    "forbidden": "Access denied. You don't have permission to access this resource.",
+    "notFound": "The requested resource was not found.",
+    "timeout": "Request timed out. Please try again.",
+    "validation": "Please check your input and try again.",
+    "duplicate": "This record already exists.",
+    "required": "This field is required",
+    "invalidFormat": "Invalid format",
+    "tooShort": "Too short",
+    "tooLong": "Too long",
+    "invalidEmail": "Please enter a valid email address",
+    "passwordMismatch": "Passwords do not match",
+    "weakPassword": "Password is too weak. Please use a stronger password.",
+    "minLength": "Must be at least {{count}} characters",
+    "maxLength": "Cannot exceed {{count}} characters",
+    "minItems": "Please select at least {{count}} item(s)",
+    "maxItems": "Cannot select more than {{count}} items",
+    "invalidNumber": "Please enter a valid number",
+    "numberTooSmall": "Number must be at least {{count}}",
+    "numberTooLarge": "Number cannot exceed {{count}}",
+    "invalidDate": "Please enter a valid date",
+    "dateInPast": "Date cannot be in the past",
+    "invalidURL": "Please enter a valid URL",
+    "invalidPhone": "Please enter a valid phone number",
+    "failedToLoad": "Failed to load data. Please refresh the page.",
+    "failedToSave": "Failed to save. Please try again.",
+    "failedToDelete": "Failed to delete. Please try again.",
+    "sessionExpired": "Your session has expired. Please sign in again.",
+    "maintenance": "System is under maintenance. Please try again later.",
+    "rateLimit": "Too many requests. Please try again later.",
+    "uploadFailed": "Upload failed. Please try again.",
+    "downloadFailed": "Download failed. Please try again.",
+    "importFailed": "Import failed. Please check your file and try again.",
+    "exportFailed": "Export failed. Please try again."
+  },
+  "http": {
+    "400": "Bad Request",
+    "401": "Unauthorized",
+    "403": "Forbidden",
+    "404": "Not Found",
+    "409": "Conflict",
+    "422": "Validation Error",
+    "429": "Too Many Requests",
+    "500": "Internal Server Error",
+    "502": "Bad Gateway",
+    "503": "Service Unavailable"
+  },
+  "validation": {
+    "required": "{{field}} is required",
+    "email": "{{field}} must be a valid email",
+    "minLength": "{{field}} must be at least {{count}} characters",
+    "maxLength": "{{field}} cannot exceed {{count}} characters",
+    "min": "{{field}} must be at least {{count}}",
+    "max": "{{field}} cannot exceed {{count}}",
+    "pattern": "{{field}} format is invalid",
+    "match": "{{field}} must match {{field2}}"
+  },
+  "database": {
+    "uniqueConstraint": "This record already exists",
+    "foreignKeyConstraint": "Related record not found",
+    "notNullConstraint": "This field cannot be empty",
+    "checkConstraint": "Invalid value provided"
+  },
+  "auth": {
+    "invalidCredentials": "Invalid email or password",
+    "accountLocked": "Your account has been locked. Please contact support.",
+    "emailNotVerified": "Please verify your email address before signing in.",
+    "tokenExpired": "Your session has expired. Please sign in again.",
+    "invalidToken": "Invalid or expired reset link",
+    "passwordResetExpired": "Password reset link has expired. Please request a new one.",
+    "maxAttempts": "Too many failed attempts. Please try again later."
+  },
+  "api": {
+    "rateLimitExceeded": "Rate limit exceeded. Please try again later.",
+    "invalidApiKey": "Invalid API key",
+    "quotaExceeded": "API quota exceeded",
+    "endpointNotFound": "API endpoint not found",
+    "methodNotAllowed": "Method not allowed",
+    "payloadTooLarge": "Request payload too large",
+    "unsupportedMediaType": "Unsupported media type"
+  },
+  "file": {
+    "tooLarge": "File size exceeds the maximum allowed limit",
+    "invalidType": "File type not supported",
+    "uploadFailed": "File upload failed",
+    "deleteFailed": "Failed to delete file",
+    "notFound": "File not found",
+    "corrupted": "File is corrupted or invalid"
+  },
+  "backup": {
+    "backupFailed": "Backup failed",
+    "restoreFailed": "Restore failed",
+    "notFound": "Backup not found",
+    "expired": "Backup has expired"
+  }
+}

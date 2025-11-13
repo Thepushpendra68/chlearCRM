@@ -1,45 +1,63 @@
-import { Fragment, useState } from 'react'
-import { Menu, Transition } from '@headlessui/react'
-import { 
-  Bars3Icon, 
-  BellIcon, 
-  UserCircleIcon, 
+import { Fragment, useState } from "react";
+import { Menu, Transition } from "@headlessui/react";
+import {
+  Bars3Icon,
+  BellIcon,
+  UserCircleIcon,
   MagnifyingGlassIcon,
   PlusIcon,
   Cog6ToothIcon,
   XMarkIcon,
-  SparklesIcon
-} from '@heroicons/react/24/outline'
-import { useAuth } from '../../context/AuthContext'
-import { useNavigate } from 'react-router-dom'
-import Breadcrumbs from './Breadcrumbs'
-import GlobalSearch from '../Search/GlobalSearch'
-import { Button } from '../ui/button'
+  SparklesIcon,
+} from "@heroicons/react/24/outline";
+import { useAuth } from "../../context/AuthContext";
+import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import Breadcrumbs from "./Breadcrumbs";
+import GlobalSearch from "../Search/GlobalSearch";
+import MobileSearchModal from "../MobileSearch/MobileSearchModal";
+import { MobileOnly } from "../ResponsiveUtils";
+import { Button } from "../ui/button";
+import LanguageSwitcher from "../ui/LanguageSwitcher";
 
 const Header = ({ setSidebarOpen, isCollapsed, currentPath }) => {
-  const { user, logout, chatPanelOpen, toggleChatPanel } = useAuth()
-  const navigate = useNavigate()
-  const [showQuickActions, setShowQuickActions] = useState(false)
+  const { user, logout, chatPanelOpen, toggleChatPanel } = useAuth();
+  const navigate = useNavigate();
+  const { t } = useTranslation(["navigation", "common"]);
+  const [showQuickActions, setShowQuickActions] = useState(false);
+  const [showMobileSearch, setShowMobileSearch] = useState(false);
 
   const handleLogout = async () => {
-    await logout()
-    navigate('/login')
-  }
+    await logout();
+    navigate("/login");
+  };
 
   const quickActions = [
-    { name: 'New Lead', to: '/app/leads?action=create-lead', icon: '👤' },
-    { name: 'New Task', to: '/app/tasks?action=create-task', icon: '📋' },
-    { name: 'New Activity', to: '/app/activities?action=create-activity', icon: '⏰' },
-  ]
+    {
+      name: t("navigation:header.newLead"),
+      to: "/app/leads?action=create-lead",
+      icon: "👤",
+    },
+    {
+      name: t("navigation:header.newTask"),
+      to: "/app/tasks?action=create-task",
+      icon: "📋",
+    },
+    {
+      name: t("navigation:header.newActivity"),
+      to: "/app/activities?action=create-activity",
+      icon: "⏰",
+    },
+  ];
 
   const handleQuickAction = (action) => {
-    navigate(action.to)
-    setShowQuickActions(false)
-  }
+    navigate(action.to);
+    setShowQuickActions(false);
+  };
 
   const handleMenuNavigate = (path) => {
-    navigate(path)
-  }
+    navigate(path);
+  };
 
   return (
     <div className="relative flex-shrink-0 flex h-16 bg-white shadow border-b border-gray-200">
@@ -52,7 +70,7 @@ const Header = ({ setSidebarOpen, isCollapsed, currentPath }) => {
         <span className="sr-only">Open sidebar</span>
         <Bars3Icon className="h-6 w-6" aria-hidden="true" />
       </button>
-      
+
       {/* Header content - spans only the content area, never overlaps sidebar */}
       <div className="flex-1 px-4 flex justify-between items-center">
         {/* Left side - Breadcrumbs and branding */}
@@ -64,13 +82,13 @@ const Header = ({ setSidebarOpen, isCollapsed, currentPath }) => {
             </div>
             <span className="ml-2 text-xl font-bold text-gray-900">Sakha</span>
           </div>
-          
+
           {/* Breadcrumbs - hidden on mobile, shown on desktop */}
           <div className="hidden md:block">
             <Breadcrumbs currentPath={currentPath} />
           </div>
         </div>
-        
+
         {/* Center - Global search (desktop only) */}
         <div className="hidden md:flex flex-1 max-w-lg mx-8">
           <GlobalSearch
@@ -78,14 +96,15 @@ const Header = ({ setSidebarOpen, isCollapsed, currentPath }) => {
             className="w-full"
           />
         </div>
-        
+
         {/* Right side - Actions and profile */}
         <div className="flex items-center gap-1 md:gap-2">
           {/* Mobile search button */}
           <button
             type="button"
             className="md:hidden p-2.5 min-h-11 min-w-11 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-lg"
-            onClick={() => {/* TODO: Open mobile search modal */}}
+            onClick={() => setShowMobileSearch(true)}
+            title="Search"
           >
             <MagnifyingGlassIcon className="h-5 w-5" />
           </button>
@@ -96,21 +115,26 @@ const Header = ({ setSidebarOpen, isCollapsed, currentPath }) => {
             size="sm"
             onClick={toggleChatPanel}
             className={`flex items-center gap-2 transition-colors min-h-11 px-2 md:px-3 ${
-              chatPanelOpen 
-                ? 'bg-blue-600 hover:bg-blue-700 text-white' 
-                : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+              chatPanelOpen
+                ? "bg-blue-600 hover:bg-blue-700 text-white"
+                : "border-gray-300 text-gray-700 hover:bg-gray-50"
             }`}
           >
             <SparklesIcon className="h-4 w-4" />
-            <span className="hidden sm:inline text-xs md:text-sm">AI Assistant</span>
+            <span className="hidden sm:inline text-xs md:text-sm">
+              {t("navigation:header.aiAssistant")}
+            </span>
           </Button>
+
+          {/* Language Switcher */}
+          <LanguageSwitcher />
 
           {/* Quick Actions */}
           <Menu as="div" className="relative">
             <Menu.Button
               onClick={() => setShowQuickActions(!showQuickActions)}
               className="p-2.5 min-h-11 min-w-11 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-lg transition-colors"
-              title="Quick Actions"
+              title={t("navigation:header.quickActions")}
             >
               <PlusIcon className="h-5 w-5" />
             </Menu.Button>
@@ -131,7 +155,7 @@ const Header = ({ setSidebarOpen, isCollapsed, currentPath }) => {
                         <button
                           onClick={() => handleQuickAction(action)}
                           className={`${
-                            active ? 'bg-gray-100' : ''
+                            active ? "bg-gray-100" : ""
                           } flex items-center w-full px-4 py-2 text-sm text-gray-700`}
                         >
                           <span className="mr-3">{action.icon}</span>
@@ -167,7 +191,7 @@ const Header = ({ setSidebarOpen, isCollapsed, currentPath }) => {
                   {user?.first_name} {user?.last_name}
                 </div>
                 <div className="text-xs text-gray-500 capitalize">
-                  {user?.role?.replace('_', ' ')}
+                  {user?.role?.replace("_", " ")}
                 </div>
               </div>
             </Menu.Button>
@@ -184,9 +208,9 @@ const Header = ({ setSidebarOpen, isCollapsed, currentPath }) => {
                 <Menu.Item>
                   {({ active }) => (
                     <button
-                      onClick={() => handleMenuNavigate('/app/profile')}
+                      onClick={() => handleMenuNavigate("/app/profile")}
                       className={`${
-                        active ? 'bg-gray-100' : ''
+                        active ? "bg-gray-100" : ""
                       } flex items-center w-full px-4 py-2 text-sm text-gray-700`}
                     >
                       <UserCircleIcon className="h-4 w-4 mr-3" />
@@ -197,9 +221,9 @@ const Header = ({ setSidebarOpen, isCollapsed, currentPath }) => {
                 <Menu.Item>
                   {({ active }) => (
                     <button
-                      onClick={() => handleMenuNavigate('/app/settings')}
+                      onClick={() => handleMenuNavigate("/app/settings")}
                       className={`${
-                        active ? 'bg-gray-100' : ''
+                        active ? "bg-gray-100" : ""
                       } flex items-center w-full px-4 py-2 text-sm text-gray-700`}
                     >
                       <Cog6ToothIcon className="h-4 w-4 mr-3" />
@@ -212,7 +236,7 @@ const Header = ({ setSidebarOpen, isCollapsed, currentPath }) => {
                     <button
                       onClick={handleLogout}
                       className={`${
-                        active ? 'bg-gray-100' : ''
+                        active ? "bg-gray-100" : ""
                       } flex items-center w-full px-4 py-2 text-sm text-gray-700`}
                     >
                       Sign out
@@ -224,8 +248,14 @@ const Header = ({ setSidebarOpen, isCollapsed, currentPath }) => {
           </Menu>
         </div>
       </div>
-    </div>
-  )
-}
 
-export default Header
+      {/* Mobile Search Modal */}
+      <MobileSearchModal
+        isOpen={showMobileSearch}
+        onClose={() => setShowMobileSearch(false)}
+      />
+    </div>
+  );
+};
+
+export default Header;

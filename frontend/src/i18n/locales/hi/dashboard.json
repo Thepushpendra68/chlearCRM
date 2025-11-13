@@ -1,0 +1,89 @@
+{
+  "pageTitle": "डैशबोर्ड",
+  "welcome": {
+    "title": "वापस स्वागत है, {{name}}!",
+    "subtitle": "आज आपके व्यापार के साथ क्या हो रहा है"
+  },
+  "overview": {
+    "title": "अवलोकन",
+    "totalLeads": "कुल लीड्स",
+    "activeLeads": "सक्रिय लीड्स",
+    "newThisWeek": "इस सप्ताह नए",
+    "conversionRate": "कन्वर्जन रेट",
+    "totalActivities": "कुल एक्टिविटीज",
+    "completedActivities": "पूर्ण एक्टिविटीज",
+    "pendingTasks": "लंबित टास्क्स",
+    "completedTasks": "पूर्ण टास्क्स",
+    "totalRevenue": "कुल राजस्व",
+    "thisMonth": "इस महीने",
+    "lastMonth": "पिछला महीना"
+  },
+  "quickStats": {
+    "title": "त्वरित आँकड़े",
+    "leadsToday": "आज के लीड्स",
+    "activitiesToday": "आज की एक्टिविटीज",
+    "tasksDue": "देनद टास्क्स",
+    "revenueGoal": "राजस्व लक्ष्य",
+    "goalProgress": "लक्ष्य प्रगति"
+  },
+  "recentActivity": {
+    "title": "हाल की गतिविधि",
+    "viewAll": "सभी एक्टिविटीज देखें",
+    "noActivity": "कोई हाल की गतिविधि नहीं"
+  },
+  "upcomingTasks": {
+    "title": "आने वाले टास्क्स",
+    "viewAll": "सभी टास्क्स देखें",
+    "noTasks": "कोई आने वाला टास्क नहीं"
+  },
+  "topLeads": {
+    "title": "शीर्ष लीड्स",
+    "viewAll": "सभी लीड्स देखें",
+    "noLeads": "दिखाने के लिए कोई लीड नहीं"
+  },
+  "performance": {
+    "title": "प्रदर्शन",
+    "conversionFunnel": "कन्वर्जन फ़नल",
+    "salesPipeline": "सेल्स पाइपलाइन",
+    "teamPerformance": "टीम प्रदर्शन",
+    "goalAchievement": "लक्ष्य सिद्धि"
+  },
+  "charts": {
+    "leads": "समय के साथ लीड्स",
+    "revenue": "राजस्व रुझान",
+    "activities": "एक्टिविटी सारांश",
+    "conversion": "कन्वर्जन रेट्स"
+  },
+  "cards": {
+    "today": "आज",
+    "week": "इस सप्ताह",
+    "month": "इस महीने",
+    "quarter": "इस तिमाही",
+    "year": "इस साल",
+    "all": "सभी समय"
+  },
+  "filters": {
+    "dateRange": "तारीख सीमा",
+    "today": "आज",
+    "yesterday": "कल",
+    "last7Days": "पिछले 7 दिन",
+    "last30Days": "पिछले 30 दिन",
+    "custom": "कस्टम रेंज",
+    "fromDate": "तारीख से",
+    "toDate": "तारीख तक"
+  },
+  "actions": {
+    "refreshData": "डेटा रिफ्रेश करें",
+    "viewReport": "रिपोर्ट देखें",
+    "exportData": "डेटा एक्सपोर्ट करें",
+    "shareReport": "रिपोर्ट शेयर करें",
+    "scheduleReport": "रिपोर्ट शेड्यूल करें"
+  },
+  "badges": {
+    "new": "नया",
+    "hot": "हॉट",
+    "trending": "ट्रेंडिंग",
+    "top": "शीर्ष",
+    "urgent": "तत्काल"
+  }
+}

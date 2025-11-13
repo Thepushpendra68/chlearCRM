@@ -1,0 +1,110 @@
+{
+  "pageTitle": "Users",
+  "title": "Users",
+  "subtitle": "Manage users and permissions",
+  "addUser": "Add User",
+  "inviteUser": "Invite User",
+  "fields": {
+    "firstName": "First Name",
+    "lastName": "Last Name",
+    "fullName": "Full Name",
+    "email": "Email",
+    "phone": "Phone",
+    "role": "Role",
+    "department": "Department",
+    "position": "Position",
+    "status": "Status",
+    "avatar": "Avatar",
+    "timezone": "Timezone",
+    "language": "Language",
+    "lastLogin": "Last Login",
+    "createdAt": "Created At",
+    "updatedAt": "Updated At"
+  },
+  "roles": {
+    "superAdmin": "Super Admin",
+    "admin": "Admin",
+    "manager": "Manager",
+    "salesRep": "Sales Rep",
+    "viewer": "Viewer"
+  },
+  "statuses": {
+    "active": "Active",
+    "inactive": "Inactive",
+    "pending": "Pending",
+    "invited": "Invited",
+    "suspended": "Suspended"
+  },
+  "actions": {
+    "view": "View",
+    "edit": "Edit",
+    "delete": "Delete",
+    "invite": "Invite",
+    "resendInvite": "Resend Invitation",
+    "activate": "Activate",
+    "deactivate": "Deactivate",
+    "suspend": "Suspend",
+    "resetPassword": "Reset Password",
+    "impersonate": "Impersonate User"
+  },
+  "modals": {
+    "add": {
+      "title": "Add New User",
+      "editTitle": "Edit User",
+      "submit": "Create User",
+      "update": "Update User"
+    },
+    "invite": {
+      "title": "Invite User",
+      "submit": "Send Invitation"
+    },
+    "delete": {
+      "title": "Delete User",
+      "message": "Are you sure you want to delete this user?",
+      "confirm": "Delete User"
+    }
+  },
+  "permissions": {
+    "title": "Permissions",
+    "manageUsers": "Manage Users",
+    "manageLeads": "Manage Leads",
+    "manageActivities": "Manage Activities",
+    "manageTasks": "Manage Tasks",
+    "manageReports": "Manage Reports",
+    "manageSettings": "Manage Settings",
+    "exportData": "Export Data",
+    "importData": "Import Data",
+    "viewAnalytics": "View Analytics",
+    "manageCustomFields": "Manage Custom Fields",
+    "manageApiKeys": "Manage API Keys"
+  },
+  "filters": {
+    "title": "Filter Users",
+    "search": "Search users...",
+    "role": "Role",
+    "status": "Status",
+    "department": "Department",
+    "clear": "Clear Filters",
+    "apply": "Apply Filters"
+  },
+  "lists": {
+    "allUsers": "All Users",
+    "activeUsers": "Active Users",
+    "pendingUsers": "Pending Users",
+    "suspendedUsers": "Suspended Users"
+  },
+  "emptyState": {
+    "title": "No users yet",
+    "description": "Add your first user to get started",
+    "action": "Add User"
+  },
+  "messages": {
+    "created": "User created successfully",
+    "updated": "User updated successfully",
+    "deleted": "User deleted successfully",
+    "invited": "Invitation sent successfully",
+    "activated": "User activated successfully",
+    "deactivated": "User deactivated successfully",
+    "passwordReset": "Password reset email sent"
+  }
+}

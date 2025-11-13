@@ -1,0 +1,146 @@
+{
+  "pageTitle": "ईमेल",
+  "title": "ईमेल",
+  "subtitle": "अपने ईमेल कैंपेन और टेम्प्लेट्स का प्रबंधन करें",
+  "sendEmail": "ईमेल भेजें",
+  "fields": {
+    "subject": "विषय",
+    "body": "मुख्य भाग",
+    "template": "टेम्प्लेट",
+    "fromName": "से नाम",
+    "fromEmail": "से ईमेल",
+    "to": "को",
+    "cc": "CC",
+    "bcc": "BCC",
+    "attachments": "अटैचमेंट्स",
+    "scheduledAt": "शेड्यूल किया गया",
+    "status": "स्थिति",
+    "sentAt": "भेजा गया",
+    "openedAt": "खोला गया",
+    "clickedAt": "क्लिक किया गया",
+    "repliedAt": "उत्तर दिया गया",
+    "deliveredAt": "डिलीवर किया गया",
+    "bouncedAt": "वापस आया",
+    "opened": "खोला गया",
+    "clicked": "क्लिक किया गया",
+    "replied": "उत्तर दिया गया",
+    "bounced": "वापस आया",
+    "unsubscribed": "सदस्यता समाप्त"
+  },
+  "types": {
+    "transactional": "ट्रांजैक्शनल",
+    "marketing": "मार्केटिंग",
+    "newsletter": "न्यूज़लेटर",
+    "announcement": "घोषणा",
+    "followUp": "फ़ॉलो-अप",
+    "welcome": "स्वागत",
+    "reminder": "रिमाइंडर"
+  },
+  "statuses": {
+    "draft": "ड्राफ्ट",
+    "scheduled": "शेड्यूल किया गया",
+    "sending": "भेजा जा रहा है",
+    "sent": "भेजा गया",
+    "delivered": "डिलीवर किया गया",
+    "opened": "खोला गया",
+    "clicked": "क्लिक किया गया",
+    "replied": "उत्तर दिया गया",
+    "bounced": "वापस आया",
+    "failed": "विफल",
+    "cancelled": "रद्द"
+  },
+  "templates": {
+    "title": "ईमेल टेम्प्लेट्स",
+    "subject": "विषय पंक्ति",
+    "htmlContent": "HTML कंटेंट",
+    "textContent": "टेक्स्ट कंटेंट",
+    "variables": "वेरिएबल्स",
+    "preview": "प्रीव्यू",
+    "testSend": "टेस्ट भेजें"
+  },
+  "sequences": {
+    "title": "ईमेल सीक्वेंस",
+    "steps": "कदम",
+    "delay": "विलंब",
+    "trigger": "ट्रिगर",
+    "conditions": "शर्तें",
+    "active": "सक्रिय",
+    "paused": "रोका गया",
+    "completed": "पूर्ण",
+    "enrollments": "नामांकन"
+  },
+  "campaigns": {
+    "title": "ईमेल कैंपेन",
+    "recipients": "प्राप्तकर्ता",
+    "sent": "भेजे गए",
+    "delivered": "डिलीवर किए गए",
+    "opened": "खोले गए",
+    "clicked": "क्लिक किए गए",
+    "replied": "उत्तर दिए गए",
+    "bounced": "वापस आए",
+    "unsubscribed": "सदस्यता समाप्त की",
+    "openRate": "ओपन रेट",
+    "clickRate": "क्लिक रेट",
+    "replyRate": "उत्तर दर",
+    "bounceRate": "बाउंस रेट"
+  },
+  "automation": {
+    "title": "ऑटोमेशन",
+    "triggers": "ट्रिगर्स",
+    "actions": "एक्शन्स",
+    "conditions": "शर्तें",
+    "workflows": "वर्कफ़्लो"
+  },
+  "settings": {
+    "title": "ईमेल सेटिंग्स",
+    "provider": "ईमेल प्रदाता",
+    "smtpSettings": "SMTP सेटिंग्स",
+    "fromName": "डिफ़ॉल्ट से नाम",
+    "fromEmail": "डिफ़ॉल्ट से ईमेल",
+    "replyTo": "उत्तर देना",
+    "signature": "ईमेल सिग्नेचर",
+    "testConnection": "कनेक्शन टेस्ट करें"
+  },
+  "actions": {
+    "view": "देखें",
+    "edit": "संपादित करें",
+    "delete": "डिलीट करें",
+    "send": "भेजें",
+    "schedule": "शेड्यूल करें",
+    "duplicate": "डुप्लीकेट करें",
+    "pause": "रोकें",
+    "resume": "फिर से शुरू करें",
+    "activate": "सक्रिय करें",
+    "deactivate": "निष्क्रिय करें"
+  },
+  "modals": {
+    "compose": {
+      "title": "ईमेल लिखें",
+      "send": "ईमेल भेजें",
+      "save": "ड्राफ्ट सेव करें",
+      "schedule": "ईमेल शेड्यूल करें"
+    },
+    "template": {
+      "title": "टेम्प्लेट बनाएं",
+      "editTitle": "टेम्प्लेट संपादित करें",
+      "submit": "टेम्प्लेट बनाएं",
+      "update": "टेम्प्लेट अपडेट करें"
+    },
+    "sequence": {
+      "title": "सीक्वेंस बनाएं",
+      "editTitle": "सीक्वेंस संपादित करें",
+      "submit": "सीक्वेंस बनाएं",
+      "update": "सीक्वेंस अपडेट करें"
+    }
+  },
+  "messages": {
+    "sent": "ईमेल सफलतापूर्वक भेजा गया",
+    "scheduled": "ईमेल सफलतापूर्वक शेड्यूल किया गया",
+    "saved": "ड्राफ्ट सफलतापूर्वक सेव किया गया",
+    "created": "टेम्प्लेट सफलतापूर्वक बनाया गया",
+    "updated": "टेम्प्लेट सफलतापूर्वक अपडेट किया गया",
+    "deleted": "टेम्प्लेट सफलतापूर्वक डिलीट किया गया",
+    "sequenceCreated": "सीक्वेंस सफलतापूर्वक बनाया गया",
+    "sequenceUpdated": "सीक्वेंस सफलतापूर्वक अपडेट किया गया"
+  }
+}

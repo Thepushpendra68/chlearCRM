@@ -1,0 +1,77 @@
+{
+  "pageTitle": "पाइपलाइन",
+  "title": "सेल्स पाइपलाइन",
+  "subtitle": "अपनी सेल्स पाइपलाइन को कल्पना करें और प्रबंधित करें",
+  "viewMode": "पाइपलाइन व्यू",
+  "stages": {
+    "prospecting": "संभावनाएं खोजना",
+    "qualification": "योग्यता",
+    "needsAnalysis": "आवश्यकताओं का विश्लेषण",
+    "valueProposition": "मूल्य प्रस्ताव",
+    "negotiation": "बातचीत",
+    "closedWon": "बंद हुआ (जीता)",
+    "closedLost": "बंद हुआ (हारा)"
+  },
+  "actions": {
+    "moveToStage": "चरण में ले जाएं",
+    "convertToDeal": "डील में कन्वर्ट करें",
+    "addNote": "नोट जोड़ें",
+    "viewDetails": "विवरण देखें",
+    "editLead": "लीड संपादित करें",
+    "scheduleActivity": "एक्टिविटी शेड्यूल करें"
+  },
+  "cards": {
+    "value": "वैल्यू: {{amount}}",
+    "closeDate": "बंद करें: {{date}}",
+    "probability": "{{percent}}% संभावना",
+    "daysInStage": "चरण में {{count}} दिन",
+    "overdue": "ओवरड्यू"
+  },
+  "filters": {
+    "title": "पाइपलाइन फ़िल्टर्स",
+    "stage": "चरण",
+    "assignedTo": "को असाइन किया गया",
+    "value": "डील वैल्यू",
+    "closeDate": "अपेक्षित बंद होने की तारीख",
+    "probability": "संभावना",
+    "clear": "फ़िल्टर्स साफ़ करें",
+    "apply": "फ़िल्टर्स लागू करें"
+  },
+  "dragAndDrop": {
+    "instruction": "चरणों के बीच लीड्स को खींचें और छोड़ें",
+    "moving": "लीड को {{stage}} में ले जाया जा रहा है",
+    "moved": "लीड को {{stage}} में ले जाया गया"
+  },
+  "metrics": {
+    "title": "पाइपलाइन मैट्रिक्स",
+    "totalValue": "कुल पाइपलाइन वैल्यू",
+    "averageDealSize": "औसत डील साइज",
+    "averageSalesCycle": "औसत सेल्स साइकिल",
+    "conversionRate": "कन्वर्जन रेट",
+    "winRate": "जीतने की दर",
+    "forecast": "पूर्वानुमान"
+  },
+  "forecast": {
+    "title": "राजस्व पूर्वानुमान",
+    "bestCase": "सर्वोत्तम केस",
+    "mostLikely": "सबसे संभावित",
+    "worstCase": "विस्त केस"
+  },
+  "kpis": {
+    "title": "मुख्य प्रदर्शन संकेतक",
+    "totalOpportunities": "कुल अवसर",
+    "activeLeads": "सक्रिय लीड्स",
+    "qualifiedLeads": "योग्य लीड्स",
+    "proposals": "प्रस्ताव",
+    "closedDeals": "बंद डील्स"
+  },
+  "emptyStage": {
+    "title": "इस चरण में कोई लीड नहीं",
+    "description": "लीड्स को यहां खींचें या नए लीड्स जोड़ें"
+  },
+  "messages": {
+    "stageUpdated": "लीड को {{stage}} में ले जाया गया",
+    "dealCreated": "डील सफलतापूर्वक बनाया गया",
+    "leadUpdated": "लीड सफलतापूर्वक अपडेट किया गया"
+  }
+}

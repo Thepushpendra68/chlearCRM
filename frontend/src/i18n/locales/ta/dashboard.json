@@ -1,0 +1,89 @@
+{
+  "pageTitle": "Dashboard",
+  "welcome": {
+    "title": "Welcome back, {{name}}!",
+    "subtitle": "Here's what's happening with your business today"
+  },
+  "overview": {
+    "title": "Overview",
+    "totalLeads": "Total Leads",
+    "activeLeads": "Active Leads",
+    "newThisWeek": "New This Week",
+    "conversionRate": "Conversion Rate",
+    "totalActivities": "Total Activities",
+    "completedActivities": "Completed Activities",
+    "pendingTasks": "Pending Tasks",
+    "completedTasks": "Completed Tasks",
+    "totalRevenue": "Total Revenue",
+    "thisMonth": "This Month",
+    "lastMonth": "Last Month"
+  },
+  "quickStats": {
+    "title": "Quick Stats",
+    "leadsToday": "Leads Today",
+    "activitiesToday": "Activities Today",
+    "tasksDue": "Tasks Due",
+    "revenueGoal": "Revenue Goal",
+    "goalProgress": "Goal Progress"
+  },
+  "recentActivity": {
+    "title": "Recent Activity",
+    "viewAll": "View All Activities",
+    "noActivity": "No recent activity"
+  },
+  "upcomingTasks": {
+    "title": "Upcoming Tasks",
+    "viewAll": "View All Tasks",
+    "noTasks": "No upcoming tasks"
+  },
+  "topLeads": {
+    "title": "Top Leads",
+    "viewAll": "View All Leads",
+    "noLeads": "No leads to display"
+  },
+  "performance": {
+    "title": "Performance",
+    "conversionFunnel": "Conversion Funnel",
+    "salesPipeline": "Sales Pipeline",
+    "teamPerformance": "Team Performance",
+    "goalAchievement": "Goal Achievement"
+  },
+  "charts": {
+    "leads": "Leads Over Time",
+    "revenue": "Revenue Trends",
+    "activities": "Activities Summary",
+    "conversion": "Conversion Rates"
+  },
+  "cards": {
+    "today": "Today",
+    "week": "This Week",
+    "month": "This Month",
+    "quarter": "This Quarter",
+    "year": "This Year",
+    "all": "All Time"
+  },
+  "filters": {
+    "dateRange": "Date Range",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "last7Days": "Last 7 Days",
+    "last30Days": "Last 30 Days",
+    "custom": "Custom Range",
+    "fromDate": "From Date",
+    "toDate": "To Date"
+  },
+  "actions": {
+    "refreshData": "Refresh Data",
+    "viewReport": "View Report",
+    "exportData": "Export Data",
+    "shareReport": "Share Report",
+    "scheduleReport": "Schedule Report"
+  },
+  "badges": {
+    "new": "NEW",
+    "hot": "HOT",
+    "trending": "TRENDING",
+    "top": "TOP",
+    "urgent": "URGENT"
+  }
+}
