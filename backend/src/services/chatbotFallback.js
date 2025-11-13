@@ -13,156 +13,331 @@ class ChatbotFallback {
     const message = userMessage.toLowerCase().trim();
 
     // Pattern 1: Detect duplicates
-    if (this.matchesPattern(message, ['duplicate', 'check duplicate', 'find duplicate'])) {
+    if (
+      this.matchesPattern(message, [
+        "duplicate",
+        "check duplicate",
+        "find duplicate",
+      ])
+    ) {
       return this.handleDetectDuplicates(message, userMessage);
     }
 
     // Pattern 2: Export leads
-    if (this.matchesPattern(message, ['export', 'download']) &&
-        this.matchesPattern(message, ['lead', 'csv', 'excel'])) {
+    if (
+      this.matchesPattern(message, ["export", "download"]) &&
+      this.matchesPattern(message, ["lead", "csv", "excel"])
+    ) {
       return this.handleExportLeads(message, userMessage);
     }
 
     // Pattern 3: Assignment suggestions
-    if (this.matchesPattern(message, ['suggest', 'suggest assignment', 'who should', 'assign to']) &&
-        !this.matchesPattern(message, ['export', 'delete', 'update'])) {
+    if (
+      this.matchesPattern(message, [
+        "suggest",
+        "suggest assignment",
+        "who should",
+        "assign to",
+      ]) &&
+      !this.matchesPattern(message, ["export", "delete", "update"])
+    ) {
       return this.handleSuggestAssignment(message, userMessage);
     }
 
     // Pattern 4: Lead scoring
-    if (this.matchesPattern(message, ['score', 'scoring', 'rank']) &&
-        this.matchesPattern(message, ['lead', 'leads'])) {
+    if (
+      this.matchesPattern(message, ["score", "scoring", "rank"]) &&
+      this.matchesPattern(message, ["lead", "leads"])
+    ) {
       return this.handleLeadScoring(message, userMessage);
     }
 
     // Pattern 5: Create task
-    if (this.matchesPattern(message, ['create task', 'new task', 'add task', 'schedule'])) {
+    if (
+      this.matchesPattern(message, [
+        "create task",
+        "new task",
+        "add task",
+        "schedule",
+      ])
+    ) {
       return this.handleCreateTask(message, userMessage);
     }
 
     // Pattern 6: List tasks
-    if (this.matchesPattern(message, ['show task', 'list task', 'my task']) ||
-        (this.matchesPattern(message, ['task']) && this.matchesPattern(message, ['overdue', 'pending', 'todo']))) {
+    if (
+      this.matchesPattern(message, ["show task", "list task", "my task"]) ||
+      (this.matchesPattern(message, ["task"]) &&
+        this.matchesPattern(message, ["overdue", "pending", "todo"]))
+    ) {
       return this.handleListMyTasks(message, userMessage);
     }
 
     // Pattern 7: Update/complete task
-    if (this.matchesPattern(message, ['complete task', 'finish task', 'mark done', 'done'])) {
+    if (
+      this.matchesPattern(message, [
+        "complete task",
+        "finish task",
+        "mark done",
+        "done",
+      ])
+    ) {
       return this.handleUpdateTask(message, userMessage);
     }
 
     // Pattern 8: Log activity (MUST come before update/add note patterns)
-    if (this.matchesPattern(message, ['log', 'log call', 'log email', 'log meeting', 'had a call', 'had a meeting', 'sent email', 'called', 'called on', 'emailed', 'met with']) ||
-        (this.matchesPattern(message, ['call', 'email', 'meeting']) && (this.matchesPattern(message, ['with', 'contact', 'discussed', 'discussed with', 'talked']) || /\b(call|email|meeting)\s+(with|on|to)\s+/.test(message)))) {
+    if (
+      this.matchesPattern(message, [
+        "log",
+        "log call",
+        "log email",
+        "log meeting",
+        "had a call",
+        "had a meeting",
+        "sent email",
+        "called",
+        "called on",
+        "emailed",
+        "met with",
+      ]) ||
+      (this.matchesPattern(message, ["call", "email", "meeting"]) &&
+        (this.matchesPattern(message, [
+          "with",
+          "contact",
+          "discussed",
+          "discussed with",
+          "talked",
+        ]) ||
+          /\b(call|email|meeting)\s+(with|on|to)\s+/.test(message)))
+    ) {
       return this.handleLogActivity(message, userMessage);
     }
 
     // Pattern 9: Team stats
-    if (this.matchesPattern(message, ['team', 'stats']) ||
-        (this.matchesPattern(message, ['stats', 'performance']) && this.matchesPattern(message, ['name', 'member']))) {
+    if (
+      this.matchesPattern(message, ["team", "stats"]) ||
+      (this.matchesPattern(message, ["stats", "performance"]) &&
+        this.matchesPattern(message, ["name", "member"]))
+    ) {
       return this.handleTeamStats(message, userMessage);
     }
 
     // Pattern 10: My stats
-    if ((this.matchesPattern(message, ['my stats', 'how am i', 'my performance']) ||
-         this.matchesPattern(message, ['stats', 'performance'])) &&
-        !this.matchesPattern(message, ['team', 'member', 'name'])) {
+    if (
+      (this.matchesPattern(message, [
+        "my stats",
+        "how am i",
+        "my performance",
+      ]) ||
+        this.matchesPattern(message, ["stats", "performance"])) &&
+      !this.matchesPattern(message, ["team", "member", "name"])
+    ) {
       return this.handleMyStats(message, userMessage);
     }
 
-    // Pattern 11: Bulk update (MUST NOT match single lead updates or activities)
-    if ((this.matchesPattern(message, ['update', 'bulk', 'all']) ||
-         this.matchesPattern(message, ['change']) && this.matchesPattern(message, ['all', 'leads'])) &&
-        !this.matchesPattern(message, ['single', 'one']) &&
-        !this.matchesPattern(message, ['call', 'email', 'meeting', 'task', 'activity'])) {
+    // Pattern 11: Activity management (MUST come before bulk update)
+    if (
+      this.matchesPattern(message, ["show", "list", "get"]) &&
+      this.matchesPattern(message, ["activity", "activities", "timeline"])
+    ) {
+      return this.handleGetActivities(message, userMessage);
+    }
+
+    // Pattern 12: Create activity
+    if (
+      this.matchesPattern(message, ["create", "add", "log", "new"]) &&
+      this.matchesPattern(message, ["activity", "call", "email", "meeting"]) &&
+      !this.matchesPattern(message, ["bulk", "all", "multiple"])
+    ) {
+      return this.handleCreateActivity(message, userMessage);
+    }
+
+    // Pattern 13: Activity statistics
+    if (
+      this.matchesPattern(message, ["activity", "activities", "timeline"]) &&
+      this.matchesPattern(message, ["stats", "statistics", "report", "summary"])
+    ) {
+      return this.handleGetActivityStats(message, userMessage);
+    }
+
+    // Pattern 14: Team timeline
+    if (
+      this.matchesPattern(message, [
+        "team",
+        "timeline",
+        "activity",
+        "activities",
+      ]) ||
+      (this.matchesPattern(message, ["show"]) &&
+        this.matchesPattern(message, ["team", "timeline"]))
+    ) {
+      return this.handleGetTeamTimeline(message, userMessage);
+    }
+
+    // Pattern 15: Complete activity
+    if (
+      this.matchesPattern(message, ["complete", "finish", "done", "mark"]) &&
+      this.matchesPattern(message, ["activity"])
+    ) {
+      return this.handleCompleteActivity(message, userMessage);
+    }
+
+    // Pattern 16: Bulk update (MUST NOT match single lead updates or activities)
+    if (
+      (this.matchesPattern(message, ["update", "bulk", "all"]) ||
+        (this.matchesPattern(message, ["change"]) &&
+          this.matchesPattern(message, ["all", "leads"]))) &&
+      !this.matchesPattern(message, ["single", "one"]) &&
+      !this.matchesPattern(message, [
+        "call",
+        "email",
+        "meeting",
+        "task",
+        "activity",
+      ])
+    ) {
       return this.handleBulkUpdate(message, userMessage);
     }
 
     // Pattern 12: Bulk assign
-    if (this.matchesPattern(message, ['bulk', 'assign']) ||
-        (this.matchesPattern(message, ['assign']) && this.matchesPattern(message, ['all', 'multiple']))) {
+    if (
+      this.matchesPattern(message, ["bulk", "assign"]) ||
+      (this.matchesPattern(message, ["assign"]) &&
+        this.matchesPattern(message, ["all", "multiple"]))
+    ) {
       return this.handleBulkAssign(message, userMessage);
     }
 
     // Pattern 13: Group by analysis
-    if (this.matchesPattern(message, ['group', 'grouped', 'by']) ||
-        this.matchesPattern(message, ['count', 'how many']) && this.matchesPattern(message, ['by'])) {
+    if (
+      this.matchesPattern(message, ["group", "grouped", "by"]) ||
+      (this.matchesPattern(message, ["count", "how many"]) &&
+        this.matchesPattern(message, ["by"]))
+    ) {
       return this.handleGroupByAnalysis(message, userMessage);
     }
 
     // Pattern 14: Schedule report
-    if (this.matchesPattern(message, ['schedule', 'report', 'send me']) ||
-        (this.matchesPattern(message, ['daily', 'weekly', 'monthly']) && this.matchesPattern(message, ['report']))) {
+    if (
+      this.matchesPattern(message, ["schedule", "report", "send me"]) ||
+      (this.matchesPattern(message, ["daily", "weekly", "monthly"]) &&
+        this.matchesPattern(message, ["report"]))
+    ) {
       return this.handleScheduleReport(message, userMessage);
     }
 
     // Pattern 15: Create reminder
-    if (this.matchesPattern(message, ['remind', 'reminder', 'remindme']) ||
-        (this.matchesPattern(message, ['in', 'days', 'hours']) && this.matchesPattern(message, ['remind']))) {
+    if (
+      this.matchesPattern(message, ["remind", "reminder", "remindme"]) ||
+      (this.matchesPattern(message, ["in", "days", "hours"]) &&
+        this.matchesPattern(message, ["remind"]))
+    ) {
       return this.handleCreateReminder(message, userMessage);
     }
 
     // Pattern 16: Delete lead
-    if (this.matchesPattern(message, ['delete', 'remove', 'drop'])) {
+    if (this.matchesPattern(message, ["delete", "remove", "drop"])) {
       return this.handleDeleteLead(message, userMessage);
     }
 
     // Pattern 2: Add note
-    if (this.matchesPattern(message, ['add note', 'note', 'add comment'])) {
+    if (this.matchesPattern(message, ["add note", "note", "add comment"])) {
       return this.handleAddNote(message, userMessage);
     }
 
     // Pattern 3: View notes
-    if (this.matchesPattern(message, ['show note', 'view note', 'notes', 'history', 'activities']) &&
-        this.matchesPattern(message, ['note', 'history', 'activity', 'activities'])) {
+    if (
+      this.matchesPattern(message, [
+        "show note",
+        "view note",
+        "notes",
+        "history",
+        "activities",
+      ]) &&
+      this.matchesPattern(message, [
+        "note",
+        "history",
+        "activity",
+        "activities",
+      ])
+    ) {
       return this.handleViewNotes(message, userMessage);
     }
 
     // Pattern 4: Move lead to stage
-    if (this.matchesPattern(message, ['move', 'stage', 'pipeline'])) {
+    if (this.matchesPattern(message, ["move", "stage", "pipeline"])) {
       return this.handleMoveStage(message, userMessage);
     }
 
     // Pattern 5: Assign lead
-    if (this.matchesPattern(message, ['assign', 'assignee'])) {
+    if (this.matchesPattern(message, ["assign", "assignee"])) {
       return this.handleAssignLead(message, userMessage);
     }
 
     // Pattern 6: Unassign lead
-    if (this.matchesPattern(message, ['unassign', 'remove assign'])) {
+    if (this.matchesPattern(message, ["unassign", "remove assign"])) {
       return this.handleUnassignLead(message, userMessage);
     }
 
     // Pattern 7: List/Show leads with status filter
-    if (this.matchesPattern(message, ['show', 'list', 'get', 'find', 'display'])) {
+    if (
+      this.matchesPattern(message, ["show", "list", "get", "find", "display"])
+    ) {
       return this.handleListLeads(message);
     }
 
     // Pattern 8: Create lead
-    if (this.matchesPattern(message, ['create', 'add', 'new']) &&
-        this.matchesPattern(message, ['lead'])) {
+    if (
+      this.matchesPattern(message, ["create", "add", "new"]) &&
+      this.matchesPattern(message, ["lead"])
+    ) {
       return this.handleCreateLead(message, userMessage);
     }
 
     // Pattern 9: Update lead (EXCLUDE activity/task keywords to prevent misrouting)
-    if (this.matchesPattern(message, ['update', 'change', 'modify', 'edit']) &&
-        !this.matchesPattern(message, ['stage', 'pipeline', 'call', 'email', 'meeting', 'task', 'activity', 'log', 'scheduled', 'remind'])) {
+    if (
+      this.matchesPattern(message, ["update", "change", "modify", "edit"]) &&
+      !this.matchesPattern(message, [
+        "stage",
+        "pipeline",
+        "call",
+        "email",
+        "meeting",
+        "task",
+        "activity",
+        "log",
+        "scheduled",
+        "remind",
+      ])
+    ) {
       return this.handleUpdateLead(message, userMessage);
     }
 
     // Pattern 10: Search lead
-    if (this.matchesPattern(message, ['search', 'find', 'lookup']) &&
-        (message.includes('@') || message.includes('email') || /[A-Z][a-z]+/.test(userMessage))) {
+    if (
+      this.matchesPattern(message, ["search", "find", "lookup"]) &&
+      (message.includes("@") ||
+        message.includes("email") ||
+        /[A-Z][a-z]+/.test(userMessage))
+    ) {
       return this.handleSearchLead(message, userMessage);
     }
 
     // Pattern 11: Statistics
-    if (this.matchesPattern(message, ['stat', 'statistics', 'analytics', 'report', 'summary'])) {
+    if (
+      this.matchesPattern(message, [
+        "stat",
+        "statistics",
+        "analytics",
+        "report",
+        "summary",
+      ])
+    ) {
       return this.handleStats();
     }
 
     // Pattern 12: Help/Greeting
-    if (this.matchesPattern(message, ['help', 'hello', 'hi', 'hey', 'start'])) {
+    if (this.matchesPattern(message, ["help", "hello", "hi", "hey", "start"])) {
       return this.handleGreeting();
     }
 
@@ -174,7 +349,7 @@ class ChatbotFallback {
    * Check if message matches any of the patterns
    */
   matchesPattern(message, keywords) {
-    return keywords.some(keyword => message.includes(keyword));
+    return keywords.some((keyword) => message.includes(keyword));
   }
 
   /**
@@ -191,15 +366,16 @@ class ChatbotFallback {
    */
   extractName(message) {
     // Look for patterns like "named John Doe" or "name is John Doe"
-    const namedPattern = /(?:named|name is|called)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/i;
+    const namedPattern =
+      /(?:named|name is|called)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/i;
     const match = message.match(namedPattern);
 
     if (match) {
       const fullName = match[1].trim();
-      const nameParts = fullName.split(' ');
+      const nameParts = fullName.split(" ");
       return {
-        first_name: nameParts[0] || '',
-        last_name: nameParts.slice(1).join(' ') || ''
+        first_name: nameParts[0] || "",
+        last_name: nameParts.slice(1).join(" ") || "",
       };
     }
 
@@ -210,7 +386,8 @@ class ChatbotFallback {
    * Extract company from message
    */
   extractCompany(message) {
-    const companyPattern = /(?:from|at|company|works at)\s+([A-Z][A-Za-z\s&,.']+?)(?:\s*,|\s+email|\s*$)/i;
+    const companyPattern =
+      /(?:from|at|company|works at)\s+([A-Z][A-Za-z\s&,.']+?)(?:\s*,|\s+email|\s*$)/i;
     const match = message.match(companyPattern);
     return match ? match[1].trim() : null;
   }
@@ -220,19 +397,19 @@ class ChatbotFallback {
    */
   extractStatus(message) {
     const statusKeywords = {
-      'active': ['active'],
-      'inactive': ['inactive'],
-      'new': ['new'],
-      'contacted': ['contacted'],
-      'qualified': ['qualified'],
-      'proposal': ['proposal'],
-      'negotiation': ['negotiation', 'negotiating'],
-      'won': ['won', 'closed won'],
-      'lost': ['lost', 'closed lost']
+      active: ["active"],
+      inactive: ["inactive"],
+      new: ["new"],
+      contacted: ["contacted"],
+      qualified: ["qualified"],
+      proposal: ["proposal"],
+      negotiation: ["negotiation", "negotiating"],
+      won: ["won", "closed won"],
+      lost: ["lost", "closed lost"],
     };
 
     for (const [status, keywords] of Object.entries(statusKeywords)) {
-      if (keywords.some(keyword => message.includes(keyword))) {
+      if (keywords.some((keyword) => message.includes(keyword))) {
         return status;
       }
     }
@@ -244,14 +421,14 @@ class ChatbotFallback {
    * Handle list/show leads request
    */
   handleListLeads(message) {
-    const DateParser = require('../utils/dateParser');
+    const DateParser = require("../utils/dateParser");
     const status = this.extractStatus(message);
 
     // Check if user wants all leads
-    const wantsAll = message.includes('all') || message.includes('every');
+    const wantsAll = message.includes("all") || message.includes("every");
 
     const parameters = {
-      limit: 50
+      limit: 50,
     };
 
     if (status) {
@@ -262,7 +439,9 @@ class ChatbotFallback {
     const dateKeywords = DateParser.extractDateKeywords(message);
     if (dateKeywords.length > 0) {
       // Look for date expressions in the message
-      const dateExprMatch = message.match(/(?:created|since|between|last|this)\s+[^.!?]*/);
+      const dateExprMatch = message.match(
+        /(?:created|since|between|last|this)\s+[^.!?]*/,
+      );
       if (dateExprMatch) {
         const dateRange = DateParser.parseNaturalDate(dateExprMatch[0]);
         if (dateRange) {
@@ -274,8 +453,13 @@ class ChatbotFallback {
 
     // Try to extract deal value ranges
     const valueKeywords = DateParser.extractValueKeywords(message);
-    if (valueKeywords.includes('deal_value') || valueKeywords.includes('value')) {
-      const valueExprMatch = message.match(/(?:deal value|value|worth)\s+[^.!?]*/i);
+    if (
+      valueKeywords.includes("deal_value") ||
+      valueKeywords.includes("value")
+    ) {
+      const valueExprMatch = message.match(
+        /(?:deal value|value|worth)\s+[^.!?]*/i,
+      );
       if (valueExprMatch) {
         const valueRange = DateParser.parseDealValueRange(valueExprMatch[0]);
         if (valueRange) {
@@ -290,14 +474,14 @@ class ChatbotFallback {
     }
 
     return {
-      action: 'LIST_LEADS',
-      intent: status ? `List ${status} leads` : 'List all leads',
+      action: "LIST_LEADS",
+      intent: status ? `List ${status} leads` : "List all leads",
       parameters,
       response: status
         ? `Here are all ${status} leads:`
-        : 'Here are all your leads:',
+        : "Here are all your leads:",
       needsConfirmation: false,
-      missingFields: []
+      missingFields: [],
     };
   }
 
@@ -316,13 +500,13 @@ class ChatbotFallback {
       parameters.first_name = name.first_name;
       parameters.last_name = name.last_name;
     } else {
-      missingFields.push('first_name', 'last_name');
+      missingFields.push("first_name", "last_name");
     }
 
     if (email) {
       parameters.email = email;
     } else {
-      missingFields.push('email');
+      missingFields.push("email");
     }
 
     if (company) {
@@ -332,22 +516,22 @@ class ChatbotFallback {
     // If missing critical fields, ask for them
     if (missingFields.length > 0) {
       return {
-        action: 'CHAT',
-        intent: 'Need more information to create lead',
+        action: "CHAT",
+        intent: "Need more information to create lead",
         parameters: {},
-        response: `I'd like to help you create a lead! Please provide: ${missingFields.join(', ')}. For example: "Create a lead named John Doe, email john@example.com, from Acme Corp"`,
+        response: `I'd like to help you create a lead! Please provide: ${missingFields.join(", ")}. For example: "Create a lead named John Doe, email john@example.com, from Acme Corp"`,
         needsConfirmation: false,
-        missingFields
+        missingFields,
       };
     }
 
     return {
-      action: 'CREATE_LEAD',
-      intent: 'Create new lead',
+      action: "CREATE_LEAD",
+      intent: "Create new lead",
       parameters,
-      response: `I'll create a lead for ${name.first_name} ${name.last_name} (${email})${company ? ` from ${company}` : ''}. Please confirm.`,
+      response: `I'll create a lead for ${name.first_name} ${name.last_name} (${email})${company ? ` from ${company}` : ""}. Please confirm.`,
       needsConfirmation: true,
-      missingFields: []
+      missingFields: [],
     };
   }
 
@@ -360,12 +544,13 @@ class ChatbotFallback {
 
     if (!email && !status) {
       return {
-        action: 'CHAT',
-        intent: 'Need more information',
+        action: "CHAT",
+        intent: "Need more information",
         parameters: {},
-        response: 'To update a lead, please provide the email address and what you want to update. For example: "Update john@example.com status to qualified"',
+        response:
+          'To update a lead, please provide the email address and what you want to update. For example: "Update john@example.com status to qualified"',
         needsConfirmation: false,
-        missingFields: ['email']
+        missingFields: ["email"],
       };
     }
 
@@ -374,12 +559,12 @@ class ChatbotFallback {
     if (status) parameters.status = status;
 
     return {
-      action: 'UPDATE_LEAD',
-      intent: 'Update lead',
+      action: "UPDATE_LEAD",
+      intent: "Update lead",
       parameters,
-      response: `I'll update the lead${email ? ` with email ${email}` : ''}${status ? ` to status "${status}"` : ''}. Please confirm.`,
+      response: `I'll update the lead${email ? ` with email ${email}` : ""}${status ? ` to status "${status}"` : ""}. Please confirm.`,
       needsConfirmation: true,
-      missingFields: email ? [] : ['email']
+      missingFields: email ? [] : ["email"],
     };
   }
 
@@ -390,39 +575,40 @@ class ChatbotFallback {
     const email = this.extractEmail(originalMessage);
     const name = this.extractName(originalMessage);
 
-    let searchQuery = '';
+    let searchQuery = "";
     if (email) {
       searchQuery = email;
     } else if (name) {
       searchQuery = `${name.first_name} ${name.last_name}`.trim();
     } else {
       // Extract any capitalized words as potential name
-      const words = originalMessage.split(' ');
-      const capitalizedWords = words.filter(w => /^[A-Z]/.test(w));
-      searchQuery = capitalizedWords.join(' ');
+      const words = originalMessage.split(" ");
+      const capitalizedWords = words.filter((w) => /^[A-Z]/.test(w));
+      searchQuery = capitalizedWords.join(" ");
     }
 
     if (!searchQuery) {
       return {
-        action: 'CHAT',
-        intent: 'Need search query',
+        action: "CHAT",
+        intent: "Need search query",
         parameters: {},
-        response: 'What would you like to search for? Please provide a name or email address.',
+        response:
+          "What would you like to search for? Please provide a name or email address.",
         needsConfirmation: false,
-        missingFields: ['search']
+        missingFields: ["search"],
       };
     }
 
     return {
-      action: 'SEARCH_LEADS',
-      intent: 'Search for lead',
+      action: "SEARCH_LEADS",
+      intent: "Search for lead",
       parameters: {
         search: searchQuery,
-        limit: 10
+        limit: 10,
       },
       response: `Searching for "${searchQuery}"...`,
       needsConfirmation: false,
-      missingFields: []
+      missingFields: [],
     };
   }
 
@@ -431,12 +617,12 @@ class ChatbotFallback {
    */
   handleStats() {
     return {
-      action: 'GET_STATS',
-      intent: 'Get lead statistics',
+      action: "GET_STATS",
+      intent: "Get lead statistics",
       parameters: {},
-      response: 'Here are your lead statistics:',
+      response: "Here are your lead statistics:",
       needsConfirmation: false,
-      missingFields: []
+      missingFields: [],
     };
   }
 
@@ -447,7 +633,7 @@ class ChatbotFallback {
     const email = this.extractEmail(originalMessage);
     const name = this.extractName(originalMessage);
 
-    let searchQuery = '';
+    let searchQuery = "";
     if (email) {
       searchQuery = email;
     } else if (name) {
@@ -456,22 +642,23 @@ class ChatbotFallback {
 
     if (!searchQuery) {
       return {
-        action: 'CHAT',
-        intent: 'Need lead identifier',
+        action: "CHAT",
+        intent: "Need lead identifier",
         parameters: {},
-        response: 'To delete a lead, please provide the name or email. For example: "Delete john@example.com"',
+        response:
+          'To delete a lead, please provide the name or email. For example: "Delete john@example.com"',
         needsConfirmation: false,
-        missingFields: ['email']
+        missingFields: ["email"],
       };
     }
 
     return {
-      action: 'DELETE_LEAD',
-      intent: 'Delete lead',
+      action: "DELETE_LEAD",
+      intent: "Delete lead",
       parameters: email ? { email } : { search: searchQuery },
       response: `I'll delete the lead "${searchQuery}". This action cannot be undone. Are you sure?`,
       needsConfirmation: true,
-      missingFields: []
+      missingFields: [],
     };
   }
 
@@ -483,14 +670,14 @@ class ChatbotFallback {
     const name = this.extractName(originalMessage);
 
     // Try to extract note content - look for content after "note:" or "add note"
-    let noteContent = '';
+    let noteContent = "";
     const notePattern = /(?:note:|add note|comment:)\s*(.+?)(?:$|for|to)/i;
     const noteMatch = originalMessage.match(notePattern);
     if (noteMatch) {
       noteContent = noteMatch[1].trim();
     }
 
-    let searchQuery = '';
+    let searchQuery = "";
     if (email) {
       searchQuery = email;
     } else if (name) {
@@ -499,33 +686,36 @@ class ChatbotFallback {
 
     if (!searchQuery) {
       return {
-        action: 'CHAT',
-        intent: 'Need lead identifier',
+        action: "CHAT",
+        intent: "Need lead identifier",
         parameters: {},
-        response: 'To add a note, please provide the lead name or email. For example: "Add note to john@example.com: Called today"',
+        response:
+          'To add a note, please provide the lead name or email. For example: "Add note to john@example.com: Called today"',
         needsConfirmation: false,
-        missingFields: ['email']
+        missingFields: ["email"],
       };
     }
 
     if (!noteContent) {
       return {
-        action: 'CHAT',
-        intent: 'Need note content',
+        action: "CHAT",
+        intent: "Need note content",
         parameters: {},
         response: `To add a note to "${searchQuery}", please provide the note content. For example: "Add note to ${searchQuery}: Called today, very interested"`,
         needsConfirmation: false,
-        missingFields: ['note_content']
+        missingFields: ["note_content"],
       };
     }
 
     return {
-      action: 'ADD_LEAD_NOTE',
-      intent: 'Add note to lead',
-      parameters: email ? { email, note_content: noteContent } : { search: searchQuery, note_content: noteContent },
+      action: "ADD_LEAD_NOTE",
+      intent: "Add note to lead",
+      parameters: email
+        ? { email, note_content: noteContent }
+        : { search: searchQuery, note_content: noteContent },
       response: `I'll add the note to "${searchQuery}": "${noteContent}"`,
       needsConfirmation: false,
-      missingFields: []
+      missingFields: [],
     };
   }
 
@@ -536,7 +726,7 @@ class ChatbotFallback {
     const email = this.extractEmail(originalMessage);
     const name = this.extractName(originalMessage);
 
-    let searchQuery = '';
+    let searchQuery = "";
     if (email) {
       searchQuery = email;
     } else if (name) {
@@ -545,22 +735,23 @@ class ChatbotFallback {
 
     if (!searchQuery) {
       return {
-        action: 'CHAT',
-        intent: 'Need lead identifier',
+        action: "CHAT",
+        intent: "Need lead identifier",
         parameters: {},
-        response: 'To view notes and activities, please provide the lead name or email. For example: "Show notes for john@example.com"',
+        response:
+          'To view notes and activities, please provide the lead name or email. For example: "Show notes for john@example.com"',
         needsConfirmation: false,
-        missingFields: ['email']
+        missingFields: ["email"],
       };
     }
 
     return {
-      action: 'VIEW_LEAD_NOTES',
-      intent: 'View lead notes and activities',
+      action: "VIEW_LEAD_NOTES",
+      intent: "View lead notes and activities",
       parameters: email ? { email } : { search: searchQuery },
       response: `Getting notes and activities for "${searchQuery}"...`,
       needsConfirmation: false,
-      missingFields: []
+      missingFields: [],
     };
   }
 
@@ -574,9 +765,9 @@ class ChatbotFallback {
     // Extract stage name - look for "to [stage]" or "move to [stage]"
     const stagePattern = /(?:to|stage|move to)\s+(\w+)/i;
     const stageMatch = originalMessage.match(stagePattern);
-    const stageName = stageMatch ? stageMatch[1].toLowerCase() : '';
+    const stageName = stageMatch ? stageMatch[1].toLowerCase() : "";
 
-    let searchQuery = '';
+    let searchQuery = "";
     if (email) {
       searchQuery = email;
     } else if (name) {
@@ -585,33 +776,36 @@ class ChatbotFallback {
 
     if (!searchQuery) {
       return {
-        action: 'CHAT',
-        intent: 'Need lead identifier',
+        action: "CHAT",
+        intent: "Need lead identifier",
         parameters: {},
-        response: 'To move a lead, please provide the lead name or email and stage. For example: "Move john@example.com to proposal stage"',
+        response:
+          'To move a lead, please provide the lead name or email and stage. For example: "Move john@example.com to proposal stage"',
         needsConfirmation: false,
-        missingFields: ['email']
+        missingFields: ["email"],
       };
     }
 
     if (!stageName) {
       return {
-        action: 'CHAT',
-        intent: 'Need stage name',
+        action: "CHAT",
+        intent: "Need stage name",
         parameters: {},
         response: `To move the lead "${searchQuery}", please specify a stage. For example: "Move ${searchQuery} to proposal stage"`,
         needsConfirmation: false,
-        missingFields: ['stage_name']
+        missingFields: ["stage_name"],
       };
     }
 
     return {
-      action: 'MOVE_LEAD_STAGE',
-      intent: 'Move lead to pipeline stage',
-      parameters: email ? { email, stage_name: stageName } : { search: searchQuery, stage_name: stageName },
+      action: "MOVE_LEAD_STAGE",
+      intent: "Move lead to pipeline stage",
+      parameters: email
+        ? { email, stage_name: stageName }
+        : { search: searchQuery, stage_name: stageName },
       response: `I'll move "${searchQuery}" to the ${stageName} stage.`,
       needsConfirmation: true,
-      missingFields: []
+      missingFields: [],
     };
   }
 
@@ -623,11 +817,12 @@ class ChatbotFallback {
     const name = this.extractName(originalMessage);
 
     // Extract assignee name - look for "to [name]" or "assign to [name]"
-    const assigneePattern = /(?:to|assign to)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i;
+    const assigneePattern =
+      /(?:to|assign to)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i;
     const assigneeMatch = originalMessage.match(assigneePattern);
-    const assigneeName = assigneeMatch ? assigneeMatch[1] : '';
+    const assigneeName = assigneeMatch ? assigneeMatch[1] : "";
 
-    let searchQuery = '';
+    let searchQuery = "";
     if (email) {
       searchQuery = email;
     } else if (name) {
@@ -636,33 +831,36 @@ class ChatbotFallback {
 
     if (!searchQuery) {
       return {
-        action: 'CHAT',
-        intent: 'Need lead identifier',
+        action: "CHAT",
+        intent: "Need lead identifier",
         parameters: {},
-        response: 'To assign a lead, please provide the lead name/email and team member name. For example: "Assign john@example.com to Sarah"',
+        response:
+          'To assign a lead, please provide the lead name/email and team member name. For example: "Assign john@example.com to Sarah"',
         needsConfirmation: false,
-        missingFields: ['email']
+        missingFields: ["email"],
       };
     }
 
     if (!assigneeName) {
       return {
-        action: 'CHAT',
-        intent: 'Need assignee name',
+        action: "CHAT",
+        intent: "Need assignee name",
         parameters: {},
         response: `To assign the lead "${searchQuery}", please specify who to assign it to. For example: "Assign ${searchQuery} to Sarah"`,
         needsConfirmation: false,
-        missingFields: ['assigned_to']
+        missingFields: ["assigned_to"],
       };
     }
 
     return {
-      action: 'ASSIGN_LEAD',
-      intent: 'Assign lead to team member',
-      parameters: email ? { email, assigned_to: assigneeName } : { search: searchQuery, assigned_to: assigneeName },
+      action: "ASSIGN_LEAD",
+      intent: "Assign lead to team member",
+      parameters: email
+        ? { email, assigned_to: assigneeName }
+        : { search: searchQuery, assigned_to: assigneeName },
       response: `I'll assign "${searchQuery}" to ${assigneeName}.`,
       needsConfirmation: true,
-      missingFields: []
+      missingFields: [],
     };
   }
 
@@ -673,7 +871,7 @@ class ChatbotFallback {
     const email = this.extractEmail(originalMessage);
     const name = this.extractName(originalMessage);
 
-    let searchQuery = '';
+    let searchQuery = "";
     if (email) {
       searchQuery = email;
     } else if (name) {
@@ -682,22 +880,23 @@ class ChatbotFallback {
 
     if (!searchQuery) {
       return {
-        action: 'CHAT',
-        intent: 'Need lead identifier',
+        action: "CHAT",
+        intent: "Need lead identifier",
         parameters: {},
-        response: 'To unassign a lead, please provide the lead name or email. For example: "Unassign john@example.com"',
+        response:
+          'To unassign a lead, please provide the lead name or email. For example: "Unassign john@example.com"',
         needsConfirmation: false,
-        missingFields: ['email']
+        missingFields: ["email"],
       };
     }
 
     return {
-      action: 'UNASSIGN_LEAD',
-      intent: 'Unassign lead',
+      action: "UNASSIGN_LEAD",
+      intent: "Unassign lead",
       parameters: email ? { email } : { search: searchQuery },
       response: `I'll unassign "${searchQuery}" from its current owner.`,
       needsConfirmation: true,
-      missingFields: []
+      missingFields: [],
     };
   }
 
@@ -709,14 +908,14 @@ class ChatbotFallback {
     const name = this.extractName(originalMessage);
 
     // Try to extract phone - look for phone patterns
-    let phone = '';
+    let phone = "";
     const phonePattern = /(?:phone|number|tel)\s*:?\s*([\d\s\-\(\)]+)/i;
     const phoneMatch = originalMessage.match(phonePattern);
     if (phoneMatch) {
       phone = phoneMatch[1].trim();
     }
 
-    let searchQuery = '';
+    let searchQuery = "";
     if (email) {
       searchQuery = email;
     } else if (phone) {
@@ -727,22 +926,27 @@ class ChatbotFallback {
 
     if (!searchQuery) {
       return {
-        action: 'CHAT',
-        intent: 'Need lead identifier',
+        action: "CHAT",
+        intent: "Need lead identifier",
         parameters: {},
-        response: 'To check for duplicates, please provide an email, phone, or name. For example: "Check for duplicate john@example.com"',
+        response:
+          'To check for duplicates, please provide an email, phone, or name. For example: "Check for duplicate john@example.com"',
         needsConfirmation: false,
-        missingFields: ['email']
+        missingFields: ["email"],
       };
     }
 
     return {
-      action: 'DETECT_DUPLICATES',
-      intent: 'Detect duplicate leads',
-      parameters: email ? { email } : phone ? { phone } : { search: searchQuery },
+      action: "DETECT_DUPLICATES",
+      intent: "Detect duplicate leads",
+      parameters: email
+        ? { email }
+        : phone
+          ? { phone }
+          : { search: searchQuery },
       response: `I'll check for duplicates matching "${searchQuery}".`,
       needsConfirmation: false,
-      missingFields: []
+      missingFields: [],
     };
   }
 
@@ -754,7 +958,7 @@ class ChatbotFallback {
     const source = this.extractSource(message);
 
     const parameters = {
-      format: message.includes('excel') ? 'excel' : 'csv'
+      format: message.includes("excel") ? "excel" : "csv",
     };
 
     if (status) {
@@ -766,12 +970,12 @@ class ChatbotFallback {
     }
 
     return {
-      action: 'EXPORT_LEADS',
-      intent: 'Export leads',
+      action: "EXPORT_LEADS",
+      intent: "Export leads",
       parameters,
-      response: `I'll export ${status ? `${status} ` : ''}leads to ${parameters.format.toUpperCase()}.`,
+      response: `I'll export ${status ? `${status} ` : ""}leads to ${parameters.format.toUpperCase()}.`,
       needsConfirmation: false,
-      missingFields: []
+      missingFields: [],
     };
   }
 
@@ -780,16 +984,16 @@ class ChatbotFallback {
    */
   extractSource(message) {
     const sourceKeywords = {
-      'website': ['website'],
-      'referral': ['referral', 'referred'],
-      'social_media': ['social', 'instagram', 'facebook', 'linkedin', 'twitter'],
-      'cold_call': ['cold call', 'call', 'phone call'],
-      'event': ['event', 'conference', 'webinar', 'trade show'],
-      'other': ['other']
+      website: ["website"],
+      referral: ["referral", "referred"],
+      social_media: ["social", "instagram", "facebook", "linkedin", "twitter"],
+      cold_call: ["cold call", "call", "phone call"],
+      event: ["event", "conference", "webinar", "trade show"],
+      other: ["other"],
     };
 
     for (const [source, keywords] of Object.entries(sourceKeywords)) {
-      if (keywords.some(keyword => message.includes(keyword))) {
+      if (keywords.some((keyword) => message.includes(keyword))) {
         return source;
       }
     }
@@ -804,7 +1008,7 @@ class ChatbotFallback {
     const email = this.extractEmail(originalMessage);
     const name = this.extractName(originalMessage);
 
-    let searchQuery = '';
+    let searchQuery = "";
     if (email) {
       searchQuery = email;
     } else if (name) {
@@ -813,22 +1017,23 @@ class ChatbotFallback {
 
     if (!searchQuery) {
       return {
-        action: 'CHAT',
-        intent: 'Need lead identifier',
+        action: "CHAT",
+        intent: "Need lead identifier",
         parameters: {},
-        response: 'To get assignment suggestions, please provide a lead name or email. For example: "Who should I assign john@example.com to?"',
+        response:
+          'To get assignment suggestions, please provide a lead name or email. For example: "Who should I assign john@example.com to?"',
         needsConfirmation: false,
-        missingFields: ['email']
+        missingFields: ["email"],
       };
     }
 
     return {
-      action: 'SUGGEST_ASSIGNMENT',
-      intent: 'Suggest assignment',
+      action: "SUGGEST_ASSIGNMENT",
+      intent: "Suggest assignment",
       parameters: email ? { email } : { search: searchQuery },
       response: `Let me check assignment rules and team capacity to suggest the best person for this lead.`,
       needsConfirmation: false,
-      missingFields: []
+      missingFields: [],
     };
   }
 
@@ -840,7 +1045,7 @@ class ChatbotFallback {
     const source = this.extractSource(message);
 
     const parameters = {
-      limit: 20
+      limit: 20,
     };
 
     if (status) {
@@ -852,12 +1057,12 @@ class ChatbotFallback {
     }
 
     return {
-      action: 'LEAD_SCORING',
-      intent: 'Score leads',
+      action: "LEAD_SCORING",
+      intent: "Score leads",
       parameters,
-      response: `I'll score ${status ? `${status} ` : ''}leads based on engagement and potential.`,
+      response: `I'll score ${status ? `${status} ` : ""}leads based on engagement and potential.`,
       needsConfirmation: false,
-      missingFields: []
+      missingFields: [],
     };
   }
 
@@ -866,8 +1071,9 @@ class ChatbotFallback {
    */
   handleCreateTask(message, originalMessage) {
     // Extract description - typically everything after "create task" or "add task"
-    let description = '';
-    const taskPattern = /(?:create|add|new|schedule)\s+task\s*:?\s*(.+?)(?:\s+(?:tomorrow|today|next|in|by|due|for|at)\s|\s*$)/i;
+    let description = "";
+    const taskPattern =
+      /(?:create|add|new|schedule)\s+task\s*:?\s*(.+?)(?:\s+(?:tomorrow|today|next|in|by|due|for|at)\s|\s*$)/i;
     const taskMatch = originalMessage.match(taskPattern);
     if (taskMatch) {
       description = taskMatch[1].trim();
@@ -875,33 +1081,34 @@ class ChatbotFallback {
 
     if (!description) {
       return {
-        action: 'CHAT',
-        intent: 'Need task description',
+        action: "CHAT",
+        intent: "Need task description",
         parameters: {},
-        response: 'To create a task, please provide a description. For example: "Create task: Follow up with John Doe tomorrow"',
+        response:
+          'To create a task, please provide a description. For example: "Create task: Follow up with John Doe tomorrow"',
         needsConfirmation: false,
-        missingFields: ['description']
+        missingFields: ["description"],
       };
     }
 
     const parameters = {
-      description
+      description,
     };
 
     // Try to extract due date
     if (originalMessage.match(/tomorrow/i)) {
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
-      parameters.due_date = tomorrow.toISOString().split('T')[0];
+      parameters.due_date = tomorrow.toISOString().split("T")[0];
     }
 
     return {
-      action: 'CREATE_TASK',
-      intent: 'Create task',
+      action: "CREATE_TASK",
+      intent: "Create task",
       parameters,
       response: `I'll create a task: "${description}"`,
       needsConfirmation: true,
-      missingFields: []
+      missingFields: [],
     };
   }
 
@@ -915,19 +1122,21 @@ class ChatbotFallback {
       parameters.overdue = true;
     }
     if (originalMessage.match(/completed|done/i)) {
-      parameters.status = 'completed';
+      parameters.status = "completed";
     }
     if (originalMessage.match(/pending|todo/i)) {
-      parameters.status = 'pending';
+      parameters.status = "pending";
     }
 
     return {
-      action: 'LIST_MY_TASKS',
-      intent: 'List my tasks',
+      action: "LIST_MY_TASKS",
+      intent: "List my tasks",
       parameters,
-      response: parameters.overdue ? 'Here are your overdue tasks:' : 'Here are your tasks:',
+      response: parameters.overdue
+        ? "Here are your overdue tasks:"
+        : "Here are your tasks:",
       needsConfirmation: false,
-      missingFields: []
+      missingFields: [],
     };
   }
 
@@ -936,7 +1145,7 @@ class ChatbotFallback {
    */
   handleUpdateTask(message, originalMessage) {
     // Try to extract task ID
-    let taskId = '';
+    let taskId = "";
     const taskIdMatch = originalMessage.match(/#?(\d+)/);
     if (taskIdMatch) {
       taskId = taskIdMatch[1];
@@ -944,25 +1153,26 @@ class ChatbotFallback {
 
     if (!taskId) {
       return {
-        action: 'CHAT',
-        intent: 'Need task ID',
+        action: "CHAT",
+        intent: "Need task ID",
         parameters: {},
-        response: 'To update a task, please provide the task ID. For example: "Mark task #5 as done"',
+        response:
+          'To update a task, please provide the task ID. For example: "Mark task #5 as done"',
         needsConfirmation: false,
-        missingFields: ['task_id']
+        missingFields: ["task_id"],
       };
     }
 
     return {
-      action: 'UPDATE_TASK',
-      intent: 'Complete task',
+      action: "UPDATE_TASK",
+      intent: "Complete task",
       parameters: {
         task_id: taskId,
-        status: 'completed'
+        status: "completed",
       },
       response: `I'll mark task #${taskId} as completed.`,
       needsConfirmation: false,
-      missingFields: []
+      missingFields: [],
     };
   }
 
@@ -973,25 +1183,26 @@ class ChatbotFallback {
     const name = this.extractName(originalMessage);
     const email = this.extractEmail(originalMessage);
 
-    let searchQuery = '';
+    let searchQuery = "";
     if (email) {
       searchQuery = email;
     } else if (name) {
       searchQuery = `${name.first_name} ${name.last_name}`.trim();
     }
 
-    let activityType = 'call';
+    let activityType = "call";
     if (originalMessage.match(/email/i)) {
-      activityType = 'email';
+      activityType = "email";
     } else if (originalMessage.match(/meeting/i)) {
-      activityType = 'meeting';
+      activityType = "meeting";
     } else if (originalMessage.match(/call|phone/i)) {
-      activityType = 'call';
+      activityType = "call";
     }
 
     // Extract description - content after "discussed", "about", or the activity type
-    let description = '';
-    const descPattern = /(?:discussed|about|regarding|re:|subject:)\s+(.+?)(?:\s*$)/i;
+    let description = "";
+    const descPattern =
+      /(?:discussed|about|regarding|re:|subject:)\s+(.+?)(?:\s*$)/i;
     const descMatch = originalMessage.match(descPattern);
     if (descMatch) {
       description = descMatch[1].trim();
@@ -999,22 +1210,24 @@ class ChatbotFallback {
 
     if (!searchQuery) {
       return {
-        action: 'CHAT',
-        intent: 'Need lead identifier',
+        action: "CHAT",
+        intent: "Need lead identifier",
         parameters: {},
         response: `To log a ${activityType}, please provide a lead name or email. For example: "Log call with john@example.com, discussed pricing"`,
         needsConfirmation: false,
-        missingFields: ['lead_name']
+        missingFields: ["lead_name"],
       };
     }
 
     return {
-      action: 'LOG_ACTIVITY',
-      intent: 'Log activity',
-      parameters: email ? { lead_name: email, activity_type: activityType, description } : { lead_name: searchQuery, activity_type: activityType, description },
-      response: `I'll log a ${activityType} with ${searchQuery}${description ? ` about "${description}"` : ''}.`,
+      action: "LOG_ACTIVITY",
+      intent: "Log activity",
+      parameters: email
+        ? { lead_name: email, activity_type: activityType, description }
+        : { lead_name: searchQuery, activity_type: activityType, description },
+      response: `I'll log a ${activityType} with ${searchQuery}${description ? ` about "${description}"` : ""}.`,
       needsConfirmation: true,
-      missingFields: []
+      missingFields: [],
     };
   }
 
@@ -1025,42 +1238,43 @@ class ChatbotFallback {
     // Try to extract team member name
     const name = this.extractName(originalMessage);
 
-    let userName = '';
+    let userName = "";
     if (name) {
       userName = `${name.first_name} ${name.last_name}`.trim();
     }
 
     if (!userName) {
       return {
-        action: 'CHAT',
-        intent: 'Need team member name',
+        action: "CHAT",
+        intent: "Need team member name",
         parameters: {},
-        response: 'To see team stats, please provide a team member name. For example: "Show Sarah\'s stats this month"',
+        response:
+          'To see team stats, please provide a team member name. For example: "Show Sarah\'s stats this month"',
         needsConfirmation: false,
-        missingFields: ['user_name']
+        missingFields: ["user_name"],
       };
     }
 
     const parameters = {
-      user_name: userName
+      user_name: userName,
     };
 
     // Extract period if available
     if (originalMessage.match(/this month/i)) {
-      parameters.period = 'this_month';
+      parameters.period = "this_month";
     } else if (originalMessage.match(/this week/i)) {
-      parameters.period = 'this_week';
+      parameters.period = "this_week";
     } else if (originalMessage.match(/last month/i)) {
-      parameters.period = 'last_month';
+      parameters.period = "last_month";
     }
 
     return {
-      action: 'GET_TEAM_STATS',
-      intent: 'Get team stats',
+      action: "GET_TEAM_STATS",
+      intent: "Get team stats",
       parameters,
       response: `Let me get ${userName}'s performance metrics.`,
       needsConfirmation: false,
-      missingFields: []
+      missingFields: [],
     };
   }
 
@@ -1072,22 +1286,22 @@ class ChatbotFallback {
 
     // Extract period if available
     if (originalMessage.match(/this month/i)) {
-      parameters.period = 'this_month';
+      parameters.period = "this_month";
     } else if (originalMessage.match(/this week/i)) {
-      parameters.period = 'this_week';
+      parameters.period = "this_week";
     } else if (originalMessage.match(/last month/i)) {
-      parameters.period = 'last_month';
+      parameters.period = "last_month";
     } else if (originalMessage.match(/today/i)) {
-      parameters.period = 'today';
+      parameters.period = "today";
     }
 
     return {
-      action: 'GET_MY_STATS',
-      intent: 'Get my stats',
+      action: "GET_MY_STATS",
+      intent: "Get my stats",
       parameters,
-      response: 'Let me pull your performance metrics.',
+      response: "Let me pull your performance metrics.",
       needsConfirmation: false,
-      missingFields: []
+      missingFields: [],
     };
   }
 
@@ -1096,13 +1310,14 @@ class ChatbotFallback {
    */
   handleBulkUpdate(message, originalMessage) {
     // Extract the filter criteria and updates
-    let filterStatus = '';
-    let updateStatus = '';
+    let filterStatus = "";
+    let updateStatus = "";
 
     // Look for "all [status] leads to [new status]"
-    const bulkPattern = /(?:update|change)\s+all\s+(\w+)\s+leads?\s+(?:to|as)\s+(\w+)/i;
+    const bulkPattern =
+      /(?:update|change)\s+all\s+(\w+)\s+leads?\s+(?:to|as)\s+(\w+)/i;
     const bulkMatch = originalMessage.match(bulkPattern);
-    
+
     if (bulkMatch) {
       filterStatus = bulkMatch[1].toLowerCase();
       updateStatus = bulkMatch[2].toLowerCase();
@@ -1110,25 +1325,26 @@ class ChatbotFallback {
 
     if (!filterStatus || !updateStatus) {
       return {
-        action: 'CHAT',
-        intent: 'Need update criteria',
+        action: "CHAT",
+        intent: "Need update criteria",
         parameters: {},
-        response: 'To bulk update leads, please specify which leads and what to update. For example: "Update all new leads to contacted status"',
+        response:
+          'To bulk update leads, please specify which leads and what to update. For example: "Update all new leads to contacted status"',
         needsConfirmation: false,
-        missingFields: ['filter_status', 'update_status']
+        missingFields: ["filter_status", "update_status"],
       };
     }
 
     return {
-      action: 'BULK_UPDATE_LEADS',
-      intent: 'Bulk update leads',
+      action: "BULK_UPDATE_LEADS",
+      intent: "Bulk update leads",
       parameters: {
         filter_status: filterStatus,
-        update_status: updateStatus
+        update_status: updateStatus,
       },
       response: `I'll show you a preview of ${filterStatus} leads and update them to ${updateStatus}.`,
       needsConfirmation: true,
-      missingFields: []
+      missingFields: [],
     };
   }
 
@@ -1137,20 +1353,20 @@ class ChatbotFallback {
    */
   handleBulkAssign(message, originalMessage) {
     const name = this.extractName(originalMessage);
-    let assignTo = '';
+    let assignTo = "";
     if (name) {
       assignTo = `${name.first_name} ${name.last_name}`.trim();
     }
 
     // Extract filter criteria
-    let filterSource = '';
-    let filterStatus = '';
-    
+    let filterSource = "";
+    let filterStatus = "";
+
     if (originalMessage.match(/unassigned/i)) {
-      filterSource = 'unassigned';
+      filterSource = "unassigned";
     }
     if (originalMessage.match(/website/i)) {
-      filterSource = 'website';
+      filterSource = "website";
     }
     const statusMatch = originalMessage.match(/(\w+)\s+leads?/);
     if (statusMatch) {
@@ -1159,12 +1375,13 @@ class ChatbotFallback {
 
     if (!assignTo) {
       return {
-        action: 'CHAT',
-        intent: 'Need assignee',
+        action: "CHAT",
+        intent: "Need assignee",
         parameters: {},
-        response: 'To bulk assign leads, please specify who to assign them to. For example: "Assign all unassigned website leads to Sarah"',
+        response:
+          'To bulk assign leads, please specify who to assign them to. For example: "Assign all unassigned website leads to Sarah"',
         needsConfirmation: false,
-        missingFields: ['assign_to']
+        missingFields: ["assign_to"],
       };
     }
 
@@ -1173,12 +1390,12 @@ class ChatbotFallback {
     if (filterSource) parameters.filter_source = filterSource;
 
     return {
-      action: 'BULK_ASSIGN_LEADS',
-      intent: 'Bulk assign leads',
+      action: "BULK_ASSIGN_LEADS",
+      intent: "Bulk assign leads",
       parameters,
       response: `I'll show you a preview and then assign these leads to ${assignTo}.`,
       needsConfirmation: true,
-      missingFields: []
+      missingFields: [],
     };
   }
 
@@ -1186,22 +1403,22 @@ class ChatbotFallback {
    * Handle group by analysis request
    */
   handleGroupByAnalysis(message, originalMessage) {
-    let groupBy = 'source';
+    let groupBy = "source";
 
-    if (originalMessage.match(/by source/i)) groupBy = 'source';
-    else if (originalMessage.match(/by status/i)) groupBy = 'status';
-    else if (originalMessage.match(/by company/i)) groupBy = 'company';
-    else if (originalMessage.match(/by priority/i)) groupBy = 'priority';
+    if (originalMessage.match(/by source/i)) groupBy = "source";
+    else if (originalMessage.match(/by status/i)) groupBy = "status";
+    else if (originalMessage.match(/by company/i)) groupBy = "company";
+    else if (originalMessage.match(/by priority/i)) groupBy = "priority";
 
     return {
-      action: 'GROUP_BY_ANALYSIS',
-      intent: 'Group and analyze leads',
+      action: "GROUP_BY_ANALYSIS",
+      intent: "Group and analyze leads",
       parameters: {
-        group_by: groupBy
+        group_by: groupBy,
       },
       response: `Here are your leads grouped by ${groupBy}.`,
       needsConfirmation: false,
-      missingFields: []
+      missingFields: [],
     };
   }
 
@@ -1209,35 +1426,35 @@ class ChatbotFallback {
    * Handle schedule report request
    */
   handleScheduleReport(message, originalMessage) {
-    let frequency = 'daily';
-    let reportType = 'all_leads';
-    let time = '09:00';
+    let frequency = "daily";
+    let reportType = "all_leads";
+    let time = "09:00";
 
-    if (originalMessage.match(/weekly/i)) frequency = 'weekly';
-    else if (originalMessage.match(/monthly/i)) frequency = 'monthly';
-    
-    if (originalMessage.match(/new leads/i)) reportType = 'new_leads';
-    else if (originalMessage.match(/won leads/i)) reportType = 'won_leads';
-    else if (originalMessage.match(/activity/i)) reportType = 'activities';
+    if (originalMessage.match(/weekly/i)) frequency = "weekly";
+    else if (originalMessage.match(/monthly/i)) frequency = "monthly";
+
+    if (originalMessage.match(/new leads/i)) reportType = "new_leads";
+    else if (originalMessage.match(/won leads/i)) reportType = "won_leads";
+    else if (originalMessage.match(/activity/i)) reportType = "activities";
 
     const timeMatch = originalMessage.match(/(\d{1,2}):?(\d{0,2})?/);
     if (timeMatch) {
-      const hour = timeMatch[1].padStart(2, '0');
-      const minute = timeMatch[2] ? timeMatch[2].padStart(2, '0') : '00';
+      const hour = timeMatch[1].padStart(2, "0");
+      const minute = timeMatch[2] ? timeMatch[2].padStart(2, "0") : "00";
       time = `${hour}:${minute}`;
     }
 
     return {
-      action: 'SCHEDULE_REPORT',
-      intent: 'Schedule report',
+      action: "SCHEDULE_REPORT",
+      intent: "Schedule report",
       parameters: {
         frequency,
         report_type: reportType,
-        time
+        time,
       },
       response: `I'll schedule a ${frequency} ${reportType} report to be sent at ${time}.`,
       needsConfirmation: true,
-      missingFields: []
+      missingFields: [],
     };
   }
 
@@ -1246,7 +1463,7 @@ class ChatbotFallback {
    */
   handleCreateReminder(message, originalMessage) {
     const name = this.extractName(originalMessage);
-    let reminderText = '';
+    let reminderText = "";
     let daysFromNow = 1;
 
     // Extract days/timing
@@ -1256,7 +1473,8 @@ class ChatbotFallback {
     }
 
     // Extract reminder text
-    const reminderPattern = /(?:remind|reminder)\s*:?\s*(.+?)(?:\s+in\s+\d+|\s*$)/i;
+    const reminderPattern =
+      /(?:remind|reminder)\s*:?\s*(.+?)(?:\s+in\s+\d+|\s*$)/i;
     const reminderMatch = originalMessage.match(reminderPattern);
     if (reminderMatch) {
       reminderText = reminderMatch[1].trim();
@@ -1268,18 +1486,19 @@ class ChatbotFallback {
 
     if (!reminderText) {
       return {
-        action: 'CHAT',
-        intent: 'Need reminder text',
+        action: "CHAT",
+        intent: "Need reminder text",
         parameters: {},
-        response: 'To create a reminder, please specify what to remind you about. For example: "Remind me to follow up with John in 3 days"',
+        response:
+          'To create a reminder, please specify what to remind you about. For example: "Remind me to follow up with John in 3 days"',
         needsConfirmation: false,
-        missingFields: ['reminder_text']
+        missingFields: ["reminder_text"],
       };
     }
 
     const parameters = {
       reminder_text: reminderText,
-      days_from_now: daysFromNow
+      days_from_now: daysFromNow,
     };
 
     if (name) {
@@ -1287,12 +1506,12 @@ class ChatbotFallback {
     }
 
     return {
-      action: 'CREATE_REMINDER',
-      intent: 'Create reminder',
+      action: "CREATE_REMINDER",
+      intent: "Create reminder",
       parameters,
-      response: `I'll create a reminder for ${daysFromNow} day${daysFromNow > 1 ? 's' : ''} from now: "${reminderText}".`,
+      response: `I'll create a reminder for ${daysFromNow} day${daysFromNow > 1 ? "s" : ""} from now: "${reminderText}".`,
       needsConfirmation: true,
-      missingFields: []
+      missingFields: [],
     };
   }
 
@@ -1301,12 +1520,13 @@ class ChatbotFallback {
    */
   handleGreeting() {
     return {
-      action: 'CHAT',
-      intent: 'Greeting',
+      action: "CHAT",
+      intent: "Greeting",
       parameters: {},
-      response: 'Hello! I\'m your CRM assistant. I can help you:\n\n• Create leads: "Create a lead named John Doe, email john@example.com"\n• Show leads: "Show me all active leads"\n• Search: "Find john@example.com"\n• Update: "Update john@example.com status to qualified"\n• Delete: "Delete john@example.com"\n• Add notes: "Add note to john@example.com: Called today"\n• Assign: "Assign john@example.com to Sarah"\n• Move stage: "Move john@example.com to proposal"\n• Check duplicates: "Check for duplicate john@example.com"\n• Export: "Export all qualified leads to CSV"\n• Statistics: "Show me lead statistics"\n\nWhat would you like to do?',
+      response:
+        'Hello! I\'m your CRM assistant. I can help you:\n\n• Create leads: "Create a lead named John Doe, email john@example.com"\n• Show leads: "Show me all active leads"\n• Search: "Find john@example.com"\n• Update: "Update john@example.com status to qualified"\n• Delete: "Delete john@example.com"\n• Add notes: "Add note to john@example.com: Called today"\n• Assign: "Assign john@example.com to Sarah"\n• Move stage: "Move john@example.com to proposal"\n• Check duplicates: "Check for duplicate john@example.com"\n• Export: "Export all qualified leads to CSV"\n• Statistics: "Show me lead statistics"\n\nWhat would you like to do?',
       needsConfirmation: false,
-      missingFields: []
+      missingFields: [],
     };
   }
 
@@ -1315,12 +1535,209 @@ class ChatbotFallback {
    */
   handleUnclear(message) {
     return {
-      action: 'CHAT',
-      intent: 'Unclear request',
+      action: "CHAT",
+      intent: "Unclear request",
       parameters: {},
-      response: 'I\'m not sure what you\'d like to do. Here are some things I can help with:\n\n• "Show me all leads"\n• "Create a lead named John Doe, email john@example.com"\n• "Search for john@example.com"\n• "Show me lead statistics"\n\nCould you rephrase your request?',
+      response:
+        'I\'m not sure what you\'d like to do. Here are some things I can help with:\n\n• "Show me all leads"\n• "Create a lead named John Doe, email john@example.com"\n• "Search for john@example.com"\n• "Show me lead statistics"\n\nCould you rephrase your request?',
       needsConfirmation: false,
-      missingFields: []
+      missingFields: [],
+    };
+  }
+
+  // ===== ACTIVITY HANDLERS =====
+
+  /**
+   * Handle get activities request
+   */
+  handleGetActivities(message, originalMessage) {
+    const parameters = {};
+
+    // Extract activity type if specified
+    const typeMatch = message.match(/\b(call|email|meeting|note|activity)\b/);
+    if (typeMatch) {
+      parameters.activity_type = typeMatch[1];
+    }
+
+    // Extract date range if specified
+    if (message.match(/last week/i)) {
+      const date = new Date();
+      date.setDate(date.getDate() - 7);
+      parameters.date_from = date.toISOString().split("T")[0];
+    } else if (message.match(/this month/i)) {
+      const date = new Date();
+      parameters.date_from = new Date(date.getFullYear(), date.getMonth(), 1)
+        .toISOString()
+        .split("T")[0];
+    }
+
+    return {
+      action: "GET_ACTIVITIES",
+      intent: "List activities",
+      parameters,
+      response: "Here are your recent activities:",
+      needsConfirmation: false,
+      missingFields: [],
+    };
+  }
+
+  /**
+   * Handle create activity request
+   */
+  handleCreateActivity(message, originalMessage) {
+    const name = this.extractName(originalMessage);
+    const email = this.extractEmail(originalMessage);
+
+    let leadIdentifier = "";
+    if (email) {
+      leadIdentifier = email;
+    } else if (name) {
+      leadIdentifier = `${name.first_name} ${name.last_name}`.trim();
+    }
+
+    // Determine activity type
+    let activityType = "call";
+    if (originalMessage.match(/email/i)) {
+      activityType = "email";
+    } else if (originalMessage.match(/meeting/i)) {
+      activityType = "meeting";
+    } else if (originalMessage.match(/call|phone/i)) {
+      activityType = "call";
+    }
+
+    // Extract description
+    let description = "";
+    const descPatterns = [
+      /(?:discussed|about|regarding)\s+(.+?)(?:\s*$)/i,
+      /(?:subject:|re:)\s*(.+?)(?:\s*$)/i,
+    ];
+
+    for (const pattern of descPatterns) {
+      const match = originalMessage.match(pattern);
+      if (match) {
+        description = match[1].trim();
+        break;
+      }
+    }
+
+    if (!description) {
+      description = `Logged ${activityType} ${leadIdentifier ? `with ${leadIdentifier}` : ""}`;
+    }
+
+    const parameters = {
+      activity_type: activityType,
+      description,
+    };
+
+    if (leadIdentifier) {
+      parameters.lead_name = leadIdentifier;
+    }
+
+    return {
+      action: "CREATE_ACTIVITY",
+      intent: "Create activity",
+      parameters,
+      response: `I'll create an activity: "${description}"`,
+      needsConfirmation: true,
+      missingFields: leadIdentifier ? [] : ["lead_name"],
+    };
+  }
+
+  /**
+   * Handle get activity stats request
+   */
+  handleGetActivityStats(message, originalMessage) {
+    const parameters = {};
+
+    // Extract period
+    if (message.match(/this month/i)) {
+      parameters.period = "this_month";
+    } else if (message.match(/last month/i)) {
+      parameters.period = "last_month";
+    } else if (message.match(/this week/i)) {
+      parameters.period = "this_week";
+    }
+
+    return {
+      action: "GET_ACTIVITY_STATS",
+      intent: "Get activity statistics",
+      parameters,
+      response: "Here are your activity statistics:",
+      needsConfirmation: false,
+      missingFields: [],
+    };
+  }
+
+  /**
+   * Handle get team timeline request
+   */
+  handleGetTeamTimeline(message, originalMessage) {
+    const parameters = {};
+
+    // Extract date range
+    if (message.match(/last week/i)) {
+      const date = new Date();
+      date.setDate(date.getDate() - 7);
+      parameters.date_from = date.toISOString().split("T")[0];
+    }
+
+    return {
+      action: "GET_TEAM_TIMELINE",
+      intent: "Get team timeline",
+      parameters,
+      response: "Here's your team's activity timeline:",
+      needsConfirmation: false,
+      missingFields: [],
+    };
+  }
+
+  /**
+   * Handle complete activity request
+   */
+  handleCompleteActivity(message, originalMessage) {
+    // Try to extract activity ID
+    let activityId = "";
+    const idMatch = originalMessage.match(/activity\s*#?(\d+)|#(\d+)/);
+    if (idMatch) {
+      activityId = idMatch[1] || idMatch[2];
+    }
+
+    // Extract outcome if mentioned
+    let outcome = "";
+    const outcomeMatch = originalMessage.match(
+      /(?:outcome|result|status):?\s*(.+?)(?:\s*$)/i,
+    );
+    if (outcomeMatch) {
+      outcome = outcomeMatch[1].trim();
+    }
+
+    if (!activityId) {
+      return {
+        action: "CHAT",
+        intent: "Need activity ID",
+        parameters: {},
+        response:
+          'To complete an activity, please provide the activity ID. For example: "Complete activity #5"',
+        needsConfirmation: false,
+        missingFields: ["activity_id"],
+      };
+    }
+
+    const parameters = {
+      activity_id: activityId,
+    };
+
+    if (outcome) {
+      parameters.outcome = outcome;
+    }
+
+    return {
+      action: "COMPLETE_ACTIVITY",
+      intent: "Complete activity",
+      parameters,
+      response: `I'll mark activity #${activityId} as completed.`,
+      needsConfirmation: true,
+      missingFields: [],
     };
   }
 }
