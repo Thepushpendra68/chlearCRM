@@ -18,7 +18,7 @@ import GlobalSearch from "../Search/GlobalSearch";
 import MobileSearchModal from "../MobileSearch/MobileSearchModal";
 import { MobileOnly } from "../ResponsiveUtils";
 import { Button } from "../ui/button";
-import LanguageSwitcher from "../UI/LanguageSwitcher";
+import LanguageSwitcher from "../ui/LanguageSwitcher";
 
 const Header = ({ setSidebarOpen, isCollapsed, currentPath }) => {
   const { user, logout, chatPanelOpen, toggleChatPanel } = useAuth();
