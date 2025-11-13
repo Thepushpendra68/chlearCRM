@@ -44,6 +44,9 @@ const EmailTemplateEditor = lazy(() => import('./pages/EmailTemplateEditor'))
 const EmailSequences = lazy(() => import('./pages/EmailSequences'))
 const EmailSequenceBuilder = lazy(() => import('./pages/EmailSequenceBuilder'))
 const EmailAnalytics = lazy(() => import('./pages/EmailAnalytics'))
+const WorkflowLibrary = lazy(() => import('./pages/WorkflowLibrary'))
+const ScoringRules = lazy(() => import('./pages/ScoringRules'))
+const WhatsApp = lazy(() => import('./pages/WhatsApp'))
 
 const RouteLoadingFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -112,6 +115,11 @@ function App() {
                   <CustomFields />
                 </RoleProtectedRoute>
               } />
+              <Route path="scoring" element={
+                <RoleProtectedRoute allowedRoles={['manager', 'company_admin', 'super_admin']}>
+                  <ScoringRules />
+                </RoleProtectedRoute>
+              } />
               <Route path="email/settings" element={
                 <RoleProtectedRoute allowedRoles={['company_admin', 'super_admin']}>
                   <EmailSettings />
@@ -122,6 +130,8 @@ function App() {
               <Route path="email/sequences" element={<EmailSequences />} />
               <Route path="email/sequences/:id" element={<EmailSequenceBuilder />} />
               <Route path="email/analytics" element={<EmailAnalytics />} />
+              <Route path="email/workflow-library" element={<WorkflowLibrary />} />
+              <Route path="whatsapp" element={<WhatsApp />} />
             </Route>
 
             {/* Platform routes - Super Admin only */}

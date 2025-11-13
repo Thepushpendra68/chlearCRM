@@ -1,7 +1,7 @@
 import { format } from 'date-fns';
 import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeftIcon, PencilIcon, TrashIcon, PhoneIcon, EnvelopeIcon, BuildingOfficeIcon, UserPlusIcon, UserMinusIcon, UserIcon, LinkIcon } from '@heroicons/react/24/outline'
+import { ArrowLeftIcon, PencilIcon, TrashIcon, PhoneIcon, EnvelopeIcon, BuildingOfficeIcon, UserPlusIcon, UserMinusIcon, UserIcon, LinkIcon, ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline'
 import leadService from '../services/leadService'
 import accountService from '../services/accountService'
 import contactService from '../services/contactService'
@@ -9,6 +9,7 @@ import LeadForm from '../components/LeadForm'
 import ActivityForm from '../components/Activities/ActivityForm'
 import TaskForm from '../components/Tasks/TaskForm'
 import SendEmailModal from '../components/SendEmailModal'
+import SendWhatsAppModal from '../components/WhatsApp/SendWhatsAppModal'
 import ContactForm from '../components/Contacts/ContactForm'
 import Modal from '../components/Modal'
 import taskService from '../services/taskService'
@@ -26,6 +27,7 @@ const LeadDetail = () => {
   const [showActivityForm, setShowActivityForm] = useState(false)
   const [showTaskForm, setShowTaskForm] = useState(false)
   const [showSendEmailModal, setShowSendEmailModal] = useState(false)
+  const [showSendWhatsAppModal, setShowSendWhatsAppModal] = useState(false)
   const [activityType, setActivityType] = useState('note')
   const [showContactModal, setShowContactModal] = useState(false)
   const [selectedContact, setSelectedContact] = useState(null)
@@ -947,13 +949,22 @@ const LeadDetail = () => {
                     </a>
                   )}
                   {lead.phone && (
-                    <a
-                      href={`tel:${lead.phone}`}
-                      className="flex items-center px-3 py-2 text-xs font-medium text-gray-700 bg-gray-50 rounded-md hover:bg-green-50 hover:text-green-700 transition-colors"
-                    >
-                      <PhoneIcon className="h-3 w-3 mr-2" />
-                      Call Now
-                    </a>
+                    <>
+                      <a
+                        href={`tel:${lead.phone}`}
+                        className="flex items-center px-3 py-2 text-xs font-medium text-gray-700 bg-gray-50 rounded-md hover:bg-green-50 hover:text-green-700 transition-colors"
+                      >
+                        <PhoneIcon className="h-3 w-3 mr-2" />
+                        Call Now
+                      </a>
+                      <button
+                        onClick={() => setShowSendWhatsAppModal(true)}
+                        className="flex items-center px-3 py-2 text-xs font-medium text-gray-700 bg-gray-50 rounded-md hover:bg-green-50 hover:text-green-700 transition-colors w-full"
+                      >
+                        <ChatBubbleLeftRightIcon className="h-3 w-3 mr-2" />
+                        Send WhatsApp
+                      </button>
+                    </>
                   )}
                   <button 
                     onClick={() => {
@@ -1055,6 +1066,18 @@ const LeadDetail = () => {
             onClose={() => {
               setShowSendEmailModal(false);
               fetchLead(); // Refresh to show new email activity
+            }}
+            lead={lead}
+          />
+        )}
+
+        {/* Send WhatsApp Modal */}
+        {showSendWhatsAppModal && (
+          <SendWhatsAppModal
+            isOpen={showSendWhatsAppModal}
+            onClose={() => {
+              setShowSendWhatsAppModal(false);
+              fetchLead(); // Refresh to show new WhatsApp activity
             }}
             lead={lead}
           />
