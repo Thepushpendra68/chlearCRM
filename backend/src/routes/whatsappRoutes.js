@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const whatsappController = require('../controllers/whatsappController');
 const whatsappWebhookController = require('../controllers/whatsappWebhookController');
+const whatsappSequenceController = require('../controllers/whatsappSequenceController');
 const { authenticate, requireRole } = require('../middleware/authMiddleware');
 
 // Webhook routes (no authentication - Meta verifies via signature)
@@ -28,6 +29,16 @@ router.get('/templates', whatsappController.getTemplates.bind(whatsappController
 // Settings (Manager+)
 router.get('/settings', requireRole(['manager', 'company_admin', 'super_admin']), whatsappController.getSettings.bind(whatsappController));
 router.post('/settings', requireRole(['manager', 'company_admin', 'super_admin']), whatsappController.updateSettings.bind(whatsappController));
+
+// Sequences/Campaigns (Manager+)
+router.get('/sequences', requireRole(['manager', 'company_admin', 'super_admin']), whatsappSequenceController.getSequences.bind(whatsappSequenceController));
+router.get('/sequences/:id', requireRole(['manager', 'company_admin', 'super_admin']), whatsappSequenceController.getSequenceById.bind(whatsappSequenceController));
+router.post('/sequences', requireRole(['manager', 'company_admin', 'super_admin']), whatsappSequenceController.createSequence.bind(whatsappSequenceController));
+router.put('/sequences/:id', requireRole(['manager', 'company_admin', 'super_admin']), whatsappSequenceController.updateSequence.bind(whatsappSequenceController));
+router.delete('/sequences/:id', requireRole(['manager', 'company_admin', 'super_admin']), whatsappSequenceController.deleteSequence.bind(whatsappSequenceController));
+router.post('/sequences/:id/enroll', requireRole(['manager', 'company_admin', 'super_admin']), whatsappSequenceController.enrollLead.bind(whatsappSequenceController));
+router.post('/sequences/:id/unenroll', requireRole(['manager', 'company_admin', 'super_admin']), whatsappSequenceController.unenrollLead.bind(whatsappSequenceController));
+router.get('/sequences/:id/enrollments', requireRole(['manager', 'company_admin', 'super_admin']), whatsappSequenceController.getEnrollments.bind(whatsappSequenceController));
 
 module.exports = router;
 

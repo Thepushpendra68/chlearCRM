@@ -372,6 +372,154 @@ export const isValidWhatsAppNumber = (phone) => {
   return cleaned.length === 10 || cleaned.length === 12;
 };
 
+/**
+ * Get all WhatsApp sequences
+ */
+export const getSequences = async (filters = {}) => {
+  try {
+    const params = new URLSearchParams();
+    
+    if (filters.isActive !== undefined) params.append('is_active', filters.isActive);
+    if (filters.search) params.append('search', filters.search);
+
+    const response = await api.get(`/whatsapp/sequences?${params.toString()}`);
+    return { success: true, data: response.data };
+  } catch (error) {
+    const errorMessage = extractErrorMessage(error);
+    const normalized = normalizeError(errorMessage);
+    return {
+      success: false,
+      error: normalized,
+    };
+  }
+};
+
+/**
+ * Get sequence by ID
+ */
+export const getSequenceById = async (sequenceId) => {
+  try {
+    const response = await api.get(`/whatsapp/sequences/${sequenceId}`);
+    return { success: true, data: response.data };
+  } catch (error) {
+    const errorMessage = extractErrorMessage(error);
+    const normalized = normalizeError(errorMessage);
+    return {
+      success: false,
+      error: normalized,
+    };
+  }
+};
+
+/**
+ * Create WhatsApp sequence
+ */
+export const createSequence = async (sequenceData) => {
+  try {
+    const response = await api.post('/whatsapp/sequences', sequenceData);
+    return { success: true, data: response.data };
+  } catch (error) {
+    const errorMessage = extractErrorMessage(error);
+    const normalized = normalizeError(errorMessage);
+    return {
+      success: false,
+      error: normalized,
+    };
+  }
+};
+
+/**
+ * Update WhatsApp sequence
+ */
+export const updateSequence = async (sequenceId, sequenceData) => {
+  try {
+    const response = await api.put(`/whatsapp/sequences/${sequenceId}`, sequenceData);
+    return { success: true, data: response.data };
+  } catch (error) {
+    const errorMessage = extractErrorMessage(error);
+    const normalized = normalizeError(errorMessage);
+    return {
+      success: false,
+      error: normalized,
+    };
+  }
+};
+
+/**
+ * Delete WhatsApp sequence
+ */
+export const deleteSequence = async (sequenceId) => {
+  try {
+    await api.delete(`/whatsapp/sequences/${sequenceId}`);
+    return { success: true };
+  } catch (error) {
+    const errorMessage = extractErrorMessage(error);
+    const normalized = normalizeError(errorMessage);
+    return {
+      success: false,
+      error: normalized,
+    };
+  }
+};
+
+/**
+ * Enroll lead in sequence
+ */
+export const enrollLead = async (sequenceId, leadId) => {
+  try {
+    const response = await api.post(`/whatsapp/sequences/${sequenceId}/enroll`, {
+      lead_id: leadId
+    });
+    return { success: true, data: response.data };
+  } catch (error) {
+    const errorMessage = extractErrorMessage(error);
+    const normalized = normalizeError(errorMessage);
+    return {
+      success: false,
+      error: normalized,
+    };
+  }
+};
+
+/**
+ * Unenroll lead from sequence
+ */
+export const unenrollLead = async (sequenceId, leadId) => {
+  try {
+    await api.post(`/whatsapp/sequences/${sequenceId}/unenroll`, {
+      lead_id: leadId
+    });
+    return { success: true };
+  } catch (error) {
+    const errorMessage = extractErrorMessage(error);
+    const normalized = normalizeError(errorMessage);
+    return {
+      success: false,
+      error: normalized,
+    };
+  }
+};
+
+/**
+ * Get enrollments for a sequence
+ */
+export const getSequenceEnrollments = async (sequenceId, filters = {}) => {
+  try {
+    const params = new URLSearchParams();
+    if (filters.status) params.append('status', filters.status);
+
+    const response = await api.get(`/whatsapp/sequences/${sequenceId}/enrollments?${params.toString()}`);
+    return { success: true, data: response.data };
+  } catch (error) {
+    const errorMessage = extractErrorMessage(error);
+    const normalized = normalizeError(errorMessage);
+    return {
+      success: false,
+      error: normalized,
+    };
+  }
+};
+
 export default {
   sendTextMessage,
   sendTemplateMessage,
@@ -387,6 +535,14 @@ export default {
   markAsRead,
   formatPhoneNumber,
   formatPhoneDisplay,
-  isValidWhatsAppNumber
+  isValidWhatsAppNumber,
+  getSequences,
+  getSequenceById,
+  createSequence,
+  updateSequence,
+  deleteSequence,
+  enrollLead,
+  unenrollLead,
+  getSequenceEnrollments
 };
 

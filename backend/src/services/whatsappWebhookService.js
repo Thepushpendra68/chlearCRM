@@ -1,6 +1,7 @@
 const whatsappMetaService = require('./whatsappMetaService');
 const { supabaseAdmin } = require('../config/supabase');
 const whatsappSendService = require('./whatsappSendService');
+const whatsappAiService = require('./whatsappAiService');
 const leadService = require('./leadService');
 const activityService = require('./activityService');
 const ApiError = require('../utils/ApiError');
@@ -158,6 +159,39 @@ class WhatsAppWebhookService {
           await whatsappMetaService.markAsRead(companyId, message.id);
         } catch (error) {
           console.error('Error marking message as read:', error);
+        }
+
+        // Process with AI chatbot if message is text and auto-reply is enabled
+        if (message.type === 'text' && message.text?.body) {
+          try {
+            const autoReplyEnabled = await whatsappAiService.isAutoReplyEnabled(companyId);
+            
+            if (autoReplyEnabled) {
+              console.log(`[WhatsApp Webhook] Processing message with AI: ${message.text.body.substring(0, 50)}...`);
+              
+              await whatsappAiService.processIncomingMessage(
+                companyId,
+                message.from,
+                message.text.body,
+                {
+                  lead_id: context.lead_id,
+                  contact_id: context.contact_id,
+                  account_id: context.account_id,
+                  whatsapp_message_id: savedMessage.id
+                },
+                {
+                  autoReply: true,
+                  language: null // Auto-detect
+                }
+              );
+            } else {
+              console.log('[WhatsApp Webhook] Auto-reply is disabled for this company');
+            }
+          } catch (aiError) {
+            console.error('[WhatsApp Webhook] Error processing message with AI:', aiError);
+            // Don't fail the webhook if AI processing fails
+            // Message is already saved and logged
+          }
         }
 
         results.push({ messageId: savedMessage.id, context });

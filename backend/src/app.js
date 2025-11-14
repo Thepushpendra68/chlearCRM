@@ -69,6 +69,7 @@ const errorHandler = require('./middleware/errorMiddleware');
 
 // Initialize email sequence worker (starts automatically in production)
 require('./workers/emailSequenceWorker');
+require('./workers/whatsappSequenceWorker');
 
 const app = express();
 const PORT = process.env.PORT || 5000;

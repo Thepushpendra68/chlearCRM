@@ -298,6 +298,7 @@ const getLeadById = async (id) => {
 const createLead = async (leadData) => {
   try {
     const { supabaseAdmin } = require('../config/supabase');
+    const whatsappSequenceService = require('./whatsappSequenceService');
 
     // Transform frontend field names to database column names
     const normalizedEmail = normalizeEmail(leadData.email);
@@ -372,6 +373,16 @@ const createLead = async (leadData) => {
         throw new ApiError('Email already exists', 400);
       }
       throw error;
+    }
+
+    // Auto-enroll in WhatsApp sequences if lead source is WhatsApp
+    if (lead.source === 'whatsapp' && lead.company_id) {
+      try {
+        await whatsappSequenceService.checkAndAutoEnroll(lead.id, lead.company_id);
+      } catch (enrollError) {
+        console.error('Error auto-enrolling lead in WhatsApp sequences:', enrollError);
+        // Don't fail lead creation if enrollment fails
+      }
     }
 
     return lead;

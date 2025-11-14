@@ -33,6 +33,7 @@ import {
   IdentificationIcon,
   BookOpenIcon,
   ChatBubbleLeftRightIcon,
+  MessageSquareIcon,
 } from "@heroicons/react/24/outline";
 import api from "../../services/api";
 
@@ -210,6 +211,19 @@ const Sidebar = ({
             name: t("navigation:menu.scoringRules"),
             href: "/app/scoring",
             icon: TrophyIcon,
+            badge: null,
+          },
+        ]
+      : []),
+    // WhatsApp Campaigns - for managers and admins
+    ...(user?.role === "manager" ||
+    user?.role === "company_admin" ||
+    user?.role === "super_admin"
+      ? [
+          {
+            name: "WhatsApp Campaigns",
+            href: "/app/whatsapp/sequences",
+            icon: MessageSquareIcon,
             badge: null,
           },
         ]

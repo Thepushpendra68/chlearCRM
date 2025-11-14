@@ -47,6 +47,8 @@ const EmailAnalytics = lazy(() => import('./pages/EmailAnalytics'))
 const WorkflowLibrary = lazy(() => import('./pages/WorkflowLibrary'))
 const ScoringRules = lazy(() => import('./pages/ScoringRules'))
 const WhatsApp = lazy(() => import('./pages/WhatsApp'))
+const WhatsAppSequences = lazy(() => import('./pages/WhatsAppSequences'))
+const WhatsAppSequenceBuilder = lazy(() => import('./pages/WhatsAppSequenceBuilder'))
 
 const RouteLoadingFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -132,6 +134,16 @@ function App() {
               <Route path="email/analytics" element={<EmailAnalytics />} />
               <Route path="email/workflow-library" element={<WorkflowLibrary />} />
               <Route path="whatsapp" element={<WhatsApp />} />
+              <Route path="whatsapp/sequences" element={
+                <RoleProtectedRoute allowedRoles={['manager', 'company_admin', 'super_admin']}>
+                  <WhatsAppSequences />
+                </RoleProtectedRoute>
+              } />
+              <Route path="whatsapp/sequences/:id" element={
+                <RoleProtectedRoute allowedRoles={['manager', 'company_admin', 'super_admin']}>
+                  <WhatsAppSequenceBuilder />
+                </RoleProtectedRoute>
+              } />
             </Route>
 
             {/* Platform routes - Super Admin only */}
