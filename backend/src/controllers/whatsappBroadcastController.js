@@ -17,6 +17,12 @@ class WhatsAppBroadcastController {
         created_by: req.user.id
       };
 
+      console.log('[Broadcast Controller] Creating broadcast:', {
+        companyId: req.user.company_id,
+        recipientType: broadcastData.recipient_type,
+        messageType: broadcastData.message_type
+      });
+
       const result = await whatsappBroadcastService.createBroadcast(
         req.user.company_id,
         broadcastData
@@ -27,6 +33,7 @@ class WhatsAppBroadcastController {
         data: result.broadcast
       });
     } catch (error) {
+      console.error('[Broadcast Controller] Error creating broadcast:', error);
       next(error);
     }
   }

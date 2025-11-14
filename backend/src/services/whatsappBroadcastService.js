@@ -133,13 +133,32 @@ class WhatsAppBroadcastService {
 
         case 'contacts':
           // Get all contacts with phone numbers
-          const { data: contacts, error: contactsError } = await supabaseAdmin
+          // Use separate queries and combine results since Supabase .or() can be tricky with null checks
+          const { data: contactsWithPhone, error: phoneError } = await supabaseAdmin
             .from('contacts')
             .select('id, phone, mobile_phone, lead_id, first_name, last_name')
             .eq('company_id', companyId)
-            .or('phone.not.is.null,mobile_phone.not.is.null');
+            .not('phone', 'is', null)
+            .neq('phone', '');
 
-          if (contactsError) throw contactsError;
+          if (phoneError) throw phoneError;
+
+          const { data: contactsWithMobile, error: mobileError } = await supabaseAdmin
+            .from('contacts')
+            .select('id, phone, mobile_phone, lead_id, first_name, last_name')
+            .eq('company_id', companyId)
+            .not('mobile_phone', 'is', null)
+            .neq('mobile_phone', '');
+
+          if (mobileError) throw mobileError;
+
+          // Combine and deduplicate contacts
+          const allContacts = [...(contactsWithPhone || []), ...(contactsWithMobile || [])];
+          const uniqueContacts = Array.from(
+            new Map(allContacts.map(contact => [contact.id, contact])).values()
+          );
+
+          const contacts = uniqueContacts;
 
           contacts.forEach(contact => {
             const phone = contact.phone || contact.mobile_phone;
@@ -160,36 +179,61 @@ class WhatsAppBroadcastService {
           }
 
           // Get leads
-          const { data: customLeads, error: customLeadsError } = await supabaseAdmin
-            .from('leads')
-            .select('id, phone, name')
-            .eq('company_id', companyId)
-            .in('id', recipientIds.filter(id => id.startsWith('lead_')).map(id => id.replace('lead_', '')))
-            .not('phone', 'is', null);
+          const leadIds = recipientIds.filter(id => id.startsWith('lead_')).map(id => id.replace('lead_', ''));
+          if (leadIds.length > 0) {
+            const { data: customLeads, error: customLeadsError } = await supabaseAdmin
+              .from('leads')
+              .select('id, phone, name')
+              .eq('company_id', companyId)
+              .in('id', leadIds)
+              .not('phone', 'is', null)
+              .neq('phone', '');
 
-          if (customLeadsError) throw customLeadsError;
+            if (customLeadsError) throw customLeadsError;
 
-          customLeads.forEach(lead => {
-            if (lead.phone) {
-              recipients.push({
-                whatsapp_id: this.normalizePhoneNumber(lead.phone),
-                lead_id: lead.id,
-                contact_id: null
-              });
-            }
-          });
+            customLeads.forEach(lead => {
+              if (lead.phone) {
+                recipients.push({
+                  whatsapp_id: this.normalizePhoneNumber(lead.phone),
+                  lead_id: lead.id,
+                  contact_id: null
+                });
+              }
+            });
+          }
 
           // Get contacts
           const contactIds = recipientIds.filter(id => id.startsWith('contact_')).map(id => id.replace('contact_', ''));
           if (contactIds.length > 0) {
-            const { data: customContacts, error: customContactsError } = await supabaseAdmin
+            // Get contacts with phone
+            const { data: contactsWithPhone, error: phoneError } = await supabaseAdmin
               .from('contacts')
               .select('id, phone, mobile_phone, lead_id')
               .eq('company_id', companyId)
               .in('id', contactIds)
-              .or('phone.not.is.null,mobile_phone.not.is.null');
+              .not('phone', 'is', null)
+              .neq('phone', '');
 
-            if (customContactsError) throw customContactsError;
+            if (phoneError) throw phoneError;
+
+            // Get contacts with mobile_phone
+            const { data: contactsWithMobile, error: mobileError } = await supabaseAdmin
+              .from('contacts')
+              .select('id, phone, mobile_phone, lead_id')
+              .eq('company_id', companyId)
+              .in('id', contactIds)
+              .not('mobile_phone', 'is', null)
+              .neq('mobile_phone', '');
+
+            if (mobileError) throw mobileError;
+
+            // Combine and deduplicate
+            const allCustomContacts = [...(contactsWithPhone || []), ...(contactsWithMobile || [])];
+            const uniqueCustomContacts = Array.from(
+              new Map(allCustomContacts.map(contact => [contact.id, contact])).values()
+            );
+
+            const customContacts = uniqueCustomContacts;
 
             customContacts.forEach(contact => {
               const phone = contact.phone || contact.mobile_phone;

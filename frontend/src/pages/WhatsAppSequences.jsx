@@ -265,7 +265,7 @@ const WhatsAppSequences = () => {
                       )}
                     </button>
                     <button
-                      onClick={() => navigate(`/app/whatsapp/sequences/${sequence.id}/edit`)}
+                      onClick={() => navigate(`/app/whatsapp/sequences/${sequence.id}`)}
                       className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
                       title="Edit"
                     >

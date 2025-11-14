@@ -50,6 +50,7 @@ const WhatsApp = lazy(() => import('./pages/WhatsApp'))
 const WhatsAppSequences = lazy(() => import('./pages/WhatsAppSequences'))
 const WhatsAppBroadcasts = lazy(() => import('./pages/WhatsAppBroadcasts'))
 const WhatsAppSequenceBuilder = lazy(() => import('./pages/WhatsAppSequenceBuilder'))
+const WhatsAppSequenceEnrollments = lazy(() => import('./pages/WhatsAppSequenceEnrollments'))
 
 const RouteLoadingFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -138,6 +139,11 @@ function App() {
               <Route path="whatsapp/sequences" element={
                 <RoleProtectedRoute allowedRoles={['manager', 'company_admin', 'super_admin']}>
                   <WhatsAppSequences />
+                </RoleProtectedRoute>
+              } />
+              <Route path="whatsapp/sequences/:id/enrollments" element={
+                <RoleProtectedRoute allowedRoles={['manager', 'company_admin', 'super_admin']}>
+                  <WhatsAppSequenceEnrollments />
                 </RoleProtectedRoute>
               } />
               <Route path="whatsapp/sequences/:id" element={

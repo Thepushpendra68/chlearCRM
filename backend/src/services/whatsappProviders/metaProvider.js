@@ -207,7 +207,15 @@ class MetaWhatsAppProvider extends BaseWhatsAppProvider {
    */
   async getTemplates() {
     try {
-      const url = `${this.baseUrl}/${this.businessAccountId || this.phoneNumberId}/message_templates`;
+      // Use business account ID if available, otherwise use phone number ID
+      // Note: Templates are typically accessed via business account ID
+      const accountId = this.businessAccountId || this.phoneNumberId;
+      
+      if (!accountId) {
+        throw new ApiError('Business Account ID or Phone Number ID is required to fetch templates', 400);
+      }
+
+      const url = `${this.baseUrl}/${accountId}/message_templates`;
 
       const response = await axios.get(url, {
         headers: {
@@ -220,6 +228,7 @@ class MetaWhatsAppProvider extends BaseWhatsAppProvider {
         templates: response.data.data || []
       };
     } catch (error) {
+      console.error('Error fetching templates from Meta:', error.response?.data || error.message);
       this.handleError(error, 'Failed to get WhatsApp templates');
     }
   }

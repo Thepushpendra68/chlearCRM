@@ -188,13 +188,40 @@ class WhatsAppController {
    */
   async getTemplates(req, res, next) {
     try {
-      const result = await whatsappMetaService.getTemplates(req.user.company_id);
+      console.log('[WhatsApp Controller] Getting templates for company:', req.user.company_id);
+      
+      // First try to get templates from Meta API
+      try {
+        const result = await whatsappMetaService.getTemplates(req.user.company_id);
+        
+        if (result && result.success) {
+          return res.json({
+            success: true,
+            data: result.templates || []
+          });
+        }
+      } catch (metaError) {
+        console.warn('[WhatsApp Controller] Failed to get templates from Meta, trying database:', metaError.message);
+      }
+
+      // Fallback: Get templates from database
+      const { data: templates, error } = await supabaseAdmin
+        .from('whatsapp_templates')
+        .select('*')
+        .eq('company_id', req.user.company_id)
+        .eq('status', 'approved')
+        .order('created_at', { ascending: false });
+
+      if (error && error.code !== 'PGRST116') {
+        throw error;
+      }
 
       res.json({
         success: true,
-        data: result.templates
+        data: templates || []
       });
     } catch (error) {
+      console.error('[WhatsApp Controller] Error getting templates:', error);
       next(error);
     }
   }
