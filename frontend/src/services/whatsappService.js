@@ -69,7 +69,22 @@ export const sendTextMessage = async ({ to, message, leadId }) => {
       url: error.config?.url,
       isRetry: error.config?._retry
     });
-    
+
+    const errorMessage = extractErrorMessage(error);
+
+    // Special case: Meta (WhatsApp) access token has expired or is invalid
+    if (
+      error.response?.status === 401 &&
+      typeof errorMessage === 'string' &&
+      errorMessage.toLowerCase().includes('error validating access token')
+    ) {
+      return {
+        success: false,
+        error:
+          'Your WhatsApp access token has expired. Please open WhatsApp Settings and update the Meta access token.',
+      };
+    }
+
     // Handle 401 - but only if refresh already failed (indicated by _retry flag)
     if (error.response?.status === 401 && error.config?._retry) {
       // This means token refresh was attempted and failed
@@ -79,17 +94,15 @@ export const sendTextMessage = async ({ to, message, leadId }) => {
       };
     }
     
-    // For other 401s, the API interceptor will handle refresh and retry
+    // For other 401s (true auth issues), the API interceptor will handle refresh and retry
     // We just need to return a generic error
     if (error.response?.status === 401) {
-      // The interceptor is handling this - just return a generic error
       return {
         success: false,
         error: 'Authentication failed. Please try again.',
       };
     }
     
-    const errorMessage = extractErrorMessage(error);
     const normalized = normalizeError(errorMessage);
     
     return {

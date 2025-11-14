@@ -215,6 +215,23 @@ api.interceptors.response.use(
           const hadSession = !!currentSession;
           const hasRefreshToken = !!currentSession?.refresh_token;
 
+          // Detect Meta (WhatsApp) OAuth token errors so we DON'T log the user out
+          const isMetaAccessTokenError =
+            typeof errorMessage === 'string' &&
+            errorMessage.toLowerCase().includes('error validating access token');
+
+          if (isMetaAccessTokenError) {
+            console.log('[API] 401 from Meta WhatsApp access token, not Supabase auth. Skipping sign-out.');
+
+            // Show a clear message guiding the user to update WhatsApp settings
+            toast.error('Your WhatsApp access token has expired. Please open WhatsApp Settings and update the Meta access token.', {
+              duration: 6000,
+            });
+
+            // Do NOT attempt Supabase refresh or sign out; just reject so caller can handle
+            return Promise.reject(error);
+          }
+
           console.log('[API] 401 Unauthorized received', {
             hadSession,
             hasRefreshToken,
