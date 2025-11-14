@@ -158,7 +158,7 @@ class VoiceService {
       .replace(/\betc\./g, 'etcetera')
       .replace(/\bDr\./g, 'Doctor')
       .replace(/\bMr\./g, 'Mister')
-      .replace(/\bMrs\./g., 'Missus')
+      .replace(/\bMrs\./g, 'Missus')
       .replace(/\bMs\./g, 'Miss')
       // Clean up punctuation
       .replace(/([.!?])\1+/g, '$1')
