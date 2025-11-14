@@ -3,9 +3,19 @@ module.exports = {
   env: {
     browser: true,
     es2021: true,
+    node: true,
+    jest: true,
   },
   globals: {
     process: 'readonly',
+    describe: 'readonly',
+    test: 'readonly',
+    expect: 'readonly',
+    beforeEach: 'readonly',
+    afterEach: 'readonly',
+    beforeAll: 'readonly',
+    afterAll: 'readonly',
+    jest: 'readonly',
   },
   settings: {
     react: {
@@ -30,6 +40,11 @@ module.exports = {
     '**/*.config.js',
     '*.config.js',
     'src/test/setup.js',
+    'tests/**',
+    '**/*.test.js',
+    '**/*.test.jsx',
+    '**/*.test.ts',
+    '**/*.test.tsx',
   ],
   rules: {
     'react/prop-types': 'off',
