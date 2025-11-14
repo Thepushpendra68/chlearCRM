@@ -48,6 +48,7 @@ const WorkflowLibrary = lazy(() => import('./pages/WorkflowLibrary'))
 const ScoringRules = lazy(() => import('./pages/ScoringRules'))
 const WhatsApp = lazy(() => import('./pages/WhatsApp'))
 const WhatsAppSequences = lazy(() => import('./pages/WhatsAppSequences'))
+const WhatsAppBroadcasts = lazy(() => import('./pages/WhatsAppBroadcasts'))
 const WhatsAppSequenceBuilder = lazy(() => import('./pages/WhatsAppSequenceBuilder'))
 
 const RouteLoadingFallback = () => (
@@ -142,6 +143,11 @@ function App() {
               <Route path="whatsapp/sequences/:id" element={
                 <RoleProtectedRoute allowedRoles={['manager', 'company_admin', 'super_admin']}>
                   <WhatsAppSequenceBuilder />
+                </RoleProtectedRoute>
+              } />
+              <Route path="whatsapp/broadcasts" element={
+                <RoleProtectedRoute allowedRoles={['manager', 'company_admin', 'super_admin']}>
+                  <WhatsAppBroadcasts />
                 </RoleProtectedRoute>
               } />
             </Route>

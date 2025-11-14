@@ -524,6 +524,222 @@ export const getSequenceEnrollments = async (sequenceId, filters = {}) => {
   }
 };
 
+// =====================================================
+// BROADCAST FUNCTIONS
+// =====================================================
+
+/**
+ * Get all broadcasts
+ */
+export const getBroadcasts = async (filters = {}) => {
+  try {
+    const params = new URLSearchParams();
+    if (filters.status) params.append('status', filters.status);
+
+    const response = await api.get(`/whatsapp/broadcasts?${params.toString()}`);
+    return {
+      success: true,
+      data: response.data.data || []
+    };
+  } catch (error) {
+    console.error('[WhatsApp Service] Error getting broadcasts:', error);
+    return {
+      success: false,
+      error: extractErrorMessage(error)
+    };
+  }
+};
+
+/**
+ * Get broadcast by ID
+ */
+export const getBroadcastById = async (broadcastId) => {
+  try {
+    const response = await api.get(`/whatsapp/broadcasts/${broadcastId}`);
+    return {
+      success: true,
+      data: response.data.data
+    };
+  } catch (error) {
+    console.error('[WhatsApp Service] Error getting broadcast:', error);
+    return {
+      success: false,
+      error: extractErrorMessage(error)
+    };
+  }
+};
+
+/**
+ * Create broadcast
+ */
+export const createBroadcast = async (broadcastData) => {
+  try {
+    const response = await api.post('/whatsapp/broadcasts', broadcastData);
+    return {
+      success: true,
+      data: response.data.data
+    };
+  } catch (error) {
+    console.error('[WhatsApp Service] Error creating broadcast:', error);
+    return {
+      success: false,
+      error: extractErrorMessage(error)
+    };
+  }
+};
+
+/**
+ * Send broadcast
+ */
+export const sendBroadcast = async (broadcastId) => {
+  try {
+    const response = await api.post(`/whatsapp/broadcasts/${broadcastId}/send`);
+    return {
+      success: true,
+      data: response.data.data
+    };
+  } catch (error) {
+    console.error('[WhatsApp Service] Error sending broadcast:', error);
+    return {
+      success: false,
+      error: extractErrorMessage(error)
+    };
+  }
+};
+
+/**
+ * Cancel broadcast
+ */
+export const cancelBroadcast = async (broadcastId) => {
+  try {
+    const response = await api.post(`/whatsapp/broadcasts/${broadcastId}/cancel`);
+    return {
+      success: true,
+      data: response.data
+    };
+  } catch (error) {
+    console.error('[WhatsApp Service] Error cancelling broadcast:', error);
+    return {
+      success: false,
+      error: extractErrorMessage(error)
+    };
+  }
+};
+
+/**
+ * Delete broadcast
+ */
+export const deleteBroadcast = async (broadcastId) => {
+  try {
+    await api.delete(`/whatsapp/broadcasts/${broadcastId}`);
+    return {
+      success: true
+    };
+  } catch (error) {
+    console.error('[WhatsApp Service] Error deleting broadcast:', error);
+    return {
+      success: false,
+      error: extractErrorMessage(error)
+    };
+  }
+};
+
+/**
+ * Get broadcast statistics
+ */
+export const getBroadcastStats = async (broadcastId) => {
+  try {
+    const response = await api.get(`/whatsapp/broadcasts/${broadcastId}/stats`);
+    return {
+      success: true,
+      data: response.data.data
+    };
+  } catch (error) {
+    console.error('[WhatsApp Service] Error getting broadcast stats:', error);
+    return {
+      success: false,
+      error: extractErrorMessage(error)
+    };
+  }
+};
+
+// =====================================================
+// MEDIA UPLOAD FUNCTIONS
+// =====================================================
+
+/**
+ * Upload media file for WhatsApp
+ */
+export const uploadMedia = async (file, mediaType = null) => {
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (mediaType) {
+      formData.append('media_type', mediaType);
+    }
+
+    const response = await api.post('/whatsapp/media/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+
+    return {
+      success: true,
+      data: response.data.data
+    };
+  } catch (error) {
+    console.error('[WhatsApp Service] Error uploading media:', error);
+    return {
+      success: false,
+      error: extractErrorMessage(error)
+    };
+  }
+};
+
+/**
+ * Get media info
+ */
+export const getMediaInfo = async (filePath) => {
+  try {
+    const encodedPath = encodeURIComponent(filePath);
+    const response = await api.get(`/whatsapp/media/${encodedPath}`);
+    return {
+      success: true,
+      data: response.data.data
+    };
+  } catch (error) {
+    console.error('[WhatsApp Service] Error getting media info:', error);
+    return {
+      success: false,
+      error: extractErrorMessage(error)
+    };
+  }
+};
+
+/**
+ * Delete media file
+ */
+export const deleteMedia = async (filePath) => {
+  try {
+    const encodedPath = encodeURIComponent(filePath);
+    await api.delete(`/whatsapp/media/${encodedPath}`);
+    return {
+      success: true
+    };
+  } catch (error) {
+    console.error('[WhatsApp Service] Error deleting media:', error);
+    return {
+      success: false,
+      error: extractErrorMessage(error)
+    };
+  }
+};
+
+// =====================================================
+// DEFAULT EXPORT
+// =====================================================
+
 export default {
   sendTextMessage,
   sendTemplateMessage,
@@ -547,6 +763,18 @@ export default {
   deleteSequence,
   enrollLead,
   unenrollLead,
-  getSequenceEnrollments
+  getSequenceEnrollments,
+  // Broadcast functions
+  getBroadcasts,
+  getBroadcastById,
+  createBroadcast,
+  sendBroadcast,
+  cancelBroadcast,
+  deleteBroadcast,
+  getBroadcastStats,
+  // Media upload functions
+  uploadMedia,
+  getMediaInfo,
+  deleteMedia
 };
 

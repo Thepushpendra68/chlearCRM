@@ -210,14 +210,19 @@ class WhatsAppController {
         .select('*')
         .eq('company_id', req.user.company_id)
         .eq('type', 'whatsapp')
-        .eq('provider', 'meta')
+        .eq('is_active', true)
         .maybeSingle();
 
       if (error && error.code !== 'PGRST116') throw error;
 
+      // Get available providers
+      const providerManager = require('../services/whatsappProviders/providerManager');
+      const availableProviders = providerManager.getAvailableProviders();
+
       res.json({
         success: true,
-        data: data || null
+        data: data || null,
+        availableProviders
       });
     } catch (error) {
       next(error);
@@ -230,31 +235,62 @@ class WhatsAppController {
    */
   async updateSettings(req, res, next) {
     try {
-      const { access_token, phone_number_id, business_account_id, app_secret } = req.body;
+      const { 
+        provider = 'meta',
+        access_token, 
+        phone_number_id, 
+        business_account_id, 
+        app_secret,
+        ...otherConfig 
+      } = req.body;
 
-      if (!access_token || !phone_number_id) {
-        throw new ApiError('Access token and phone number ID are required', 400);
+      // Validate provider
+      const providerManager = require('../services/whatsappProviders/providerManager');
+      const availableProviders = providerManager.getAvailableProviders();
+      
+      if (!availableProviders.includes(provider)) {
+        throw new ApiError(`Unsupported provider: ${provider}. Available: ${availableProviders.join(', ')}`, 400);
       }
 
+      // Validate provider-specific config
+      const validation = providerManager.validateProviderConfig(provider, {
+        access_token,
+        phone_number_id,
+        business_account_id,
+        app_secret,
+        ...otherConfig
+      });
+
+      if (!validation.valid) {
+        throw new ApiError(`Invalid configuration: ${validation.errors.join(', ')}`, 400);
+      }
+
+      // Build config object based on provider
       const config = {
         access_token,
         phone_number_id,
         business_account_id,
-        app_secret
+        app_secret,
+        ...otherConfig
       };
+
+      // Remove undefined values
+      Object.keys(config).forEach(key => {
+        if (config[key] === undefined) delete config[key];
+      });
 
       const { data: existing } = await supabaseAdmin
         .from('integration_settings')
         .select('id')
         .eq('company_id', req.user.company_id)
         .eq('type', 'whatsapp')
-        .eq('provider', 'meta')
+        .eq('provider', provider)
         .maybeSingle();
 
       const payload = {
         company_id: req.user.company_id,
         type: 'whatsapp',
-        provider: 'meta',
+        provider,
         config,
         is_active: true,
         created_by: req.user.id,

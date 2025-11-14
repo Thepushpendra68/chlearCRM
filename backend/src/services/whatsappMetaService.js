@@ -1,66 +1,66 @@
-const axios = require('axios');
-const { supabaseAdmin } = require('../config/supabase');
+const providerManager = require('./whatsappProviders/providerManager');
 const ApiError = require('../utils/ApiError');
 
 /**
- * Meta WhatsApp Business API Service
- * Handles all interactions with Meta's WhatsApp Business API
+ * WhatsApp Service (Unified)
+ * Handles all WhatsApp interactions using provider abstraction
+ * Maintains backward compatibility with existing code
  */
 class WhatsAppMetaService {
   constructor() {
-    this.apiVersion = 'v21.0'; // Use latest stable version
+    // Keep for backward compatibility
+    this.apiVersion = 'v21.0';
     this.baseUrl = `https://graph.facebook.com/${this.apiVersion}`;
-    this.clients = new Map(); // Cache API clients per company
   }
 
   /**
-   * Get Meta WhatsApp client for company
+   * Get provider for company (uses provider manager)
+   */
+  async getProvider(companyId) {
+    return await providerManager.getProvider(companyId);
+  }
+
+  /**
+   * Get Meta WhatsApp client for company (backward compatibility)
+   * @deprecated Use getProvider() instead
    */
   async getClient(companyId) {
-    try {
-      // Check cache
-      if (this.clients.has(companyId)) {
-        return this.clients.get(companyId);
-      }
+    const provider = await this.getProvider(companyId);
+    
+    // Return client-like object for backward compatibility
+    const settings = await this._getSettings(companyId);
+    return {
+      accessToken: settings.config.access_token,
+      phoneNumberId: settings.config.phone_number_id,
+      businessAccountId: settings.config.business_account_id,
+      appSecret: settings.config.app_secret,
+      apiVersion: this.apiVersion,
+      baseUrl: this.baseUrl
+    };
+  }
 
-      // Get integration settings
-      const { data: settings, error } = await supabaseAdmin
-        .from('integration_settings')
-        .select('*')
-        .eq('company_id', companyId)
-        .eq('type', 'whatsapp')
-        .eq('provider', 'meta')
-        .eq('is_active', true)
-        .single();
+  /**
+   * Get settings (internal helper)
+   */
+  async _getSettings(companyId) {
+    const { supabaseAdmin } = require('../config/supabase');
+    const { data: settings, error } = await supabaseAdmin
+      .from('integration_settings')
+      .select('*')
+      .eq('company_id', companyId)
+      .eq('type', 'whatsapp')
+      .eq('is_active', true)
+      .maybeSingle();
 
-      if (error || !settings) {
-        throw new ApiError('WhatsApp integration not configured. Please set up Meta WhatsApp in settings.', 400);
-      }
-
-      const config = settings.config;
-
-      if (!config.access_token || !config.phone_number_id) {
-        throw new ApiError('WhatsApp access token and phone number ID are required', 400);
-      }
-
-      const client = {
-        accessToken: config.access_token,
-        phoneNumberId: config.phone_number_id,
-        businessAccountId: config.business_account_id,
-        appSecret: config.app_secret,
-        apiVersion: this.apiVersion,
-        baseUrl: this.baseUrl
-      };
-
-      // Cache the client
-      this.clients.set(companyId, client);
-
-      return client;
-    } catch (error) {
-      console.error('Error getting WhatsApp client:', error);
-      if (error instanceof ApiError) throw error;
-      throw new ApiError('Failed to initialize WhatsApp client', 500);
+    if (error && error.code !== 'PGRST116') {
+      throw error;
     }
+
+    if (!settings) {
+      throw new ApiError('WhatsApp integration not configured. Please set up WhatsApp in settings.', 400);
+    }
+
+    return settings;
   }
 
   /**
@@ -72,58 +72,12 @@ class WhatsAppMetaService {
    */
   async sendTextMessage(companyId, to, message) {
     try {
-      const client = await this.getClient(companyId);
-      
-      // Normalize phone number (remove +, spaces, etc.)
-      const normalizedTo = this.normalizePhoneNumber(to);
-
-      const url = `${client.baseUrl}/${client.phoneNumberId}/messages`;
-      
-      const payload = {
-        messaging_product: 'whatsapp',
-        recipient_type: 'individual',
-        to: normalizedTo,
-        type: 'text',
-        text: {
-          preview_url: false, // Set to true to enable link previews
-          body: message
-        }
-      };
-
-      const response = await axios.post(url, payload, {
-        headers: {
-          'Authorization': `Bearer ${client.accessToken}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      return {
-        success: true,
-        messageId: response.data.messages[0].id, // wamid
-        data: response.data
-      };
+      const provider = await this.getProvider(companyId);
+      return await provider.sendTextMessage(to, message);
     } catch (error) {
-      console.error('Error sending WhatsApp text message:', error.response?.data || error.message);
-      
-      // Check if it's a Meta access token error
-      const errorMessage = error.response?.data?.error?.message || '';
-      const isTokenError = error.response?.status === 401 && 
-        (errorMessage.toLowerCase().includes('error validating access token') ||
-         errorMessage.toLowerCase().includes('session has expired') ||
-         errorMessage.toLowerCase().includes('access token'));
-      
-      if (isTokenError) {
-        throw new ApiError(
-          'WhatsApp access token has expired. Please update your Meta access token in WhatsApp Settings.',
-          error.response?.status || 401,
-          'WHATSAPP_TOKEN_EXPIRED'
-        );
-      }
-      
-      throw new ApiError(
-        errorMessage || 'Failed to send WhatsApp message',
-        error.response?.status || 500
-      );
+      console.error('Error sending WhatsApp text message:', error);
+      if (error instanceof ApiError) throw error;
+      throw new ApiError('Failed to send WhatsApp message', 500);
     }
   }
 
@@ -138,72 +92,12 @@ class WhatsAppMetaService {
    */
   async sendTemplateMessage(companyId, to, templateName, language = 'en', parameters = []) {
     try {
-      const client = await this.getClient(companyId);
-      const normalizedTo = this.normalizePhoneNumber(to);
-
-      const url = `${client.baseUrl}/${client.phoneNumberId}/messages`;
-
-      // Build components array for parameters
-      const components = [];
-      if (parameters.length > 0) {
-        components.push({
-          type: 'body',
-          parameters: parameters.map(param => ({
-            type: typeof param === 'string' ? 'text' : 'currency' || 'date_time',
-            text: typeof param === 'string' ? param : undefined,
-            ...(typeof param !== 'string' ? param : {})
-          }))
-        });
-      }
-
-      const payload = {
-        messaging_product: 'whatsapp',
-        recipient_type: 'individual',
-        to: normalizedTo,
-        type: 'template',
-        template: {
-          name: templateName,
-          language: {
-            code: language
-          },
-          ...(components.length > 0 ? { components } : {})
-        }
-      };
-
-      const response = await axios.post(url, payload, {
-        headers: {
-          'Authorization': `Bearer ${client.accessToken}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      return {
-        success: true,
-        messageId: response.data.messages[0].id,
-        data: response.data
-      };
+      const provider = await this.getProvider(companyId);
+      return await provider.sendTemplateMessage(to, templateName, language, parameters);
     } catch (error) {
-      console.error('Error sending WhatsApp template message:', error.response?.data || error.message);
-      
-      // Check if it's a Meta access token error
-      const errorMessage = error.response?.data?.error?.message || '';
-      const isTokenError = error.response?.status === 401 && 
-        (errorMessage.toLowerCase().includes('error validating access token') ||
-         errorMessage.toLowerCase().includes('session has expired') ||
-         errorMessage.toLowerCase().includes('access token'));
-      
-      if (isTokenError) {
-        throw new ApiError(
-          'WhatsApp access token has expired. Please update your Meta access token in WhatsApp Settings.',
-          error.response?.status || 401,
-          'WHATSAPP_TOKEN_EXPIRED'
-        );
-      }
-      
-      throw new ApiError(
-        errorMessage || 'Failed to send WhatsApp template message',
-        error.response?.status || 500
-      );
+      console.error('Error sending WhatsApp template message:', error);
+      if (error instanceof ApiError) throw error;
+      throw new ApiError('Failed to send WhatsApp template message', 500);
     }
   }
 
@@ -218,40 +112,12 @@ class WhatsAppMetaService {
    */
   async sendMediaMessage(companyId, to, mediaType, mediaUrl, caption = null) {
     try {
-      const client = await this.getClient(companyId);
-      const normalizedTo = this.normalizePhoneNumber(to);
-
-      const url = `${client.baseUrl}/${client.phoneNumberId}/messages`;
-
-      const payload = {
-        messaging_product: 'whatsapp',
-        recipient_type: 'individual',
-        to: normalizedTo,
-        type: mediaType,
-        [mediaType]: {
-          link: mediaUrl,
-          ...(caption ? { caption } : {})
-        }
-      };
-
-      const response = await axios.post(url, payload, {
-        headers: {
-          'Authorization': `Bearer ${client.accessToken}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      return {
-        success: true,
-        messageId: response.data.messages[0].id,
-        data: response.data
-      };
+      const provider = await this.getProvider(companyId);
+      return await provider.sendMediaMessage(to, mediaType, mediaUrl, caption);
     } catch (error) {
-      console.error('Error sending WhatsApp media message:', error.response?.data || error.message);
-      throw new ApiError(
-        error.response?.data?.error?.message || 'Failed to send WhatsApp media message',
-        error.response?.status || 500
-      );
+      console.error('Error sending WhatsApp media message:', error);
+      if (error instanceof ApiError) throw error;
+      throw new ApiError('Failed to send WhatsApp media message', 500);
     }
   }
 
@@ -264,37 +130,12 @@ class WhatsAppMetaService {
    */
   async sendInteractiveMessage(companyId, to, interactiveData) {
     try {
-      const client = await this.getClient(companyId);
-      const normalizedTo = this.normalizePhoneNumber(to);
-
-      const url = `${client.baseUrl}/${client.phoneNumberId}/messages`;
-
-      const payload = {
-        messaging_product: 'whatsapp',
-        recipient_type: 'individual',
-        to: normalizedTo,
-        type: 'interactive',
-        interactive: interactiveData
-      };
-
-      const response = await axios.post(url, payload, {
-        headers: {
-          'Authorization': `Bearer ${client.accessToken}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      return {
-        success: true,
-        messageId: response.data.messages[0].id,
-        data: response.data
-      };
+      const provider = await this.getProvider(companyId);
+      return await provider.sendInteractiveMessage(to, interactiveData);
     } catch (error) {
-      console.error('Error sending WhatsApp interactive message:', error.response?.data || error.message);
-      throw new ApiError(
-        error.response?.data?.error?.message || 'Failed to send WhatsApp interactive message',
-        error.response?.status || 500
-      );
+      console.error('Error sending WhatsApp interactive message:', error);
+      if (error instanceof ApiError) throw error;
+      throw new ApiError('Failed to send WhatsApp interactive message', 500);
     }
   }
 
@@ -401,33 +242,12 @@ class WhatsAppMetaService {
    */
   async getTemplates(companyId) {
     try {
-      const client = await this.getClient(companyId);
-      
-      if (!client.businessAccountId) {
-        throw new ApiError('Business Account ID not configured', 400);
-      }
-      
-      const url = `${client.baseUrl}/${client.businessAccountId}/message_templates`;
-      
-      const response = await axios.get(url, {
-        headers: {
-          'Authorization': `Bearer ${client.accessToken}`
-        },
-        params: {
-          limit: 1000
-        }
-      });
-
-      return {
-        success: true,
-        templates: response.data.data || []
-      };
+      const provider = await this.getProvider(companyId);
+      return await provider.getTemplates();
     } catch (error) {
-      console.error('Error getting WhatsApp templates:', error.response?.data || error.message);
-      throw new ApiError(
-        error.response?.data?.error?.message || 'Failed to get WhatsApp templates',
-        error.response?.status || 500
-      );
+      console.error('Error getting WhatsApp templates:', error);
+      if (error instanceof ApiError) throw error;
+      throw new ApiError('Failed to get WhatsApp templates', 500);
     }
   }
 
@@ -508,7 +328,7 @@ class WhatsAppMetaService {
    * Clear client cache for company
    */
   clearCache(companyId) {
-    this.clients.delete(companyId);
+    providerManager.clearCache(companyId);
   }
 }
 

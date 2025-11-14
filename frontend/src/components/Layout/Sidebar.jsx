@@ -33,6 +33,7 @@ import {
   IdentificationIcon,
   BookOpenIcon,
   ChatBubbleLeftRightIcon,
+  MegaphoneIcon,
 } from "@heroicons/react/24/outline";
 import api from "../../services/api";
 
@@ -223,6 +224,12 @@ const Sidebar = ({
             name: "WhatsApp Campaigns",
             href: "/app/whatsapp/sequences",
             icon: ChatBubbleLeftRightIcon,
+            badge: null,
+          },
+          {
+            name: "WhatsApp Broadcasts",
+            href: "/app/whatsapp/broadcasts",
+            icon: MegaphoneIcon,
             badge: null,
           },
         ]

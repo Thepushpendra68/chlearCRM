@@ -124,6 +124,66 @@ class WhatsAppSendService {
   }
 
   /**
+   * Send media message (image, video, audio, document)
+   * @param {string} companyId - Company ID
+   * @param {string} to - WhatsApp ID
+   * @param {string} mediaType - 'image', 'video', 'audio', 'document'
+   * @param {string} mediaUrl - Public URL of media
+   * @param {string} caption - Optional caption
+   * @param {object} context - Context (lead_id, contact_id, user_id)
+   * @returns {object} Sent message record
+   */
+  async sendMediaMessage(companyId, to, mediaType, mediaUrl, caption = null, context = {}) {
+    try {
+      // Send via Meta API
+      const result = await whatsappMetaService.sendMediaMessage(companyId, to, mediaType, mediaUrl, caption);
+
+      // Save to database
+      const { data: messageRecord, error } = await supabaseAdmin
+        .from('whatsapp_messages')
+        .insert({
+          company_id: companyId,
+          provider_message_id: result.messageId,
+          whatsapp_id: to,
+          direction: 'outbound',
+          message_type: mediaType,
+          media_url: mediaUrl,
+          media_caption: caption,
+          lead_id: context.lead_id || null,
+          contact_id: context.contact_id || null,
+          account_id: context.account_id || null,
+          user_id: context.user_id || null,
+          status: 'sent',
+          sent_at: new Date().toISOString(),
+          metadata: { api_response: result.data }
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error saving WhatsApp media message:', error);
+      }
+
+      // Log as activity if lead/contact exists
+      if (context.lead_id || context.contact_id) {
+        await this.logActivity(companyId, messageRecord, context);
+      }
+
+      // Update conversation
+      await this.updateConversation(companyId, to, 'outbound', context);
+
+      return {
+        success: true,
+        message: messageRecord,
+        messageId: result.messageId
+      };
+    } catch (error) {
+      console.error('Error sending WhatsApp media message:', error);
+      throw error instanceof ApiError ? error : new ApiError('Failed to send WhatsApp media message', 500);
+    }
+  }
+
+  /**
    * Send interactive message (buttons or list)
    * @param {string} companyId - Company ID
    * @param {string} to - WhatsApp ID

@@ -3,6 +3,8 @@ const router = express.Router();
 const whatsappController = require('../controllers/whatsappController');
 const whatsappWebhookController = require('../controllers/whatsappWebhookController');
 const whatsappSequenceController = require('../controllers/whatsappSequenceController');
+const whatsappBroadcastController = require('../controllers/whatsappBroadcastController');
+const whatsappMediaController = require('../controllers/whatsappMediaController');
 const { authenticate, requireRole } = require('../middleware/authMiddleware');
 
 // Webhook routes (no authentication - Meta verifies via signature)
@@ -39,6 +41,20 @@ router.delete('/sequences/:id', requireRole(['manager', 'company_admin', 'super_
 router.post('/sequences/:id/enroll', requireRole(['manager', 'company_admin', 'super_admin']), whatsappSequenceController.enrollLead.bind(whatsappSequenceController));
 router.post('/sequences/:id/unenroll', requireRole(['manager', 'company_admin', 'super_admin']), whatsappSequenceController.unenrollLead.bind(whatsappSequenceController));
 router.get('/sequences/:id/enrollments', requireRole(['manager', 'company_admin', 'super_admin']), whatsappSequenceController.getEnrollments.bind(whatsappSequenceController));
+
+// Broadcasts (Manager+)
+router.get('/broadcasts', requireRole(['manager', 'company_admin', 'super_admin']), whatsappBroadcastController.getBroadcasts.bind(whatsappBroadcastController));
+router.get('/broadcasts/:id', requireRole(['manager', 'company_admin', 'super_admin']), whatsappBroadcastController.getBroadcastById.bind(whatsappBroadcastController));
+router.post('/broadcasts', requireRole(['manager', 'company_admin', 'super_admin']), whatsappBroadcastController.createBroadcast.bind(whatsappBroadcastController));
+router.post('/broadcasts/:id/send', requireRole(['manager', 'company_admin', 'super_admin']), whatsappBroadcastController.sendBroadcast.bind(whatsappBroadcastController));
+router.post('/broadcasts/:id/cancel', requireRole(['manager', 'company_admin', 'super_admin']), whatsappBroadcastController.cancelBroadcast.bind(whatsappBroadcastController));
+router.delete('/broadcasts/:id', requireRole(['manager', 'company_admin', 'super_admin']), whatsappBroadcastController.deleteBroadcast.bind(whatsappBroadcastController));
+router.get('/broadcasts/:id/stats', requireRole(['manager', 'company_admin', 'super_admin']), whatsappBroadcastController.getBroadcastStats.bind(whatsappBroadcastController));
+
+// Media Upload (Sales Rep+)
+router.post('/media/upload', requireRole(['sales_rep', 'manager', 'company_admin', 'super_admin']), whatsappMediaController.getUploadMiddleware(), whatsappMediaController.uploadMedia.bind(whatsappMediaController));
+router.get('/media/:filePath(*)', requireRole(['sales_rep', 'manager', 'company_admin', 'super_admin']), whatsappMediaController.getMediaInfo.bind(whatsappMediaController));
+router.delete('/media/:filePath(*)', requireRole(['manager', 'company_admin', 'super_admin']), whatsappMediaController.deleteMedia.bind(whatsappMediaController));
 
 module.exports = router;
 
