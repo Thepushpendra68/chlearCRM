@@ -157,19 +157,39 @@ class WhatsAppAiService {
         needsConfirmation: chatbotResponse.needsConfirmation
       });
 
+      // Translate response to detected language if not English
+      let translatedResponse = chatbotResponse.response;
+      if (detectedLanguage !== 'en' && chatbotResponse.response) {
+        try {
+          translatedResponse = await this.translateMessage(chatbotResponse.response, detectedLanguage);
+          console.log(`[WhatsApp AI] Translated response to ${detectedLanguage}`);
+        } catch (translateError) {
+          console.warn('[WhatsApp AI] Translation failed, using original response:', translateError.message);
+          // Continue with original English response
+        }
+      }
+
       // If auto-reply is enabled and it's a simple chat response, send it
       if (autoReply && chatbotResponse.action === 'CHAT') {
         await this.sendAutoReply(
           companyId,
           whatsappId,
-          chatbotResponse.response,
+          translatedResponse,
           context
         );
       }
 
       // If action was executed and needs confirmation, send confirmation message
       if (chatbotResponse.action !== 'CHAT' && chatbotResponse.needsConfirmation && chatbotResponse.data) {
-        const confirmationMessage = this.buildConfirmationMessage(chatbotResponse);
+        let confirmationMessage = this.buildConfirmationMessage(chatbotResponse);
+        // Translate confirmation message
+        if (detectedLanguage !== 'en') {
+          try {
+            confirmationMessage = await this.translateMessage(confirmationMessage, detectedLanguage);
+          } catch (translateError) {
+            console.warn('[WhatsApp AI] Failed to translate confirmation message:', translateError.message);
+          }
+        }
         await this.sendAutoReply(
           companyId,
           whatsappId,
@@ -180,7 +200,15 @@ class WhatsAppAiService {
 
       // If action was executed successfully, send success message
       if (chatbotResponse.action !== 'CHAT' && !chatbotResponse.needsConfirmation && chatbotResponse.data) {
-        const successMessage = this.buildSuccessMessage(chatbotResponse);
+        let successMessage = this.buildSuccessMessage(chatbotResponse);
+        // Translate success message
+        if (detectedLanguage !== 'en') {
+          try {
+            successMessage = await this.translateMessage(successMessage, detectedLanguage);
+          } catch (translateError) {
+            console.warn('[WhatsApp AI] Failed to translate success message:', translateError.message);
+          }
+        }
         await this.sendAutoReply(
           companyId,
           whatsappId,
@@ -336,6 +364,155 @@ class WhatsAppAiService {
     } catch (error) {
       console.error('Error checking auto-reply settings:', error);
       return true; // Default to enabled
+    }
+  }
+
+  /**
+   * Translate message to target language using Gemini AI
+   * @param {string} message - Message to translate
+   * @param {string} targetLanguage - Target language code (hi, ta, te, etc.)
+   * @returns {string} Translated message
+   */
+  async translateMessage(message, targetLanguage) {
+    try {
+      // Language name mapping
+      const languageNames = {
+        'hi': 'Hindi',
+        'ta': 'Tamil',
+        'te': 'Telugu',
+        'bn': 'Bengali',
+        'mr': 'Marathi',
+        'gu': 'Gujarati',
+        'kn': 'Kannada',
+        'ml': 'Malayalam',
+        'pa': 'Punjabi',
+        'en': 'English'
+      };
+
+      const targetLangName = languageNames[targetLanguage] || 'English';
+      
+      // Use Gemini AI for translation if available
+      if (process.env.GEMINI_API_KEY && process.env.CHATBOT_FALLBACK_ONLY !== 'true') {
+        const { GoogleGenerativeAI } = require('@google/generative-ai');
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
+
+        const prompt = `Translate the following message to ${targetLangName}. Only return the translated text, nothing else:\n\n${message}`;
+        
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const translatedText = response.text().trim();
+        
+        return translatedText || message; // Fallback to original if translation fails
+      }
+
+      // Fallback: return original message if translation not available
+      return message;
+    } catch (error) {
+      console.error('[WhatsApp AI] Translation error:', error);
+      return message; // Return original message on error
+    }
+  }
+
+  /**
+   * Build interactive button message for CRM actions
+   * @param {string} bodyText - Main message text
+   * @param {array} buttons - Array of button objects {id, title}
+   * @param {string} footerText - Optional footer text
+   * @returns {object} Interactive message structure
+   */
+  buildInteractiveButtons(bodyText, buttons, footerText = null) {
+    if (!buttons || buttons.length === 0 || buttons.length > 3) {
+      throw new Error('Buttons array must have 1-3 buttons');
+    }
+
+    return {
+      type: 'button',
+      body: {
+        text: bodyText
+      },
+      action: {
+        buttons: buttons.map(btn => ({
+          type: 'reply',
+          reply: {
+            id: btn.id,
+            title: btn.title
+          }
+        }))
+      },
+      ...(footerText ? { footer: { text: footerText } } : {})
+    };
+  }
+
+  /**
+   * Build interactive list message for CRM actions
+   * @param {string} bodyText - Main message text
+   * @param {string} buttonText - Button text (e.g., "View Options")
+   * @param {array} sections - Array of section objects {title, rows: [{id, title, description}]}
+   * @param {string} footerText - Optional footer text
+   * @returns {object} Interactive message structure
+   */
+  buildInteractiveList(bodyText, buttonText, sections, footerText = null) {
+    if (!sections || sections.length === 0 || sections.length > 10) {
+      throw new Error('Sections array must have 1-10 sections');
+    }
+
+    return {
+      type: 'list',
+      body: {
+        text: bodyText
+      },
+      action: {
+        button: buttonText,
+        sections: sections.map(section => ({
+          title: section.title,
+          rows: section.rows.map(row => ({
+            id: row.id,
+            title: row.title,
+            ...(row.description ? { description: row.description } : {})
+          }))
+        }))
+      },
+      ...(footerText ? { footer: { text: footerText } } : {})
+    };
+  }
+
+  /**
+   * Send interactive message with CRM action buttons
+   * @param {string} companyId - Company ID
+   * @param {string} whatsappId - WhatsApp ID
+   * @param {string} message - Main message text
+   * @param {array} actions - Array of action objects {id, title, action}
+   * @param {object} context - Context for logging
+   * @returns {object} Send result
+   */
+  async sendInteractiveActionMessage(companyId, whatsappId, message, actions, context = {}) {
+    try {
+      const whatsappSendService = require('./whatsappSendService');
+      
+      // Build interactive buttons (max 3 buttons)
+      const buttons = actions.slice(0, 3).map((action, index) => ({
+        id: `action_${action.id || index}`,
+        title: action.title
+      }));
+
+      const interactiveData = this.buildInteractiveButtons(
+        message,
+        buttons,
+        'Select an action'
+      );
+
+      const result = await whatsappSendService.sendInteractiveMessage(
+        companyId,
+        whatsappId,
+        interactiveData,
+        context
+      );
+
+      return result;
+    } catch (error) {
+      console.error('[WhatsApp AI] Error sending interactive message:', error);
+      throw error;
     }
   }
 }

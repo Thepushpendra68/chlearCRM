@@ -124,6 +124,57 @@ class WhatsAppSendService {
   }
 
   /**
+   * Send interactive message (buttons or list)
+   * @param {string} companyId - Company ID
+   * @param {string} to - WhatsApp ID
+   * @param {object} interactiveData - Interactive message structure
+   * @param {object} context - Context (lead_id, contact_id, user_id)
+   * @returns {object} Sent message record
+   */
+  async sendInteractiveMessage(companyId, to, interactiveData, context = {}) {
+    try {
+      // Send via Meta API
+      const result = await whatsappMetaService.sendInteractiveMessage(companyId, to, interactiveData);
+
+      // Save to database
+      const { data: messageRecord, error } = await supabaseAdmin
+        .from('whatsapp_messages')
+        .insert({
+          company_id: companyId,
+          provider_message_id: result.messageId,
+          whatsapp_id: to,
+          direction: 'outbound',
+          message_type: 'interactive',
+          content: JSON.stringify(interactiveData),
+          status: 'sent',
+          sent_at: new Date().toISOString(),
+          lead_id: context.lead_id || null,
+          contact_id: context.contact_id || null,
+          user_id: context.user_id || null
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Update conversation
+      await this.updateConversation(companyId, to, 'outbound', context);
+
+      // Log activity
+      await this.logActivity(companyId, messageRecord, context);
+
+      return {
+        success: true,
+        messageId: result.messageId,
+        message: messageRecord
+      };
+    } catch (error) {
+      console.error('Error sending WhatsApp interactive message:', error);
+      throw error instanceof ApiError ? error : new ApiError('Failed to send WhatsApp interactive message', 500);
+    }
+  }
+
+  /**
    * Log WhatsApp message as activity
    */
   async logActivity(companyId, messageRecord, context) {

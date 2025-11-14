@@ -168,15 +168,19 @@ class WhatsAppSequenceController {
       const { id } = req.params;
       const { status } = req.query;
 
-      const { data, error } = await require('../config/supabase').supabaseAdmin
+      let query = require('../config/supabase').supabaseAdmin
         .from('whatsapp_sequence_enrollments')
         .select(`
           *,
           lead:leads(id, first_name, last_name, email, phone, status)
         `)
-        .eq('sequence_id', id)
-        .eq(status ? 'status' : 'id', status || 'id', status ? status : '!=', null)
-        .order('created_at', { ascending: false });
+        .eq('sequence_id', id);
+
+      if (status) {
+        query = query.eq('status', status);
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) throw error;
 

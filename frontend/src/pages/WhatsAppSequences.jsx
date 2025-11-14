@@ -11,7 +11,7 @@ import {
   TrashIcon,
   PencilIcon,
   UserGroupIcon,
-  MessageSquareIcon
+  ChatBubbleLeftRightIcon
 } from '@heroicons/react/24/outline';
 
 const WhatsAppSequences = () => {
@@ -113,7 +113,7 @@ const WhatsAppSequences = () => {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 flex items-center">
-            <MessageSquareIcon className="h-8 w-8 mr-3 text-green-600" />
+            <ChatBubbleLeftRightIcon className="h-8 w-8 mr-3 text-green-600" />
             WhatsApp Campaigns
           </h1>
           <p className="text-gray-600 mt-1">
@@ -166,7 +166,7 @@ const WhatsAppSequences = () => {
       {/* Sequences List */}
       {filteredSequences.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
-          <MessageSquareIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <ChatBubbleLeftRightIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">No campaigns yet</h3>
           <p className="text-gray-600 mb-4">
             Create your first WhatsApp campaign to start nurturing leads automatically

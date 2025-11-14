@@ -6,10 +6,10 @@ import {
   ArrowLeftIcon,
   PlusIcon,
   TrashIcon,
-  SaveIcon,
+  CheckIcon,
   ClockIcon,
   DocumentTextIcon,
-  TemplateIcon
+  RectangleStackIcon
 } from '@heroicons/react/24/outline';
 
 const WhatsAppSequenceBuilder = () => {
@@ -214,7 +214,7 @@ const WhatsAppSequenceBuilder = () => {
           disabled={saving}
           className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
         >
-          <SaveIcon className="h-5 w-5" />
+          <CheckIcon className="h-5 w-5" />
           {saving ? 'Saving...' : 'Save Campaign'}
         </button>
       </div>

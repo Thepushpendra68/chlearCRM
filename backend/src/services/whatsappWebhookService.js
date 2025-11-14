@@ -161,7 +161,7 @@ class WhatsAppWebhookService {
           console.error('Error marking message as read:', error);
         }
 
-        // Process with AI chatbot if message is text and auto-reply is enabled
+        // Process with AI chatbot if message is text or interactive response
         if (message.type === 'text' && message.text?.body) {
           try {
             const autoReplyEnabled = await whatsappAiService.isAutoReplyEnabled(companyId);
@@ -191,6 +191,46 @@ class WhatsAppWebhookService {
             console.error('[WhatsApp Webhook] Error processing message with AI:', aiError);
             // Don't fail the webhook if AI processing fails
             // Message is already saved and logged
+          }
+        } else if (message.type === 'interactive' && message.interactive) {
+          // Handle interactive message responses (button clicks, list selections)
+          try {
+            const interactive = message.interactive;
+            let responseText = '';
+            
+            if (interactive.type === 'button_reply') {
+              responseText = interactive.button_reply?.title || '';
+              console.log(`[WhatsApp Webhook] Button clicked: ${responseText}`);
+            } else if (interactive.type === 'list_reply') {
+              responseText = interactive.list_reply?.title || '';
+              const listId = interactive.list_reply?.id || '';
+              console.log(`[WhatsApp Webhook] List item selected: ${responseText} (ID: ${listId})`);
+            }
+            
+            // Process interactive response with AI
+            if (responseText) {
+              const autoReplyEnabled = await whatsappAiService.isAutoReplyEnabled(companyId);
+              if (autoReplyEnabled) {
+                await whatsappAiService.processIncomingMessage(
+                  companyId,
+                  message.from,
+                  responseText,
+                  {
+                    lead_id: context.lead_id,
+                    contact_id: context.contact_id,
+                    account_id: context.account_id,
+                    whatsapp_message_id: savedMessage.id,
+                    interactive_response: true
+                  },
+                  {
+                    autoReply: true,
+                    language: null
+                  }
+                );
+              }
+            }
+          } catch (aiError) {
+            console.error('[WhatsApp Webhook] Error processing interactive response:', aiError);
           }
         }
 

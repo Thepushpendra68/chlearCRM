@@ -12,28 +12,40 @@ process.env.SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET || 'jwt-secret
 const whatsappSendService = require('../whatsappSendService');
 const whatsappMetaService = require('../whatsappMetaService');
 const activityService = require('../activityService');
-const { createClient } = require('@supabase/supabase-js');
+const { supabaseAdmin } = require('../../config/supabase');
 
 jest.mock('../whatsappMetaService');
 jest.mock('../activityService');
-jest.mock('@supabase/supabase-js');
+jest.mock('../../config/supabase', () => {
+  const mockSupabase = {
+    from: jest.fn(() => ({
+      select: jest.fn(() => ({
+        eq: jest.fn(() => ({
+          single: jest.fn(),
+          maybeSingle: jest.fn()
+        }))
+      })),
+      insert: jest.fn(() => ({
+        select: jest.fn(() => ({
+          single: jest.fn()
+        }))
+      })),
+      update: jest.fn(() => ({
+        eq: jest.fn().mockResolvedValue({ error: null })
+      }))
+    }))
+  };
+  return {
+    supabaseAdmin: mockSupabase
+  };
+});
 
 describe('WhatsApp Send Service', () => {
-  let mockSupabase;
-
   beforeEach(() => {
     jest.clearAllMocks();
     
-    mockSupabase = {
-      from: jest.fn().mockReturnThis(),
-      select: jest.fn().mockReturnThis(),
-      insert: jest.fn().mockReturnThis(),
-      update: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      single: jest.fn().mockReturnThis()
-    };
-
-    createClient.mockReturnValue(mockSupabase);
+    // Mock updateConversation method
+    whatsappSendService.updateConversation = jest.fn().mockResolvedValue({ success: true });
   });
 
   describe('sendTextMessage', () => {
@@ -45,9 +57,15 @@ describe('WhatsApp Send Service', () => {
       });
 
       // Mock database insert
-      mockSupabase.insert.mockResolvedValue({
-        data: { id: 'db-message-id' },
-        error: null
+      supabaseAdmin.from.mockReturnValue({
+        insert: jest.fn(() => ({
+          select: jest.fn(() => ({
+            single: jest.fn().mockResolvedValue({
+              data: { id: 'db-message-id' },
+              error: null
+            })
+          }))
+        }))
       });
 
       // Mock activity logging
@@ -247,6 +265,102 @@ describe('WhatsApp Send Service', () => {
           error_message: 'Message not delivered'
         })
       );
+    });
+  });
+
+  describe('sendInteractiveMessage', () => {
+    it('should send interactive message and log to database', async () => {
+      const interactiveData = {
+        type: 'button',
+        body: { text: 'What would you like to do?' },
+        action: {
+          buttons: [
+            { type: 'reply', reply: { id: 'action1', title: 'View Leads' } }
+          ]
+        }
+      };
+
+      whatsappMetaService.sendInteractiveMessage.mockResolvedValue({
+        success: true,
+        messageId: 'wamid.interactive123'
+      });
+
+      // Mock database chain for insert
+      supabaseAdmin.from.mockReturnValue({
+        insert: jest.fn(() => ({
+          select: jest.fn(() => ({
+            single: jest.fn().mockResolvedValue({
+              data: { id: 'db-message-id', company_id: 'company-123', whatsapp_id: '919876543210' },
+              error: null
+            })
+          }))
+        }))
+      });
+
+      activityService.createActivity.mockResolvedValue({
+        success: true,
+        activity: { id: 'activity-id' }
+      });
+
+      const result = await whatsappSendService.sendInteractiveMessage(
+        'company-123',
+        '919876543210',
+        interactiveData,
+        { lead_id: 'lead-123' }
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.messageId).toBe('wamid.interactive123');
+      expect(whatsappMetaService.sendInteractiveMessage).toHaveBeenCalledWith(
+        'company-123',
+        '919876543210',
+        interactiveData
+      );
+      expect(mockSupabase.insert).toHaveBeenCalled();
+      expect(whatsappSendService.updateConversation).toHaveBeenCalled();
+      expect(activityService.createActivity).toHaveBeenCalled();
+    });
+
+    it('should handle Meta API errors', async () => {
+      whatsappMetaService.sendInteractiveMessage.mockRejectedValue(
+        new Error('API Error')
+      );
+
+      await expect(
+        whatsappSendService.sendInteractiveMessage(
+          'company-123',
+          '919876543210',
+          { type: 'button', body: { text: 'Test' } },
+          {}
+        )
+      ).rejects.toThrow();
+    });
+
+    it('should handle database errors', async () => {
+      whatsappMetaService.sendInteractiveMessage.mockResolvedValue({
+        success: true,
+        messageId: 'wamid.test'
+      });
+
+      supabaseAdmin.from.mockReturnValue({
+        insert: jest.fn(() => ({
+          select: jest.fn(() => ({
+            single: jest.fn().mockResolvedValue({
+              data: null,
+              error: { message: 'Database error' }
+            })
+          }))
+        }))
+      });
+
+      await expect(
+        whatsappSendService.sendInteractiveMessage(
+          'company-123',
+          '919876543210',
+          { type: 'button', body: { text: 'Test' } },
+          {}
+        )
+      ).rejects.toThrow();
     });
   });
 });
