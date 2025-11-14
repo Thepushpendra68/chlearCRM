@@ -6,7 +6,7 @@ import ImpersonationBanner from '../Platform/ImpersonationBanner'
 import { useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 
-const ChatPanel = lazy(() => import('../Chatbot/ChatPanel'))
+const ChatbotWidget = lazy(() => import('../Chatbot/ChatbotWidget'))
 
 const Layout = () => {
   const { isImpersonating, impersonatedUser, endImpersonation, chatPanelOpen } = useAuth()
@@ -48,10 +48,10 @@ const Layout = () => {
             <Outlet />
           </main>
 
-          {/* Chat Panel - Appears on right side on desktop */}
+          {/* Chatbot Widget - Floating chatbot with voice features */}
           <Suspense fallback={null}>
             {chatPanelOpen && (
-              <ChatPanel />
+              <ChatbotWidget />
             )}
           </Suspense>
         </div>
