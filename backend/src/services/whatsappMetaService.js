@@ -104,8 +104,24 @@ class WhatsAppMetaService {
       };
     } catch (error) {
       console.error('Error sending WhatsApp text message:', error.response?.data || error.message);
+      
+      // Check if it's a Meta access token error
+      const errorMessage = error.response?.data?.error?.message || '';
+      const isTokenError = error.response?.status === 401 && 
+        (errorMessage.toLowerCase().includes('error validating access token') ||
+         errorMessage.toLowerCase().includes('session has expired') ||
+         errorMessage.toLowerCase().includes('access token'));
+      
+      if (isTokenError) {
+        throw new ApiError(
+          'WhatsApp access token has expired. Please update your Meta access token in WhatsApp Settings.',
+          error.response?.status || 401,
+          'WHATSAPP_TOKEN_EXPIRED'
+        );
+      }
+      
       throw new ApiError(
-        error.response?.data?.error?.message || 'Failed to send WhatsApp message',
+        errorMessage || 'Failed to send WhatsApp message',
         error.response?.status || 500
       );
     }
@@ -168,8 +184,24 @@ class WhatsAppMetaService {
       };
     } catch (error) {
       console.error('Error sending WhatsApp template message:', error.response?.data || error.message);
+      
+      // Check if it's a Meta access token error
+      const errorMessage = error.response?.data?.error?.message || '';
+      const isTokenError = error.response?.status === 401 && 
+        (errorMessage.toLowerCase().includes('error validating access token') ||
+         errorMessage.toLowerCase().includes('session has expired') ||
+         errorMessage.toLowerCase().includes('access token'));
+      
+      if (isTokenError) {
+        throw new ApiError(
+          'WhatsApp access token has expired. Please update your Meta access token in WhatsApp Settings.',
+          error.response?.status || 401,
+          'WHATSAPP_TOKEN_EXPIRED'
+        );
+      }
+      
       throw new ApiError(
-        error.response?.data?.error?.message || 'Failed to send WhatsApp template message',
+        errorMessage || 'Failed to send WhatsApp template message',
         error.response?.status || 500
       );
     }

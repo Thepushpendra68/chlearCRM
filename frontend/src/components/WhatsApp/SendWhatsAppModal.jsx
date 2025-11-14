@@ -48,7 +48,21 @@ const SendWhatsAppModal = ({ isOpen, onClose, lead, contact }) => {
       setMessage('');
       onClose();
     } else {
-      toast.error(result.error || 'Failed to send WhatsApp message');
+      const errorMsg = result.error || 'Failed to send WhatsApp message';
+      
+      // Check if it's a token expiration error
+      const isTokenError = errorMsg.toLowerCase().includes('access token') || 
+                          errorMsg.toLowerCase().includes('token has expired');
+      
+      if (isTokenError) {
+        // Show a more helpful error with longer duration
+        toast.error(
+          'WhatsApp access token expired. Please go to WhatsApp page and click Settings (⚙️) to update your token.',
+          { duration: 8000 }
+        );
+      } else {
+        toast.error(errorMsg);
+      }
     }
     
     setSending(false);

@@ -73,15 +73,19 @@ export const sendTextMessage = async ({ to, message, leadId }) => {
     const errorMessage = extractErrorMessage(error);
 
     // Special case: Meta (WhatsApp) access token has expired or is invalid
-    if (
-      error.response?.status === 401 &&
-      typeof errorMessage === 'string' &&
-      errorMessage.toLowerCase().includes('error validating access token')
-    ) {
+    const isTokenError = 
+      (error.response?.status === 401 &&
+       typeof errorMessage === 'string' &&
+       (errorMessage.toLowerCase().includes('error validating access token') ||
+        errorMessage.toLowerCase().includes('access token has expired') ||
+        errorMessage.toLowerCase().includes('token has expired'))) ||
+      error.response?.data?.error?.code === 'WHATSAPP_TOKEN_EXPIRED';
+    
+    if (isTokenError) {
       return {
         success: false,
         error:
-          'Your WhatsApp access token has expired. Please open WhatsApp Settings and update the Meta access token.',
+          'WhatsApp access token has expired. Please go to WhatsApp page and click Settings (⚙️) to update your Meta access token.',
       };
     }
 
