@@ -1,0 +1,159 @@
+{
+  "pageTitle": "Activities",
+  "title": "Activities",
+  "subtitle": "Track and manage all your lead activities",
+  "addActivity": "Add Activity",
+  "logActivity": "Log Activity",
+  "viewCalendar": "View Calendar",
+  "actions": {
+    "addActivity": "Add Activity"
+  },
+  "quickActions": {
+    "logCall": "Log Call",
+    "sendEmail": "Send Email",
+    "scheduleMeeting": "Schedule Meeting",
+    "addNote": "Add Note",
+    "createTask": "Create Task"
+  },
+  "sections": {
+    "allActivities": "All Activities",
+    "allActivitiesDescription": "View and manage all activities across your leads"
+  },
+  "fields": {
+    "type": "Type",
+    "subject": "Subject",
+    "description": "Description",
+    "status": "Status",
+    "priority": "Priority",
+    "assignedTo": "Assigned To",
+    "relatedTo": "Related To",
+    "relatedType": "Related Type",
+    "dueDate": "Due Date",
+    "dueTime": "Due Time",
+    "duration": "Duration",
+    "location": "Location",
+    "attendees": "Attendees",
+    "meetingLink": "Meeting Link",
+    "outcome": "Outcome",
+    "nextStep": "Next Step",
+    "createdAt": "Created At",
+    "updatedAt": "Updated At",
+    "completedAt": "Completed At"
+  },
+  "types": {
+    "call": "Phone Call",
+    "email": "Email",
+    "meeting": "Meeting",
+    "task": "Task",
+    "note": "Note",
+    "demo": "Demo",
+    "presentation": "Presentation",
+    "proposal": "Proposal",
+    "followUp": "Follow-up",
+    "event": "Event",
+    "webinar": "Webinar",
+    "conference": "Conference"
+  },
+  "statuses": {
+    "scheduled": "Scheduled",
+    "inProgress": "In Progress",
+    "completed": "Completed",
+    "cancelled": "Cancelled",
+    "rescheduled": "Rescheduled",
+    "noShow": "No Show"
+  },
+  "priorities": {
+    "low": "Low",
+    "medium": "Medium",
+    "high": "High",
+    "urgent": "Urgent"
+  },
+  "relatedTypes": {
+    "lead": "Lead",
+    "contact": "Contact",
+    "account": "Account",
+    "opportunity": "Opportunity",
+    "deal": "Deal",
+    "task": "Task",
+    "case": "Case"
+  },
+  "actions": {
+    "view": "View",
+    "edit": "Edit",
+    "delete": "Delete",
+    "complete": "Mark as Complete",
+    "cancel": "Cancel",
+    "reschedule": "Reschedule",
+    "duplicate": "Duplicate",
+    "convertToTask": "Convert to Task",
+    "addToCalendar": "Add to Calendar",
+    "sendReminder": "Send Reminder"
+  },
+  "modals": {
+    "add": {
+      "title": "Add New Activity",
+      "editTitle": "Edit Activity",
+      "submit": "Create Activity",
+      "update": "Update Activity"
+    },
+    "log": {
+      "title": "Log Activity",
+      "submit": "Log Activity"
+    },
+    "complete": {
+      "title": "Complete Activity",
+      "submit": "Mark as Complete"
+    }
+  },
+  "filters": {
+    "title": "Filter Activities",
+    "search": "Search activities...",
+    "type": "Type",
+    "status": "Status",
+    "priority": "Priority",
+    "assignedTo": "Assigned To",
+    "dueDate": "Due Date",
+    "relatedTo": "Related To",
+    "dateRange": "Date Range",
+    "clear": "Clear Filters",
+    "apply": "Apply Filters"
+  },
+  "views": {
+    "list": "List View",
+    "calendar": "Calendar View",
+    "timeline": "Timeline View",
+    "kanban": "Kanban View"
+  },
+  "emptyState": {
+    "title": "No activities yet",
+    "description": "Start tracking your activities to stay organized",
+    "action": "Add Activity"
+  },
+  "calendar": {
+    "today": "Today",
+    "month": "Month",
+    "week": "Week",
+    "day": "Day",
+    "agenda": "Agenda",
+    "nextEvent": "Next Event: {{title}} at {{time}}",
+    "noEvents": "No events scheduled"
+  },
+  "reminders": {
+    "5min": "5 minutes before",
+    "15min": "15 minutes before",
+    "30min": "30 minutes before",
+    "1hour": "1 hour before",
+    "2hours": "2 hours before",
+    "1day": "1 day before",
+    "2days": "2 days before",
+    "1week": "1 week before"
+  },
+  "messages": {
+    "created": "Activity created successfully",
+    "updated": "Activity updated successfully",
+    "deleted": "Activity deleted successfully",
+    "completed": "Activity marked as complete",
+    "cancelled": "Activity cancelled",
+    "rescheduled": "Activity rescheduled"
+  }
+}

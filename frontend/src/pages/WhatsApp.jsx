@@ -7,8 +7,11 @@ import React, { useState, useEffect } from 'react';
 import { Search, Plus, RefreshCw, Settings, MessageSquare } from 'lucide-react';
 import toast from 'react-hot-toast';
 import ChatInterface from '../components/WhatsApp/ChatInterface';
-import { getConversations, getMessages, formatPhoneDisplay } from '../services/whatsappService';
+import WhatsAppSettingsModal from '../components/WhatsApp/WhatsAppSettingsModal';
+import NewChatModal from '../components/WhatsApp/NewChatModal';
+import { getConversations, formatPhoneDisplay } from '../services/whatsappService';
 import { formatDistanceToNow } from 'date-fns';
+import { runAuthDiagnostics } from '../utils/authDiagnostics';
 
 const WhatsApp = () => {
   const [conversations, setConversations] = useState([]);
@@ -17,21 +20,47 @@ const WhatsApp = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showNewChatModal, setShowNewChatModal] = useState(false);
 
   useEffect(() => {
-    loadConversations();
+    // Run auth diagnostics on mount (only in development)
+    if (import.meta.env.DEV) {
+      runAuthDiagnostics().then((result) => {
+        if (!result.success) {
+          console.warn('[WhatsApp] Auth diagnostics failed:', result.error);
+        }
+      });
+    }
+
+    // Load conversations on mount
+    loadConversations().catch((error) => {
+      // Catch any unhandled errors to prevent component crash
+      console.error('Unhandled error in loadConversations:', error);
+      setLoading(false);
+    });
   }, []);
 
   const loadConversations = async () => {
-    setLoading(true);
-    const result = await getConversations({ isActive: true, limit: 50 });
-    
-    if (result.success) {
-      setConversations(result.data.conversations || []);
-    } else {
-      toast.error('Failed to load conversations');
+    try {
+      setLoading(true);
+      const result = await getConversations({ isActive: true, limit: 50 });
+      
+      if (result.success) {
+        setConversations(result.data?.conversations || []);
+      } else {
+        console.error('Failed to load conversations:', result.error);
+        toast.error(result.error || 'Failed to load conversations');
+        // Don't redirect, just show error
+        setConversations([]);
+      }
+    } catch (error) {
+      console.error('Error loading conversations:', error);
+      toast.error('Failed to load conversations. Please try again.');
+      setConversations([]);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleRefresh = async () => {
@@ -41,28 +70,55 @@ const WhatsApp = () => {
     toast.success('Conversations refreshed');
   };
 
+  // Helper to get contact/lead name
+  const getContactName = (lead, contact) => {
+    if (lead?.name) return lead.name;
+    if (contact?.first_name || contact?.last_name) {
+      return [contact.first_name, contact.last_name].filter(Boolean).join(' ') || 'Unknown';
+    }
+    return 'Unknown';
+  };
+
   const handleSelectConversation = (conversation) => {
     setSelectedConversation(conversation);
-    
-    // Create a lead object from conversation data
+
+    const phoneNumber =
+      conversation.whatsapp_id ||
+      conversation.lead?.phone ||
+      conversation.contact?.phone ||
+      conversation.contact?.mobile_phone ||
+      '';
+
+    const leadId =
+      conversation.lead_id ||
+      conversation.lead?.id ||
+      conversation.contact?.lead_id ||
+      null;
+
     const lead = {
-      id: conversation.lead_id,
-      name: conversation.lead?.name || conversation.contact?.name || 'Unknown',
-      phone: conversation.whatsapp_id,
+      id: leadId,
+      name: getContactName(conversation.lead, conversation.contact),
+      phone: phoneNumber,
       email: conversation.lead?.email || conversation.contact?.email,
-      company: conversation.lead?.company || conversation.contact?.company
+      company: conversation.lead?.company || null, // Contacts don't have company directly
     };
-    
+
     setSelectedLead(lead);
   };
 
   const filteredConversations = conversations.filter((conv) => {
     if (!searchQuery) return true;
-    
+
     const query = searchQuery.toLowerCase();
-    const name = (conv.lead?.name || conv.contact?.name || '').toLowerCase();
-    const phone = conv.whatsapp_id.toLowerCase();
-    
+    const name = getContactName(conv.lead, conv.contact).toLowerCase();
+    const phoneRaw =
+      conv.whatsapp_id ||
+      conv.lead?.phone ||
+      conv.contact?.phone ||
+      conv.contact?.mobile_phone ||
+      '';
+    const phone = phoneRaw.toString().toLowerCase();
+
     return name.includes(query) || phone.includes(query);
   });
 
@@ -101,6 +157,7 @@ const WhatsApp = () => {
             </button>
             
             <button
+              onClick={() => setShowSettingsModal(true)}
               className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
               title="Settings"
             >
@@ -108,6 +165,7 @@ const WhatsApp = () => {
             </button>
             
             <button
+              onClick={() => setShowNewChatModal(true)}
               className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
             >
               <Plus className="w-5 h-5" />
@@ -158,9 +216,15 @@ const WhatsApp = () => {
               <div>
                 {filteredConversations.map((conversation) => {
                   const isSelected = selectedConversation?.id === conversation.id;
-                  const name = conversation.lead?.name || conversation.contact?.name || 'Unknown';
+                  const name = getContactName(conversation.lead, conversation.contact);
                   const lastMessage = conversation.last_message_preview || '';
-                  
+                  const phoneNumber =
+                    conversation.whatsapp_id ||
+                    conversation.lead?.phone ||
+                    conversation.contact?.phone ||
+                    conversation.contact?.mobile_phone ||
+                    '';
+
                   return (
                     <div
                       key={conversation.id}
@@ -172,7 +236,7 @@ const WhatsApp = () => {
                       <div className="flex items-start gap-3">
                         {/* Avatar */}
                         <div className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center text-white font-semibold flex-shrink-0">
-                          {name.charAt(0).toUpperCase()}
+                          {(name || '?').charAt(0).toUpperCase()}
                         </div>
 
                         {/* Content */}
@@ -187,7 +251,7 @@ const WhatsApp = () => {
                           </div>
                           
                           <p className="text-xs text-gray-500 truncate mb-1">
-                            {formatPhoneDisplay(conversation.whatsapp_id)}
+                            {formatPhoneDisplay(phoneNumber)}
                           </p>
                           
                           <div className="flex items-center justify-between">
@@ -220,12 +284,25 @@ const WhatsApp = () => {
             lead={selectedLead}
             conversation={selectedConversation}
             onMessageSent={() => {
-              // Refresh conversations to update last message
               loadConversations();
             }}
           />
         </div>
       </div>
+
+      {/* Modals */}
+      <WhatsAppSettingsModal
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+      />
+      
+      <NewChatModal
+        isOpen={showNewChatModal}
+        onClose={() => setShowNewChatModal(false)}
+        onMessageSent={() => {
+          loadConversations();
+        }}
+      />
     </div>
   );
 };

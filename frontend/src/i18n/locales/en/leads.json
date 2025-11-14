@@ -1,0 +1,219 @@
+{
+  "pageTitle": "Leads",
+  "title": "Leads",
+  "subtitle": "Manage your leads and track their progress through the sales pipeline",
+  "addLead": "Add Lead",
+  "importLeads": "Import Leads",
+  "exportLeads": "Export Leads",
+  "viewMode": {
+    "grid": "Grid View",
+    "list": "List View",
+    "kanban": "Kanban View"
+  },
+  "fields": {
+    "firstName": "First Name",
+    "lastName": "Last Name",
+    "fullName": "Full Name",
+    "email": "Email",
+    "phone": "Phone",
+    "company": "Company",
+    "position": "Position",
+    "status": "Status",
+    "source": "Source",
+    "assignedTo": "Assigned To",
+    "owner": "Owner",
+    "tags": "Tags",
+    "notes": "Notes",
+    "value": "Deal Value",
+    "expectedCloseDate": "Expected Close Date",
+    "actualCloseDate": "Actual Close Date",
+    "priority": "Priority",
+    "stage": "Stage",
+    "createdAt": "Created At",
+    "updatedAt": "Updated At",
+    "lastActivity": "Last Activity",
+    "nextFollowUp": "Next Follow-up",
+    "address": "Address",
+    "city": "City",
+    "state": "State",
+    "country": "Country",
+    "zipCode": "ZIP Code",
+    "website": "Website",
+    "linkedin": "LinkedIn",
+    "twitter": "Twitter"
+  },
+  "statuses": {
+    "new": "New",
+    "contacted": "Contacted",
+    "qualified": "Qualified",
+    "proposal": "Proposal",
+    "negotiation": "Negotiation",
+    "closedWon": "Closed Won",
+    "closedLost": "Closed Lost",
+    "onHold": "On Hold",
+    "disqualified": "Disqualified"
+  },
+  "sources": {
+    "website": "Website",
+    "referral": "Referral",
+    "socialMedia": "Social Media",
+    "email": "Email Campaign",
+    "coldCall": "Cold Call",
+    "tradeShow": "Trade Show",
+    "advertisement": "Advertisement",
+    "partner": "Partner",
+    "other": "Other"
+  },
+  "stages": {
+    "prospecting": "Prospecting",
+    "qualification": "Qualification",
+    "needsAnalysis": "Needs Analysis",
+    "valueProposition": "Value Proposition",
+    "negotiation": "Negotiation",
+    "closedWon": "Closed Won",
+    "closedLost": "Closed Lost"
+  },
+  "actions": {
+    "view": "View",
+    "edit": "Edit",
+    "delete": "Delete",
+    "convert": "Convert to Contact",
+    "assign": "Assign",
+    "updateStatus": "Update Status",
+    "addNote": "Add Note",
+    "scheduleCall": "Schedule Call",
+    "sendEmail": "Send Email",
+    "createTask": "Create Task",
+    "duplicate": "Duplicate",
+    "archive": "Archive",
+    "merge": "Merge"
+  },
+  "modals": {
+    "add": {
+      "title": "Add New Lead",
+      "editTitle": "Edit Lead",
+      "submit": "Create Lead",
+      "update": "Update Lead"
+    },
+    "delete": {
+      "title": "Delete Lead",
+      "message": "Are you sure you want to delete this lead?",
+      "confirm": "Delete Lead"
+    },
+    "merge": {
+      "title": "Merge Leads",
+      "message": "Are you sure you want to merge these leads?",
+      "primary": "Primary Lead",
+      "secondary": "Secondary Lead",
+      "confirm": "Merge Leads"
+    }
+  },
+  "filters": {
+    "title": "Filter Leads",
+    "search": "Search leads...",
+    "status": "Status",
+    "source": "Source",
+    "assignedTo": "Assigned To",
+    "stage": "Stage",
+    "dateRange": "Date Range",
+    "tags": "Tags",
+    "value": "Deal Value",
+    "priority": "Priority",
+    "clear": "Clear Filters",
+    "apply": "Apply Filters"
+  },
+  "bulkActions": {
+    "title": "Bulk Actions",
+    "assign": "Assign",
+    "updateStatus": "Update Status",
+    "updateStage": "Update Stage",
+    "addTags": "Add Tags",
+    "removeTags": "Remove Tags",
+    "delete": "Delete",
+    "export": "Export",
+    "merge": "Merge",
+    "selected": "{{count}} selected"
+  },
+  "lists": {
+    "allLeads": "All Leads",
+    "myLeads": "My Leads",
+    "recent": "Recent Leads",
+    "favorites": "Favorites",
+    "archived": "Archived Leads"
+  },
+  "stats": {
+    "total": "total leads",
+    "new": "new",
+    "qualified": "qualified"
+  },
+  "search": {
+    "placeholder": "Search leads by name, company, or email..."
+  },
+  "filters": {
+    "allStatuses": "All Statuses",
+    "allSources": "All Sources",
+    "allStages": "All Stages"
+  },
+  "table": {
+    "headers": {
+      "contact": "Contact",
+      "company": "Company",
+      "status": "Status",
+      "source": "Source",
+      "pipelineStage": "Pipeline Stage",
+      "account": "Account",
+      "created": "Created"
+    },
+    "noCompany": "No company",
+    "noAccount": "No account"
+  },
+  "loading": {
+    "title": "Loading leads...",
+    "subtitle": "Please wait while we fetch your data"
+  },
+  "emptyState": {
+    "title": "No leads yet",
+    "description": "Start building your sales pipeline by adding your first lead. You can import leads from a file or create them manually.",
+    "createFirst": "Create Your First Lead",
+    "importLeads": "Import Leads"
+  },
+  "features": {
+    "trackContacts": {
+      "title": "Track Contacts",
+      "description": "Keep all your potential customers organized in one place"
+    },
+    "monitorProgress": {
+      "title": "Monitor Progress",
+      "description": "Follow leads through your sales pipeline stages"
+    },
+    "boostSales": {
+      "title": "Boost Sales",
+      "description": "Convert more leads into paying customers"
+    }
+  },
+  "confirmations": {
+    "deleteLead": "Are you sure you want to delete {{name}}?",
+    "bulkDelete": "Are you sure you want to delete {{count}} lead(s)?"
+  },
+  "success": {
+    "deleted": "{{name}} deleted successfully",
+    "bulkDeleted": "{{count}} lead(s) deleted successfully"
+  },
+  "errors": {
+    "deleteFailed": "Failed to delete lead",
+    "bulkDeleteFailed": "Failed to delete leads"
+  },
+  "actions": {
+    "addLead": "Add Lead"
+  },
+  "bulk": {
+    "selected": "{{count}} lead(s) selected"
+  },
+  "messages": {
+    "created": "Lead created successfully",
+    "updated": "Lead updated successfully",
+    "deleted": "Lead deleted successfully",
+    "assigned": "Lead assigned successfully",
+    "statusUpdated": "Lead status updated successfully"
+  }
+}

@@ -66,26 +66,26 @@ CREATE TABLE IF NOT EXISTS email_template_versions (
   from_name TEXT,
   from_email TEXT,
   reply_to TEXT,
-  
+
   -- Content storage
   mjml TEXT, -- raw MJML (for code editor)
   html TEXT NOT NULL, -- compiled HTML (ready to send)
   text_version TEXT, -- plain text fallback
   json_design JSONB, -- drag-drop design JSON (GrapesJS/Unlayer)
-  
+
   -- Merge variables
   variables JSONB DEFAULT '[]', -- discovered merge vars: [{name, type, required}]
-  
+
   -- Publishing
   is_published BOOLEAN DEFAULT false,
   published_at TIMESTAMPTZ,
-  
+
   -- Preview
   preview_data JSONB DEFAULT '{}', -- sample data for preview
-  
+
   created_by UUID REFERENCES user_profiles(id),
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  
+
   CONSTRAINT unique_version_per_template UNIQUE(template_id, version_number)
 );
 
@@ -102,33 +102,33 @@ CREATE TABLE IF NOT EXISTS outbound_messages (
   lead_id UUID REFERENCES leads(id) ON DELETE SET NULL,
   template_id UUID REFERENCES email_templates(id) ON DELETE SET NULL,
   template_version_id UUID REFERENCES email_template_versions(id) ON DELETE SET NULL,
-  
+
   -- Recipient
   to_email TEXT NOT NULL,
   to_name TEXT,
-  
+
   -- Content
   subject TEXT NOT NULL,
   html TEXT NOT NULL,
   text_version TEXT,
-  
+
   -- Provider details
   provider TEXT, -- 'postmark', 'sendgrid', etc.
   provider_message_id TEXT,
-  
+
   -- Status tracking
   status TEXT NOT NULL DEFAULT 'queued', -- queued|sending|sent|delivered|bounced|failed
   error_message TEXT,
-  
+
   -- Metrics
   metrics JSONB DEFAULT '{}', -- {sent_at, delivered_at, opened_at, clicked_at, bounced_at, opened_count, clicked_count, links_clicked: []}
-  
+
   -- Metadata
   sequence_id UUID, -- if sent as part of sequence
   enrollment_id UUID, -- specific enrollment
   automation_rule_id UUID, -- if triggered by rule
   context JSONB DEFAULT '{}', -- additional context
-  
+
   created_by UUID REFERENCES user_profiles(id),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -150,29 +150,29 @@ CREATE TABLE IF NOT EXISTS email_sequences (
   company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   description TEXT,
-  
+
   -- Workflow definition
   json_definition JSONB NOT NULL, -- {steps: [{type, delay, template_id, conditions, actions}]}
-  
+
   -- Entry conditions
   entry_conditions JSONB, -- conditions to auto-enroll leads
-  
+
   -- Exit rules
   exit_on_reply BOOLEAN DEFAULT true,
   exit_on_goal JSONB, -- e.g., {type: 'stage_change', stage_id: '...'}
-  
+
   -- Settings
   is_active BOOLEAN DEFAULT false,
   send_time_window JSONB, -- {start: '09:00', end: '17:00', timezone: 'America/New_York'}
   max_emails_per_day INTEGER DEFAULT 3,
-  
+
   -- Stats
   stats JSONB DEFAULT '{}', -- {enrolled: 0, active: 0, completed: 0, emails_sent: 0}
-  
+
   created_by UUID REFERENCES user_profiles(id),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
-  
+
   CONSTRAINT unique_sequence_name_per_company UNIQUE(company_id, name)
 );
 
@@ -187,30 +187,30 @@ CREATE TABLE IF NOT EXISTS sequence_enrollments (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   sequence_id UUID NOT NULL REFERENCES email_sequences(id) ON DELETE CASCADE,
   lead_id UUID NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
-  
+
   -- Status
   status TEXT NOT NULL DEFAULT 'active', -- active|paused|completed|exited|failed
-  
+
   -- Progress
   current_step INTEGER DEFAULT 0,
   next_run_at TIMESTAMPTZ,
-  
+
   -- Tracking
   steps_completed INTEGER DEFAULT 0,
   emails_sent INTEGER DEFAULT 0,
   last_email_sent_at TIMESTAMPTZ,
-  
+
   -- Exit info
   exit_reason TEXT, -- 'replied', 'goal_met', 'manual', 'unsubscribed', 'bounced'
   exited_at TIMESTAMPTZ,
-  
+
   -- Metadata
   metadata JSONB DEFAULT '{}', -- variables, custom data
-  
+
   enrolled_by UUID REFERENCES user_profiles(id),
   enrolled_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
-  
+
   CONSTRAINT unique_lead_sequence_enrollment UNIQUE(sequence_id, lead_id)
 );
 
@@ -228,27 +228,27 @@ CREATE TABLE IF NOT EXISTS automation_rules (
   company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   description TEXT,
-  
+
   -- Trigger configuration
   trigger JSONB NOT NULL, -- {type: 'lead_created'|'stage_changed'|'field_updated'|'inactivity', config: {...}}
-  
+
   -- Conditions to check before executing
   conditions JSONB, -- [{field, operator, value}, ...] with AND/OR logic
-  
+
   -- Actions to execute
   actions JSONB NOT NULL, -- [{type: 'send_email'|'enroll_sequence'|'update_field'|'create_task', config: {...}}]
-  
+
   -- Settings
   is_active BOOLEAN DEFAULT true,
   priority INTEGER DEFAULT 10, -- execution order (higher = first)
   run_once_per_lead BOOLEAN DEFAULT false,
-  
+
   -- Limits
   max_runs_per_day INTEGER,
-  
+
   -- Stats
   stats JSONB DEFAULT '{}', -- {total_runs, successful_runs, failed_runs, last_run_at}
-  
+
   created_by UUID REFERENCES user_profiles(id),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -267,16 +267,16 @@ CREATE TABLE IF NOT EXISTS automation_runs (
   automation_rule_id UUID NOT NULL REFERENCES automation_rules(id) ON DELETE CASCADE,
   company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   lead_id UUID REFERENCES leads(id) ON DELETE SET NULL,
-  
+
   -- Execution details
   status TEXT NOT NULL DEFAULT 'pending', -- pending|running|completed|failed
   trigger_data JSONB, -- snapshot of trigger event
   conditions_met BOOLEAN,
   actions_executed JSONB DEFAULT '[]', -- [{action, status, result}]
-  
+
   -- Result
   error_message TEXT,
-  
+
   started_at TIMESTAMPTZ DEFAULT NOW(),
   completed_at TIMESTAMPTZ
 );
@@ -294,16 +294,16 @@ CREATE TABLE IF NOT EXISTS email_suppression_list (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   email TEXT NOT NULL,
-  
+
   -- Reason
   reason TEXT NOT NULL CHECK (reason IN ('unsubscribed', 'bounced', 'spam_complaint', 'manual')),
-  
+
   -- Details
   source TEXT, -- 'user_request', 'webhook', 'admin'
   notes TEXT,
-  
+
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  
+
   CONSTRAINT unique_suppressed_email_per_company UNIQUE(company_id, email)
 );
 
@@ -489,9 +489,9 @@ COMMIT;
 -- =====================================================
 
 -- Verify tables created
-SELECT table_name 
-FROM information_schema.tables 
-WHERE table_schema = 'public' 
+SELECT table_name
+FROM information_schema.tables
+WHERE table_schema = 'public'
 AND table_name IN (
   'integration_settings',
   'email_templates',

@@ -19,7 +19,7 @@ BEGIN;
 
 CREATE SCHEMA IF NOT EXISTS _migrations;
 
-COMMENT ON SCHEMA _migrations IS 
+COMMENT ON SCHEMA _migrations IS
   'Internal schema for database migration tracking. DO NOT modify directly.';
 
 -- =====================================================
@@ -30,21 +30,21 @@ COMMENT ON SCHEMA _migrations IS
 
 CREATE TABLE IF NOT EXISTS _migrations.schema_migrations (
   id SERIAL PRIMARY KEY,
-  
+
   -- Migration identification
   version VARCHAR(50) NOT NULL UNIQUE,
   description TEXT NOT NULL,
-  
+
   -- Execution details
   installed_on TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   execution_time_ms INTEGER,
   success BOOLEAN NOT NULL DEFAULT true,
   error_message TEXT,
-  
+
   -- Organization & tracking
   batch INTEGER NOT NULL DEFAULT 1,
   installed_by TEXT DEFAULT CURRENT_USER,
-  
+
   -- Audit fields
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   reverted_at TIMESTAMP,
@@ -52,26 +52,26 @@ CREATE TABLE IF NOT EXISTS _migrations.schema_migrations (
   indexed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-COMMENT ON TABLE _migrations.schema_migrations IS 
+COMMENT ON TABLE _migrations.schema_migrations IS
   'Core migration tracking table. Records all applied migrations with execution metadata.';
 
-COMMENT ON COLUMN _migrations.schema_migrations.version IS 
+COMMENT ON COLUMN _migrations.schema_migrations.version IS
   'Unique migration identifier in format: YYYYMMDD_NNN (e.g., 20251022_001)';
 
-COMMENT ON COLUMN _migrations.schema_migrations.batch IS 
+COMMENT ON COLUMN _migrations.schema_migrations.batch IS
   'Batch number for grouping related migrations. Helps understand deployment sequence.';
 
 -- Create indexes for efficient queries
-CREATE INDEX IF NOT EXISTS idx_schema_migrations_version 
+CREATE INDEX IF NOT EXISTS idx_schema_migrations_version
   ON _migrations.schema_migrations(version);
 
-CREATE INDEX IF NOT EXISTS idx_schema_migrations_batch 
+CREATE INDEX IF NOT EXISTS idx_schema_migrations_batch
   ON _migrations.schema_migrations(batch DESC);
 
-CREATE INDEX IF NOT EXISTS idx_schema_migrations_installed_on 
+CREATE INDEX IF NOT EXISTS idx_schema_migrations_installed_on
   ON _migrations.schema_migrations(installed_on DESC);
 
-CREATE INDEX IF NOT EXISTS idx_schema_migrations_success 
+CREATE INDEX IF NOT EXISTS idx_schema_migrations_success
   ON _migrations.schema_migrations(success);
 
 -- =====================================================
@@ -93,13 +93,13 @@ CREATE TABLE IF NOT EXISTS _migrations.migration_errors (
   resolved_by TEXT
 );
 
-COMMENT ON TABLE _migrations.migration_errors IS 
+COMMENT ON TABLE _migrations.migration_errors IS
   'Detailed error log for debugging failed migrations. Helps root cause analysis.';
 
-CREATE INDEX IF NOT EXISTS idx_migration_errors_version 
+CREATE INDEX IF NOT EXISTS idx_migration_errors_version
   ON _migrations.migration_errors(version);
 
-CREATE INDEX IF NOT EXISTS idx_migration_errors_resolved 
+CREATE INDEX IF NOT EXISTS idx_migration_errors_resolved
   ON _migrations.migration_errors(resolved);
 
 -- =====================================================
@@ -117,7 +117,7 @@ CREATE TABLE IF NOT EXISTS _migrations.migration_dependencies (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_migration_deps_version 
+CREATE INDEX IF NOT EXISTS idx_migration_deps_version
   ON _migrations.migration_dependencies(migration_version);
 
 -- =====================================================
@@ -126,7 +126,7 @@ CREATE INDEX IF NOT EXISTS idx_migration_deps_version
 -- Quick reference view for seeing which migrations have been applied
 
 CREATE OR REPLACE VIEW _migrations.v_applied_migrations AS
-SELECT 
+SELECT
   version,
   description,
   batch,
@@ -134,7 +134,7 @@ SELECT
   execution_time_ms,
   success,
   installed_by,
-  CASE 
+  CASE
     WHEN reverted_at IS NOT NULL THEN 'REVERTED'
     WHEN success = false THEN 'FAILED'
     WHEN success = true THEN 'APPLIED'
@@ -149,7 +149,7 @@ ORDER BY installed_on DESC;
 -- This will be used to compare against actual migration files
 
 CREATE OR REPLACE VIEW _migrations.v_migration_status AS
-SELECT 
+SELECT
   COUNT(*) FILTER (WHERE success = true) as applied_count,
   COUNT(*) FILTER (WHERE success = false) as failed_count,
   COUNT(*) FILTER (WHERE reverted_at IS NOT NULL) as reverted_count,
@@ -172,7 +172,7 @@ RETURNS TABLE (
 ) AS $$
 BEGIN
   RETURN QUERY
-  SELECT 
+  SELECT
     COUNT(*)::BIGINT,
     COUNT(*) FILTER (WHERE success = true)::BIGINT,
     COUNT(*) FILTER (WHERE success = false)::BIGINT,
@@ -212,10 +212,10 @@ DECLARE
   v_batch INTEGER;
 BEGIN
   v_batch := COALESCE(p_batch, _migrations.get_next_batch());
-  
-  INSERT INTO _migrations.schema_migrations 
+
+  INSERT INTO _migrations.schema_migrations
     (version, description, batch, success, installed_by)
-  VALUES 
+  VALUES
     (p_version, p_description, v_batch, false, CURRENT_USER)
   ON CONFLICT (version) DO NOTHING;
 END;
@@ -233,8 +233,8 @@ CREATE OR REPLACE PROCEDURE _migrations.log_migration_complete(
 LANGUAGE plpgsql
 AS $$
 BEGIN
-  UPDATE _migrations.schema_migrations 
-  SET 
+  UPDATE _migrations.schema_migrations
+  SET
     success = (p_error_message IS NULL),
     execution_time_ms = p_execution_time_ms,
     error_message = p_error_message,
@@ -248,9 +248,9 @@ $$;
 -- =====================================================
 -- Record this migration itself
 
-INSERT INTO _migrations.schema_migrations 
+INSERT INTO _migrations.schema_migrations
   (version, description, batch, success, installed_by)
-VALUES 
+VALUES
   ('20251022_000', 'PREREQUISITE: migration_tracking_schema', 1, true, CURRENT_USER)
 ON CONFLICT (version) DO NOTHING;
 
@@ -259,17 +259,17 @@ COMMIT;
 -- =====================================================
 -- VERIFICATION QUERIES (Run these to verify success)
 -- =====================================================
--- 
+--
 -- Check tables exist:
--- SELECT table_name FROM information_schema.tables 
+-- SELECT table_name FROM information_schema.tables
 -- WHERE table_schema = '_migrations' ORDER BY table_name;
 --
 -- Check functions exist:
--- SELECT routine_name FROM information_schema.routines 
+-- SELECT routine_name FROM information_schema.routines
 -- WHERE routine_schema = '_migrations' ORDER BY routine_name;
 --
 -- Check views exist:
--- SELECT table_name FROM information_schema.tables 
+-- SELECT table_name FROM information_schema.tables
 -- WHERE table_schema = '_migrations' AND table_type = 'VIEW';
 --
 -- Get migration stats:

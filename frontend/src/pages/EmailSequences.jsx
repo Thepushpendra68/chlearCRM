@@ -11,7 +11,8 @@ import {
   TrashIcon,
   PencilIcon,
   UserGroupIcon,
-  EnvelopeIcon
+  EnvelopeIcon,
+  BookOpenIcon
 } from '@heroicons/react/24/outline';
 
 const EmailSequences = () => {
@@ -95,10 +96,16 @@ const EmailSequences = () => {
             Create automated email sequences for lead nurturing
           </p>
         </div>
-        <Link to="/app/email/sequences/new" className="btn-primary">
-          <PlusIcon className="h-5 w-5 mr-2" />
-          New Sequence
-        </Link>
+        <div className="flex gap-2">
+          <Link to="/app/email/workflow-library" className="btn-secondary">
+            <BookOpenIcon className="h-5 w-5 mr-2" />
+            Browse Templates
+          </Link>
+          <Link to="/app/email/sequences/new" className="btn-primary">
+            <PlusIcon className="h-5 w-5 mr-2" />
+            New Sequence
+          </Link>
+        </div>
       </div>
 
       {/* Filter */}

@@ -3,58 +3,98 @@
  * Handles all WhatsApp-related API calls
  */
 
-import axios from 'axios';
+import api from './api';
+import { ensureSessionInitialized, getCachedSession } from '../config/supabase';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const normalizeError = (error) => {
+  if (!error) return 'An unexpected error occurred.';
+  if (typeof error === 'string') return error;
 
-// Create axios instance with default config
-const whatsappApi = axios.create({
-  baseURL: `${API_URL}/whatsapp`,
-  headers: {
-    'Content-Type': 'application/json'
+  if (error.message && typeof error.message === 'string') {
+    return error.message;
   }
-});
 
-// Add auth token to all requests
-whatsappApi.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
-// Response interceptor for error handling
-whatsappApi.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      // Token expired or invalid
-      localStorage.removeItem('token');
-      window.location.href = '/login';
-    }
-    return Promise.reject(error);
+  if (error.details && typeof error.details === 'string') {
+    return error.details;
   }
-);
+
+  if (error.code && error.message) {
+    return `${error.code}: ${error.message}`;
+  }
+
+  try {
+    return JSON.stringify(error);
+  } catch (jsonError) {
+    return 'An unexpected error occurred.';
+  }
+};
+
+/**
+ * Extract error message from API error response
+ * Backend returns: { success: false, error: { message, code } }
+ */
+const extractErrorMessage = (error) => {
+  if (!error) return 'An unexpected error occurred.';
+  
+  const errorData = error.response?.data;
+  if (errorData) {
+    // Backend format: { success: false, error: { message, code } }
+    if (errorData.error?.message) return errorData.error.message;
+    if (errorData.message) return errorData.message;
+    if (errorData.error) return typeof errorData.error === 'string' ? errorData.error : JSON.stringify(errorData.error);
+  }
+  
+  return error.message || 'An unexpected error occurred.';
+};
 
 /**
  * Send a text message via WhatsApp
  */
 export const sendTextMessage = async ({ to, message, leadId }) => {
   try {
-    const response = await whatsappApi.post('/send/text', {
+    // Ensure session is initialized (but don't fail if it's not - let API interceptor handle it)
+    await ensureSessionInitialized();
+    
+    // Make the API call - the interceptor will handle token refresh if needed
+    const response = await api.post('/whatsapp/send/text', {
       to,
       message,
       lead_id: leadId
     });
     return { success: true, data: response.data };
   } catch (error) {
+    console.error('[WhatsApp Service] Error sending text message:', {
+      status: error.response?.status,
+      message: error.message,
+      url: error.config?.url,
+      isRetry: error.config?._retry
+    });
+    
+    // Handle 401 - but only if refresh already failed (indicated by _retry flag)
+    if (error.response?.status === 401 && error.config?._retry) {
+      // This means token refresh was attempted and failed
+      return {
+        success: false,
+        error: 'Your session has expired. Please refresh the page and login again.',
+      };
+    }
+    
+    // For other 401s, the API interceptor will handle refresh and retry
+    // We just need to return a generic error
+    if (error.response?.status === 401) {
+      // The interceptor is handling this - just return a generic error
+      return {
+        success: false,
+        error: 'Authentication failed. Please try again.',
+      };
+    }
+    
+    const errorMessage = extractErrorMessage(error);
+    const normalized = normalizeError(errorMessage);
+    
     return {
       success: false,
-      error: error.response?.data?.error || error.message
+      error: normalized,
     };
   }
 };
@@ -70,7 +110,7 @@ export const sendTemplateMessage = async ({
   leadId
 }) => {
   try {
-    const response = await whatsappApi.post('/send/template', {
+    const response = await api.post('/whatsapp/send/template', {
       to,
       template_name: templateName,
       language,
@@ -79,9 +119,11 @@ export const sendTemplateMessage = async ({
     });
     return { success: true, data: response.data };
   } catch (error) {
+    const errorMessage = extractErrorMessage(error);
+    const normalized = normalizeError(errorMessage);
     return {
       success: false,
-      error: error.response?.data?.error || error.message
+      error: normalized,
     };
   }
 };
@@ -99,12 +141,14 @@ export const getMessages = async (filters = {}) => {
     if (filters.limit) params.append('limit', filters.limit);
     if (filters.offset) params.append('offset', filters.offset);
 
-    const response = await whatsappApi.get(`/messages?${params.toString()}`);
+    const response = await api.get(`/whatsapp/messages?${params.toString()}`);
     return { success: true, data: response.data };
   } catch (error) {
+    const errorMessage = extractErrorMessage(error);
+    const normalized = normalizeError(errorMessage);
     return {
       success: false,
-      error: error.response?.data?.error || error.message
+      error: normalized,
     };
   }
 };
@@ -114,12 +158,14 @@ export const getMessages = async (filters = {}) => {
  */
 export const getLeadMessages = async (leadId) => {
   try {
-    const response = await whatsappApi.get(`/messages/${leadId}`);
+    const response = await api.get(`/whatsapp/messages/${leadId}`);
     return { success: true, data: response.data };
   } catch (error) {
+    const errorMessage = extractErrorMessage(error);
+    const normalized = normalizeError(errorMessage);
     return {
       success: false,
-      error: error.response?.data?.error || error.message
+      error: normalized,
     };
   }
 };
@@ -135,12 +181,14 @@ export const getConversations = async (filters = {}) => {
     if (filters.limit) params.append('limit', filters.limit);
     if (filters.offset) params.append('offset', filters.offset);
 
-    const response = await whatsappApi.get(`/conversations?${params.toString()}`);
+    const response = await api.get(`/whatsapp/conversations?${params.toString()}`);
     return { success: true, data: response.data };
   } catch (error) {
+    const errorMessage = extractErrorMessage(error);
+    const normalized = normalizeError(errorMessage);
     return {
       success: false,
-      error: error.response?.data?.error || error.message
+      error: normalized,
     };
   }
 };
@@ -150,12 +198,14 @@ export const getConversations = async (filters = {}) => {
  */
 export const getConversationByPhone = async (whatsappId) => {
   try {
-    const response = await whatsappApi.get(`/conversations/${whatsappId}`);
+    const response = await api.get(`/whatsapp/conversations/${whatsappId}`);
     return { success: true, data: response.data };
   } catch (error) {
+    const errorMessage = extractErrorMessage(error);
+    const normalized = normalizeError(errorMessage);
     return {
       success: false,
-      error: error.response?.data?.error || error.message
+      error: normalized,
     };
   }
 };
@@ -165,12 +215,14 @@ export const getConversationByPhone = async (whatsappId) => {
  */
 export const syncTemplates = async () => {
   try {
-    const response = await whatsappApi.post('/templates/sync');
+    const response = await api.post('/whatsapp/templates/sync');
     return { success: true, data: response.data };
   } catch (error) {
+    const errorMessage = extractErrorMessage(error);
+    const normalized = normalizeError(errorMessage);
     return {
       success: false,
-      error: error.response?.data?.error || error.message
+      error: normalized,
     };
   }
 };
@@ -186,12 +238,14 @@ export const getTemplates = async (filters = {}) => {
     if (filters.category) params.append('category', filters.category);
     if (filters.language) params.append('language', filters.language);
 
-    const response = await whatsappApi.get(`/templates?${params.toString()}`);
+    const response = await api.get(`/whatsapp/templates?${params.toString()}`);
     return { success: true, data: response.data };
   } catch (error) {
+    const errorMessage = extractErrorMessage(error);
+    const normalized = normalizeError(errorMessage);
     return {
       success: false,
-      error: error.response?.data?.error || error.message
+      error: normalized,
     };
   }
 };
@@ -201,12 +255,14 @@ export const getTemplates = async (filters = {}) => {
  */
 export const getSettings = async () => {
   try {
-    const response = await whatsappApi.get('/settings');
+    const response = await api.get('/whatsapp/settings');
     return { success: true, data: response.data };
   } catch (error) {
+    const errorMessage = extractErrorMessage(error);
+    const normalized = normalizeError(errorMessage);
     return {
       success: false,
-      error: error.response?.data?.error || error.message
+      error: normalized,
     };
   }
 };
@@ -216,12 +272,14 @@ export const getSettings = async () => {
  */
 export const updateSettings = async (settings) => {
   try {
-    const response = await whatsappApi.put('/settings', settings);
+    const response = await api.post('/whatsapp/settings', settings);
     return { success: true, data: response.data };
   } catch (error) {
+    const errorMessage = extractErrorMessage(error);
+    const normalized = normalizeError(errorMessage);
     return {
       success: false,
-      error: error.response?.data?.error || error.message
+      error: normalized,
     };
   }
 };
@@ -231,7 +289,7 @@ export const updateSettings = async (settings) => {
  */
 export const getUnreadCount = async () => {
   try {
-    const response = await whatsappApi.get('/conversations/unread/count');
+    const response = await api.get('/whatsapp/conversations/unread/count');
     return { success: true, count: response.data.count || 0 };
   } catch (error) {
     return { success: false, count: 0 };
@@ -243,12 +301,14 @@ export const getUnreadCount = async () => {
  */
 export const markAsRead = async (whatsappId) => {
   try {
-    const response = await whatsappApi.post(`/conversations/${whatsappId}/read`);
+    const response = await api.post(`/whatsapp/conversations/${whatsappId}/read`);
     return { success: true, data: response.data };
   } catch (error) {
+    const errorMessage = extractErrorMessage(error);
+    const normalized = normalizeError(errorMessage);
     return {
       success: false,
-      error: error.response?.data?.error || error.message
+      error: normalized,
     };
   }
 };

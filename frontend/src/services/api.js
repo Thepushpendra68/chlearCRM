@@ -40,26 +40,61 @@ const applyAuthorizationHeader = (config, token) => {
 let refreshSessionPromise = null;
 
 const refreshSupabaseSession = async () => {
+  // Check if we have a refresh token
+  const currentSession = getCachedSession();
+  if (!currentSession?.refresh_token) {
+    const error = new Error('No refresh token available');
+    console.error('[API] Cannot refresh session:', error.message);
+    throw error;
+  }
+
+  // Check if refresh token might be expired
+  if (currentSession.expires_at) {
+    const expiresIn = (currentSession.expires_at * 1000) - Date.now();
+    if (expiresIn < -3600000) { // Expired more than 1 hour ago
+      const error = new Error('Session expired too long ago, refresh token likely invalid');
+      console.error('[API] Session expired too long:', Math.round(Math.abs(expiresIn) / 1000 / 60), 'minutes ago');
+      throw error;
+    }
+  }
+
   if (!refreshSessionPromise) {
     refreshSessionPromise = supabase.auth
-      .refreshSession()
+      .refreshSession(currentSession)
       .then(async ({ data, error }) => {
         if (error) {
+          console.error('[API] Supabase refreshSession error:', {
+            message: error.message,
+            status: error.status,
+            name: error.name
+          });
           throw error;
         }
 
         const refreshedSession = data?.session ?? null;
 
+        if (!refreshedSession) {
+          throw new Error('Refresh returned no session');
+        }
+
         console.log('[API] Supabase session refresh result:', {
           hasSession: !!refreshedSession,
           hasToken: !!refreshedSession?.access_token,
+          newExpiresAt: refreshedSession.expires_at ? new Date(refreshedSession.expires_at * 1000).toISOString() : 'none',
+          newExpiresIn: refreshedSession.expires_at ? Math.round((refreshedSession.expires_at * 1000 - Date.now()) / 1000) : 'none'
         });
 
+        // Update cached session
         await ensureSessionInitialized();
         return getCachedSession();
       })
       .catch((refreshError) => {
-        console.error('[API] Token refresh failed:', refreshError);
+        console.error('[API] Token refresh failed:', {
+          message: refreshError.message,
+          status: refreshError.status,
+          name: refreshError.name,
+          error: refreshError
+        });
         throw refreshError;
       })
       .finally(() => {
@@ -79,13 +114,42 @@ api.interceptors.request.use(
     }
 
     const session = getCachedSession();
-    const token = session?.access_token ?? null;
+    let token = session?.access_token ?? null;
+
+    // Proactively refresh token if it's about to expire (within 5 minutes)
+    if (session?.expires_at && session?.refresh_token) {
+      const expiresIn = (session.expires_at * 1000) - Date.now();
+      const fiveMinutes = 5 * 60 * 1000; // 5 minutes in milliseconds
+      
+      if (expiresIn > 0 && expiresIn < fiveMinutes) {
+        console.log('[API] Token expiring soon, proactively refreshing...', {
+          expiresIn: Math.round(expiresIn / 1000),
+          seconds: 'seconds'
+        });
+        
+        try {
+          const refreshedSession = await refreshSupabaseSession();
+          if (refreshedSession?.access_token) {
+            token = refreshedSession.access_token;
+            console.log('[API] Proactive refresh successful');
+          }
+        } catch (refreshError) {
+          console.warn('[API] Proactive refresh failed, using current token:', refreshError.message);
+          // Continue with current token - it might still work
+        }
+      }
+    }
 
     console.log('[API] Request interceptor:', {
       url: config.url,
+      method: config.method,
       hasSession: !!session,
       hasToken: !!token,
       tokenPrefix: token ? `${token.substring(0, 20)}...` : 'none',
+      tokenLength: token ? token.length : 0,
+      expiresAt: session?.expires_at ? new Date(session.expires_at * 1000).toISOString() : 'none',
+      expiresIn: session?.expires_at ? Math.round((session.expires_at * 1000 - Date.now()) / 1000) : 'none',
+      hasRefreshToken: !!session?.refresh_token
     });
 
     applyAuthorizationHeader(config, token);
@@ -128,22 +192,44 @@ api.interceptors.response.use(
     if (response) {
       const { status, data } = response;
 
+      // Backend returns: { success: false, error: { message, code } }
+      const errorMessage = data?.error?.message || data?.message || data?.error || JSON.stringify(data) || 'No message';
+      
       console.log('[API] Response error:', {
         status,
         url: response.config?.url,
-        data: data?.message || 'No message'
+        method: response.config?.method,
+        errorMessage,
+        fullData: data,
+        errorCode: data?.error?.code,
+        headers: response.headers,
+        hasAuthHeader: !!response.config?.headers?.Authorization,
+        authHeaderValue: response.config?.headers?.Authorization ? 
+          response.config.headers.Authorization.substring(0, 30) + '...' : 'none'
       });
 
       switch (status) {
         case 401: {
           const originalRequest = error.config;
-          const hadSession = !!getCachedSession();
+          const currentSession = getCachedSession();
+          const hadSession = !!currentSession;
+          const hasRefreshToken = !!currentSession?.refresh_token;
 
-          console.log('[API] 401 Unauthorized received');
+          console.log('[API] 401 Unauthorized received', {
+            hadSession,
+            hasRefreshToken,
+            isRetry: originalRequest?._retry,
+            errorMessage
+          });
 
-          if (hadSession && originalRequest && !originalRequest._retry) {
+          // Only try refresh if:
+          // 1. We have a session
+          // 2. We have a refresh token
+          // 3. This isn't already a retry
+          if (hadSession && hasRefreshToken && originalRequest && !originalRequest._retry) {
             originalRequest._retry = true;
             try {
+              console.log('[API] Attempting to refresh session and retry request...');
               const refreshedSession = await refreshSupabaseSession();
               const refreshedToken = refreshedSession?.access_token;
 
@@ -151,17 +237,34 @@ api.interceptors.response.use(
                 console.log('[API] Token refresh succeeded; retrying original request');
                 applyAuthorizationHeader(originalRequest, refreshedToken);
                 return api(originalRequest);
+              } else {
+                console.error('[API] Refresh succeeded but no token returned');
               }
             } catch (refreshError) {
-              console.error('[API] Refresh-and-retry failed:', refreshError);
+              console.error('[API] Refresh-and-retry failed:', {
+                message: refreshError.message,
+                status: refreshError.status,
+                name: refreshError.name
+              });
+            }
+          } else {
+            if (!hasRefreshToken) {
+              console.log('[API] No refresh token available, cannot refresh');
+            }
+            if (originalRequest?._retry) {
+              console.log('[API] Already retried, refresh failed');
             }
           }
 
+          // If we get here, refresh failed or wasn't possible
           await triggerSignOut();
 
           if (!hasShownSessionToast) {
             hasShownSessionToast = true;
-            toast.error('Session expired. Please login again.');
+            const message = hasRefreshToken 
+              ? 'Session expired and could not be refreshed. Please login again.'
+              : 'Session expired. Please login again.';
+            toast.error(message);
             setTimeout(() => {
               hasShownSessionToast = false;
             }, 3000);

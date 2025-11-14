@@ -70,7 +70,7 @@ CREATE INDEX IF NOT EXISTS idx_api_client_requests_status ON api_client_requests
 -- =====================================================
 
 -- Add custom_fields JSONB column to store additional form data
-ALTER TABLE leads 
+ALTER TABLE leads
 ADD COLUMN IF NOT EXISTS custom_fields JSONB DEFAULT '{}';
 
 -- Add index for custom fields queries
@@ -165,14 +165,14 @@ UNION ALL
 SELECT 'api_client_requests', COUNT(*) FROM api_client_requests;
 
 -- Verify indexes
-SELECT tablename, indexname 
-FROM pg_indexes 
+SELECT tablename, indexname
+FROM pg_indexes
 WHERE tablename IN ('api_clients', 'api_client_requests')
 ORDER BY tablename, indexname;
 
 -- Verify RLS is enabled
-SELECT tablename, rowsecurity 
-FROM pg_tables 
+SELECT tablename, rowsecurity
+FROM pg_tables
 WHERE tablename IN ('api_clients', 'api_client_requests')
 AND schemaname = 'public';
 

@@ -56,7 +56,7 @@ BEGIN
   IF auth.uid() IS NULL THEN
     RETURN TRUE;
   END IF;
-  
+
   -- Otherwise check if user belongs to the company
   RETURN EXISTS (
     SELECT 1 FROM user_profiles
@@ -74,7 +74,7 @@ BEGIN
   IF auth.uid() IS NULL THEN
     RETURN TRUE;
   END IF;
-  
+
   -- Otherwise check if user has the required role
   RETURN EXISTS (
     SELECT 1 FROM user_profiles
@@ -92,43 +92,43 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE TABLE IF NOT EXISTS custom_field_definitions (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
-  
+
   -- Field identification
   field_name TEXT NOT NULL,
   field_label TEXT NOT NULL,
   field_description TEXT,
-  
+
   -- Field configuration
   entity_type custom_field_entity_type NOT NULL,
   data_type custom_field_data_type NOT NULL,
-  
+
   -- Validation rules
   is_required BOOLEAN DEFAULT false,
   is_unique BOOLEAN DEFAULT false,
   is_searchable BOOLEAN DEFAULT true,
-  
+
   -- Options for select/multiselect
   field_options JSONB DEFAULT '[]'::JSONB,
-  
+
   -- Validation rules
   validation_rules JSONB DEFAULT '{}'::JSONB,
-  
+
   -- Display settings
   display_order INTEGER DEFAULT 0,
   placeholder TEXT,
   help_text TEXT,
   default_value TEXT,
-  
+
   -- Status
   is_active BOOLEAN DEFAULT true,
   is_system_field BOOLEAN DEFAULT false,
-  
+
   -- Metadata
   created_by UUID REFERENCES user_profiles(id),
   updated_by UUID REFERENCES user_profiles(id),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
-  
+
   -- Constraints
   UNIQUE(company_id, entity_type, field_name)
 );
@@ -141,13 +141,13 @@ CREATE TABLE IF NOT EXISTS custom_field_audit (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   custom_field_id UUID REFERENCES custom_field_definitions(id) ON DELETE CASCADE,
   company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
-  
+
   action TEXT NOT NULL CHECK (action IN ('created', 'updated', 'deleted', 'activated', 'deactivated')),
-  
+
   -- Changed data
   old_values JSONB,
   new_values JSONB,
-  
+
   -- Audit metadata
   changed_by UUID REFERENCES user_profiles(id),
   changed_at TIMESTAMPTZ DEFAULT NOW(),
@@ -219,7 +219,7 @@ BEGIN
     ) VALUES (
       NEW.id,
       NEW.company_id,
-      CASE 
+      CASE
         WHEN OLD.is_active = true AND NEW.is_active = false THEN 'deactivated'
         WHEN OLD.is_active = false AND NEW.is_active = true THEN 'activated'
         ELSE 'updated'
@@ -305,7 +305,7 @@ CREATE POLICY custom_field_audit_select_policy ON custom_field_audit
 -- =====================================================
 
 CREATE OR REPLACE VIEW custom_field_usage_stats AS
-SELECT 
+SELECT
   cfd.id,
   cfd.company_id,
   cfd.field_name,
@@ -313,15 +313,15 @@ SELECT
   cfd.entity_type,
   cfd.data_type,
   cfd.is_active,
-  
+
   -- Count usage in leads
   (
-    SELECT COUNT(*) 
-    FROM leads 
-    WHERE company_id = cfd.company_id 
+    SELECT COUNT(*)
+    FROM leads
+    WHERE company_id = cfd.company_id
     AND custom_fields ? cfd.field_name
   ) AS usage_count_leads,
-  
+
   -- Get unique values count
   (
     SELECT COUNT(DISTINCT custom_fields->>cfd.field_name)
@@ -329,7 +329,7 @@ SELECT
     WHERE company_id = cfd.company_id
     AND custom_fields ? cfd.field_name
   ) AS unique_values_count,
-  
+
   -- Last used timestamp
   (
     SELECT MAX(created_at)
@@ -337,7 +337,7 @@ SELECT
     WHERE company_id = cfd.company_id
     AND custom_fields ? cfd.field_name
   ) AS last_used_at,
-  
+
   cfd.created_at,
   cfd.updated_at
 FROM custom_field_definitions cfd

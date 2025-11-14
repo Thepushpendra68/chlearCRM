@@ -114,6 +114,75 @@ class WhatsAppController {
   }
 
   /**
+   * Get conversations
+   * GET /api/whatsapp/conversations
+   */
+  async getConversations(req, res, next) {
+    try {
+      const { is_active, limit = 50, offset = 0 } = req.query;
+
+      let query = supabaseAdmin
+        .from('whatsapp_conversations')
+        .select(`
+          *,
+          lead:leads(id, name, email, phone, company),
+          contact:contacts(id, first_name, last_name, email, phone, mobile_phone)
+        `)
+        .eq('company_id', req.user.company_id)
+        .order('last_message_at', { ascending: false, nullsFirst: false });
+
+      if (is_active !== undefined) {
+        query = query.eq('is_active', is_active === 'true');
+      }
+
+      const { data, error } = await query.range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
+
+      if (error) throw error;
+
+      res.json({
+        success: true,
+        data: {
+          conversations: data || []
+        }
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Get messages for a specific lead
+   * GET /api/whatsapp/messages/:leadId
+   */
+  async getLeadMessages(req, res, next) {
+    try {
+      const { leadId } = req.params;
+      const { limit = 50, page = 1 } = req.query;
+
+      let query = supabaseAdmin
+        .from('whatsapp_messages')
+        .select('*')
+        .eq('company_id', req.user.company_id)
+        .eq('lead_id', leadId)
+        .order('created_at', { ascending: false });
+
+      const offset = (page - 1) * limit;
+      const { data, error } = await query.range(offset, offset + parseInt(limit) - 1);
+
+      if (error) throw error;
+
+      res.json({
+        success: true,
+        data: {
+          messages: data || []
+        }
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * Get templates from Meta
    * GET /api/whatsapp/templates
    */

@@ -33,17 +33,29 @@ const ChatInterface = ({ lead, conversation, onMessageSent }) => {
   }, [lead?.id]);
 
   const loadMessages = async () => {
-    if (!lead?.id) return;
-
-    setLoading(true);
-    const result = await getLeadMessages(lead.id);
-    
-    if (result.success) {
-      setMessages(result.data.messages || []);
-    } else {
-      toast.error('Failed to load messages');
+    if (!lead?.id) {
+      setMessages([]);
+      return;
     }
-    setLoading(false);
+
+    try {
+      setLoading(true);
+      const result = await getLeadMessages(lead.id);
+      
+      if (result.success) {
+        setMessages(result.data?.messages || []);
+      } else {
+        console.error('Failed to load messages:', result.error);
+        toast.error(result.error || 'Failed to load messages');
+        setMessages([]);
+      }
+    } catch (error) {
+      console.error('Error loading messages:', error);
+      toast.error('Failed to load messages. Please try again.');
+      setMessages([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSendMessage = async (e) => {

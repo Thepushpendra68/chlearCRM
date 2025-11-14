@@ -249,6 +249,29 @@ npm run dev
 - **Backend API**: http://localhost:5000
 - **Health Check**: http://localhost:5000/health
 
+## 📖 Documentation
+
+Comprehensive documentation is organized in the `/docs` directory:
+
+### Getting Started
+- **[Quick Start Guide](./README.md#-quick-start)** - Get up and running in minutes
+- **[Database Setup](./docs/troubleshooting/DATABASE_SETUP.md)** - Supabase schema and migration guide
+
+### Feature Documentation
+- **[CRM Feature Roadmap](./docs/features/CRM_ROADMAP.md)** - Complete feature implementation status and upcoming features
+- **[Contact Management](./docs/features/CONTACT_MANAGEMENT.md)** - Contact module implementation details
+
+### Troubleshooting & Support
+- **[Common Issues & Solutions](./docs/troubleshooting/COMMON_ISSUES.md)** - Solutions to frequently encountered problems
+  - Server and route issues (404 errors, port conflicts)
+  - Database setup problems
+  - Authentication troubleshooting
+  - Development workflow issues
+
+### Development Guidelines
+- **[CLAUDE.md](./CLAUDE.md)** - AI development guidelines and best practices
+- **[agents.md](./agents.md)** - Repository guidelines for AI agents
+
 ## 👤 User Authentication
 
 **Supabase Auth Integration**: Users register via company registration endpoint

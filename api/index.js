@@ -74,6 +74,9 @@ try {
   console.log('📦 [API] Loading account routes...');
   const accountRoutes = require('../backend/src/routes/accountRoutes');
   console.log('✅ [API] Account routes loaded:', !!accountRoutes);
+  console.log('📦 [API] Loading contact routes...');
+  const contactRoutes = require('../backend/src/routes/contactRoutes');
+  console.log('✅ [API] Contact routes loaded:', !!contactRoutes);
   const picklistRoutes = require('../backend/src/routes/picklistRoutes');
   const apiClientRoutes = require('../backend/src/routes/apiClientRoutes');
   const configRoutes = require('../backend/src/routes/configRoutes');
@@ -81,6 +84,7 @@ try {
   const emailRoutes = require('../backend/src/routes/emailRoutes');
   const leadCaptureRoutes = require('../backend/src/routes/leadCaptureRoutes');
   const preferencesRoutes = require('../backend/src/routes/preferencesRoutes');
+  const scoringRoutes = require('../backend/src/routes/scoringRoutes');
 
   app.use('/api/auth', authRoutes);
   app.use('/api/supabase-auth', supabaseAuthRoutes);
@@ -99,6 +103,9 @@ try {
   console.log('🔗 [API] Registering /api/accounts...');
   app.use('/api/accounts', accountRoutes);
   console.log('✅ [API] /api/accounts registered');
+  console.log('🔗 [API] Registering /api/contacts...');
+  app.use('/api/contacts', contactRoutes);
+  console.log('✅ [API] /api/contacts registered');
   app.use('/api/picklists', picklistRoutes);
   app.use('/api/config', configRoutes);
   app.use('/api/custom-fields', customFieldRoutes);
@@ -106,6 +113,7 @@ try {
   app.use('/api/email', emailRoutes);
   app.use('/api/v1/capture', leadCaptureRoutes);
   app.use('/api/preferences', preferencesRoutes);
+  app.use('/api', scoringRoutes);
 } catch (error) {
   console.error('Failed to load backend routes:', error);
 

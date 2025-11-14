@@ -1,35 +1,41 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import ActivityList from '../components/Activities/ActivityList';
-import ActivityForm from '../components/Activities/ActivityForm';
-import ActivityDetail from '../components/Activities/ActivityDetail';
-import activityService from '../services/activityService';
-import { MobileOnly, TabletAndDesktop, ContentWrapper } from '../components/ResponsiveUtils';
-import ActivitiesTableMobile from '../components/Activities/ActivitiesTableMobile';
+import React, { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import ActivityList from "../components/Activities/ActivityList";
+import ActivityForm from "../components/Activities/ActivityForm";
+import ActivityDetail from "../components/Activities/ActivityDetail";
+import activityService from "../services/activityService";
+import {
+  MobileOnly,
+  TabletAndDesktop,
+  ContentWrapper,
+} from "../components/ResponsiveUtils";
+import ActivitiesTableMobile from "../components/Activities/ActivitiesTableMobile";
 
 const Activities = () => {
+  const { t } = useTranslation(["activities", "common"]);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [showActivityForm, setShowActivityForm] = useState(false);
   const [showActivityDetail, setShowActivityDetail] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState(null);
   const [selectedLeadId, setSelectedLeadId] = useState(null);
-  const [activityType, setActivityType] = useState('note');
-  
+  const [activityType, setActivityType] = useState("note");
+
   // Move activities state to parent for proper management
   const [activities, setActivities] = useState([]);
   const [activitiesLoading, setActivitiesLoading] = useState(true);
   const [activitiesError, setActivitiesError] = useState(null);
 
   useEffect(() => {
-    const action = searchParams.get('action');
-    if (action === 'create-activity') {
-      const type = searchParams.get('type') || 'note';
+    const action = searchParams.get("action");
+    if (action === "create-activity") {
+      const type = searchParams.get("type") || "note";
       setActivityType(type);
       setSelectedActivity(null);
       setSelectedLeadId(null);
       setShowActivityForm(true);
-      navigate('/app/activities', { replace: true });
+      navigate("/app/activities", { replace: true });
     }
   }, [searchParams, navigate]);
 
@@ -40,33 +46,32 @@ const Activities = () => {
 
   // Debug activities state changes
   useEffect(() => {
-    console.log('Activities state changed:', activities.length, 'activities');
+    console.log("Activities state changed:", activities.length, "activities");
   }, [activities]);
 
   const fetchActivities = async () => {
     try {
       setActivitiesLoading(true);
       setActivitiesError(null);
-      console.log('Fetching activities...');
+      console.log("Fetching activities...");
       const response = await activityService.getActivities();
-      console.log('Activities API response:', response);
+      console.log("Activities API response:", response);
       if (response.success) {
-        console.log('Setting activities:', response.data);
+        console.log("Setting activities:", response.data);
         setActivities(response.data);
       } else {
-        console.error('Activities API error:', response.error);
-        setActivitiesError(response.error || 'Failed to load activities');
+        console.error("Activities API error:", response.error);
+        setActivitiesError(response.error || "Failed to load activities");
       }
     } catch (error) {
-      console.error('Error fetching activities:', error);
-      setActivitiesError('Failed to load activities');
+      console.error("Error fetching activities:", error);
+      setActivitiesError("Failed to load activities");
     } finally {
       setActivitiesLoading(false);
     }
   };
 
-
-  const handleAddActivity = (leadId = null, type = 'note') => {
+  const handleAddActivity = (leadId = null, type = "note") => {
     setSelectedLeadId(leadId);
     setActivityType(type);
     setSelectedActivity(null);
@@ -102,30 +107,30 @@ const Activities = () => {
 
   const handleActivityFormSubmit = (activityData) => {
     // Activity was created/updated successfully - implement optimistic update
-    console.log('handleActivityFormSubmit called with:', activityData);
-    console.log('Current activities count:', activities.length);
-    console.log('selectedActivity:', selectedActivity);
-    
+    console.log("handleActivityFormSubmit called with:", activityData);
+    console.log("Current activities count:", activities.length);
+    console.log("selectedActivity:", selectedActivity);
+
     if (selectedActivity) {
       // Update existing activity
-      console.log('Updating existing activity');
-      setActivities(prev => {
-        const updated = prev.map(activity => 
-          activity.id === activityData.id ? activityData : activity
+      console.log("Updating existing activity");
+      setActivities((prev) => {
+        const updated = prev.map((activity) =>
+          activity.id === activityData.id ? activityData : activity,
         );
-        console.log('Updated activities:', updated.length);
+        console.log("Updated activities:", updated.length);
         return updated;
       });
     } else {
       // Add new activity to the top of the list (optimistic update)
-      console.log('Adding new activity to list');
-      setActivities(prev => {
+      console.log("Adding new activity to list");
+      setActivities((prev) => {
         const newList = [activityData, ...prev];
-        console.log('New activities count:', newList.length);
+        console.log("New activities count:", newList.length);
         return newList;
       });
     }
-    
+
     // Close the form and reset state
     setShowActivityForm(false);
     setSelectedActivity(null);
@@ -140,23 +145,26 @@ const Activities = () => {
 
   const handleDeleteActivity = async (activityId) => {
     try {
-      console.log('Deleting activity:', activityId);
+      console.log("Deleting activity:", activityId);
       const response = await activityService.deleteActivity(activityId);
 
       if (response.success) {
         // Remove the activity from the list
-        setActivities(prev => prev.filter(activity => activity.id !== activityId));
-        console.log('Activity deleted successfully');
+        setActivities((prev) =>
+          prev.filter((activity) => activity.id !== activityId),
+        );
+        console.log("Activity deleted successfully");
       } else {
-        console.error('Failed to delete activity:', response.error);
-        alert('Failed to delete activity: ' + (response.error || 'Unknown error'));
+        console.error("Failed to delete activity:", response.error);
+        alert(
+          "Failed to delete activity: " + (response.error || "Unknown error"),
+        );
       }
     } catch (error) {
-      console.error('Error deleting activity:', error);
-      alert('Failed to delete activity');
+      console.error("Error deleting activity:", error);
+      alert("Failed to delete activity");
     }
   };
-
 
   return (
     <div className="activities-page">
@@ -165,37 +173,73 @@ const Activities = () => {
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Activities</h1>
+              <h1 className="text-2xl font-bold text-gray-900">
+                {t("activities:title")}
+              </h1>
               <p className="mt-1 text-sm text-gray-600">
-                Track and manage all your lead activities
+                {t("activities:subtitle")}
               </p>
             </div>
-            
+
             <div className="flex items-center space-x-3">
               <button
                 onClick={() => handleAddActivity(selectedLeadId)}
                 className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
-                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                <svg
+                  className="w-4 h-4 mr-2"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 4v16m8-8H4"
+                  />
                 </svg>
-                Add Activity
+                {t("activities:actions.addActivity")}
               </button>
             </div>
           </div>
         </div>
 
-
         {/* Activity Types Quick Buttons */}
         <div className="mb-6">
           <div className="flex flex-wrap gap-2">
             {[
-              { type: 'call', label: 'Log Call', icon: '📞', color: 'bg-blue-500 hover:bg-blue-600' },
-              { type: 'email', label: 'Send Email', icon: '📧', color: 'bg-green-500 hover:bg-green-600' },
-              { type: 'meeting', label: 'Schedule Meeting', icon: '🤝', color: 'bg-purple-500 hover:bg-purple-600' },
-              { type: 'note', label: 'Add Note', icon: '📝', color: 'bg-yellow-500 hover:bg-yellow-600' },
-              { type: 'task', label: 'Create Task', icon: '✅', color: 'bg-orange-500 hover:bg-orange-600' }
-            ].map(action => (
+              {
+                type: "call",
+                label: t("activities:quickActions.logCall"),
+                icon: "📞",
+                color: "bg-blue-500 hover:bg-blue-600",
+              },
+              {
+                type: "email",
+                label: t("activities:quickActions.sendEmail"),
+                icon: "📧",
+                color: "bg-green-500 hover:bg-green-600",
+              },
+              {
+                type: "meeting",
+                label: t("activities:quickActions.scheduleMeeting"),
+                icon: "🤝",
+                color: "bg-purple-500 hover:bg-purple-600",
+              },
+              {
+                type: "note",
+                label: t("activities:quickActions.addNote"),
+                icon: "📝",
+                color: "bg-yellow-500 hover:bg-yellow-600",
+              },
+              {
+                type: "task",
+                label: t("activities:quickActions.createTask"),
+                icon: "✅",
+                color: "bg-orange-500 hover:bg-orange-600",
+              },
+            ].map((action) => (
               <button
                 key={action.type}
                 onClick={() => handleAddActivity(selectedLeadId, action.type)}
@@ -224,12 +268,14 @@ const Activities = () => {
         <TabletAndDesktop>
           <div className="bg-white border border-gray-200 rounded-lg">
             <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-medium text-gray-900">All Activities</h2>
+              <h2 className="text-lg font-medium text-gray-900">
+                {t("activities:sections.allActivities")}
+              </h2>
               <p className="mt-1 text-sm text-gray-600">
-                View and manage all activities across your leads
+                {t("activities:sections.allActivitiesDescription")}
               </p>
             </div>
-            
+
             <div className="p-6">
               <ActivityList
                 activities={activities}

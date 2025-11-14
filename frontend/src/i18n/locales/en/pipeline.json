@@ -1,0 +1,77 @@
+{
+  "pageTitle": "Pipeline",
+  "title": "Sales Pipeline",
+  "subtitle": "Visualize and manage your sales pipeline",
+  "viewMode": "Pipeline View",
+  "stages": {
+    "prospecting": "Prospecting",
+    "qualification": "Qualification",
+    "needsAnalysis": "Needs Analysis",
+    "valueProposition": "Value Proposition",
+    "negotiation": "Negotiation",
+    "closedWon": "Closed Won",
+    "closedLost": "Closed Lost"
+  },
+  "actions": {
+    "moveToStage": "Move to Stage",
+    "convertToDeal": "Convert to Deal",
+    "addNote": "Add Note",
+    "viewDetails": "View Details",
+    "editLead": "Edit Lead",
+    "scheduleActivity": "Schedule Activity"
+  },
+  "cards": {
+    "value": "Value: {{amount}}",
+    "closeDate": "Close: {{date}}",
+    "probability": "{{percent}}% probability",
+    "daysInStage": "{{count}} days in stage",
+    "overdue": "Overdue"
+  },
+  "filters": {
+    "title": "Pipeline Filters",
+    "stage": "Stage",
+    "assignedTo": "Assigned To",
+    "value": "Deal Value",
+    "closeDate": "Expected Close Date",
+    "probability": "Probability",
+    "clear": "Clear Filters",
+    "apply": "Apply Filters"
+  },
+  "dragAndDrop": {
+    "instruction": "Drag and drop leads between stages",
+    "moving": "Moving lead to {{stage}}",
+    "moved": "Lead moved to {{stage}}"
+  },
+  "metrics": {
+    "title": "Pipeline Metrics",
+    "totalValue": "Total Pipeline Value",
+    "averageDealSize": "Average Deal Size",
+    "averageSalesCycle": "Average Sales Cycle",
+    "conversionRate": "Conversion Rate",
+    "winRate": "Win Rate",
+    "forecast": "Forecast"
+  },
+  "forecast": {
+    "title": "Revenue Forecast",
+    "bestCase": "Best Case",
+    "mostLikely": "Most Likely",
+    "worstCase": "Worst Case"
+  },
+  "kpis": {
+    "title": "Key Performance Indicators",
+    "totalOpportunities": "Total Opportunities",
+    "activeLeads": "Active Leads",
+    "qualifiedLeads": "Qualified Leads",
+    "proposals": "Proposals",
+    "closedDeals": "Closed Deals"
+  },
+  "emptyStage": {
+    "title": "No leads in this stage",
+    "description": "Drag leads here or add new leads"
+  },
+  "messages": {
+    "stageUpdated": "Lead moved to {{stage}}",
+    "dealCreated": "Deal created successfully",
+    "leadUpdated": "Lead updated successfully"
+  }
+}

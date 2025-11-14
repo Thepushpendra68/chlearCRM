@@ -15,8 +15,12 @@ router.use(authenticate);
 router.post('/send/text', requireRole(['sales_rep', 'manager', 'company_admin', 'super_admin']), whatsappController.sendTextMessage.bind(whatsappController));
 router.post('/send/template', requireRole(['sales_rep', 'manager', 'company_admin', 'super_admin']), whatsappController.sendTemplateMessage.bind(whatsappController));
 
-// Get messages
+// Get messages (parameterized route must come first)
+router.get('/messages/:leadId', whatsappController.getLeadMessages.bind(whatsappController));
 router.get('/messages', whatsappController.getMessages.bind(whatsappController));
+
+// Get conversations
+router.get('/conversations', whatsappController.getConversations.bind(whatsappController));
 
 // Templates
 router.get('/templates', whatsappController.getTemplates.bind(whatsappController));
