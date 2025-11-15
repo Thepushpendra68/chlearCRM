@@ -1,33 +1,45 @@
+import React, { useMemo } from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { Card, CardContent } from '../ui/card';
 import { Badge } from '../ui/badge';
-import { Avatar, AvatarImage, AvatarFallback } from '../ui/avatar';
+import { Avatar, AvatarFallback } from '../ui/avatar';
 import { AlertCircle, Zap } from 'lucide-react';
 
 const ChatMessage = ({ message }) => {
   const isUser = message.role === 'user';
   const isError = message.isError;
 
-  const formatKey = (key = '') =>
-    key
+  // Memoize formatted key to prevent recreation on every render
+  const formatKey = useMemo(() => {
+    return (key = '') => key
       .replace(/_/g, ' ')
       .replace(/\b\w/g, char => char.toUpperCase());
+  }, []);
 
-  const sourceMap = {
+  // Memoize source map to prevent recreation
+  const sourceMap = useMemo(() => ({
     gemini: { label: 'Gemini AI', className: 'bg-blue-100 text-blue-700' },
     fallback: { label: 'Fallback mode', className: 'bg-orange-100 text-orange-700' },
     system: { label: 'System', className: 'bg-gray-200 text-gray-700' }
-  };
+  }), []);
 
-  const sourceMeta = message.meta?.source
-    ? sourceMap[message.meta.source] || { label: formatKey(message.meta.source), className: 'bg-gray-200 text-gray-700' }
-    : null;
+  // Memoize source metadata
+  const sourceMeta = useMemo(() => {
+    return message.meta?.source
+      ? sourceMap[message.meta.source] || { label: formatKey(message.meta.source), className: 'bg-gray-200 text-gray-700' }
+      : null;
+  }, [message.meta?.source, sourceMap, formatKey]);
 
-  const parameterEntries = !isUser && message.parameters && typeof message.parameters === 'object'
-    ? Object.entries(message.parameters).filter(([, value]) => value !== undefined && value !== null && value !== '')
-    : [];
+  // Memoize parameter entries to prevent recalculation
+  const parameterEntries = useMemo(() => {
+    return !isUser && message.parameters && typeof message.parameters === 'object'
+      ? Object.entries(message.parameters).filter(([, value]) => value !== undefined && value !== null && value !== '')
+      : [];
+  }, [isUser, message.parameters]);
 
-  const showPendingSummary = !isUser && message.data?.pending && parameterEntries.length > 0;
+  // Memoize pending summary visibility
+  const showPendingSummary = useMemo(() => {
+    return !isUser && message.data?.pending && parameterEntries.length > 0;
+  }, [isUser, message.data?.pending, parameterEntries.length]);
 
   // Format lead data if available
   const renderLeadData = (data) => {
@@ -234,4 +246,20 @@ const ChatMessage = ({ message }) => {
   );
 };
 
-export default ChatMessage;
+// Memoize the ChatMessage component to prevent unnecessary re-renders
+// This is critical for chat list items that update frequently
+export default React.memo(ChatMessage, (prevProps, nextProps) => {
+  // Custom comparison function for more fine-grained control
+  // Only re-render if the message data actually changed
+  return (
+    prevProps.message.id === nextProps.message.id &&
+    prevProps.message.content === nextProps.message.content &&
+    prevProps.message.role === nextProps.message.role &&
+    prevProps.message.timestamp === nextProps.message.timestamp &&
+    prevProps.message.isError === nextProps.message.isError &&
+    prevProps.message.data === nextProps.message.data &&
+    prevProps.message.parameters === nextProps.message.parameters &&
+    prevProps.message.meta === nextProps.message.meta &&
+    prevProps.message.missingFields === nextProps.message.missingFields
+  );
+});

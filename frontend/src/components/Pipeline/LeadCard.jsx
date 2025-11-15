@@ -1,40 +1,63 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { format } from 'date-fns';
 
 const LeadCard = ({ lead, onDragStart, onDragEnd, onClick }) => {
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-US', {
+  // Memoize currency formatter to prevent recreation on every render
+  const formatCurrency = useMemo(() => {
+    const formatter = new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
-    }).format(amount);
-  };
+    });
+    return (amount) => formatter.format(amount);
+  }, []);
+
+  // Memoize priority colors to prevent recreation
+  const priorityColors = useMemo(() => ({
+    high: 'bg-red-100 text-red-800 border-red-200',
+    medium: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+    low: 'bg-green-100 text-green-800 border-green-200',
+    default: 'bg-gray-100 text-gray-800 border-gray-200'
+  }), []);
+
+  // Memoize status colors
+  const statusColors = useMemo(() => ({
+    hot: 'bg-red-500',
+    warm: 'bg-orange-500',
+    cold: 'bg-blue-500',
+    default: 'bg-gray-500'
+  }), []);
+
+  // Memoize computed values to prevent unnecessary recalculations
+  const computedValues = useMemo(() => {
+    const displayName = lead.company || 'No Company';
+    const contactName = lead.first_name && lead.last_name
+      ? `${lead.first_name} ${lead.last_name}`
+      : 'No Contact';
+    const formattedDate = lead.expected_close_date
+      ? format(new Date(lead.expected_close_date), 'dd-MM-yyyy')
+      : null;
+    const assignedUserName = lead.assigned_user_first_name || lead.assigned_user_last_name
+      ? `${lead.assigned_user_first_name || ''} ${lead.assigned_user_last_name || ''}`.trim()
+      : null;
+    const formattedCreatedDate = format(new Date(lead.created_at), 'MMM dd');
+
+    return {
+      displayName,
+      contactName,
+      formattedDate,
+      assignedUserName,
+      formattedCreatedDate
+    };
+  }, [lead.company, lead.first_name, lead.last_name, lead.expected_close_date, lead.assigned_user_first_name, lead.assigned_user_last_name, lead.created_at]);
 
   const getPriorityColor = (priority) => {
-    switch (priority?.toLowerCase()) {
-      case 'high':
-        return 'bg-red-100 text-red-800 border-red-200';
-      case 'medium':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'low':
-        return 'bg-green-100 text-green-800 border-green-200';
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
+    return priorityColors[priority?.toLowerCase()] || priorityColors.default;
   };
 
   const getStatusColor = (status) => {
-    switch (status?.toLowerCase()) {
-      case 'hot':
-        return 'bg-red-500';
-      case 'warm':
-        return 'bg-orange-500';
-      case 'cold':
-        return 'bg-blue-500';
-      default:
-        return 'bg-gray-500';
-    }
+    return statusColors[status?.toLowerCase()] || statusColors.default;
   };
 
   return (
@@ -49,10 +72,10 @@ const LeadCard = ({ lead, onDragStart, onDragEnd, onClick }) => {
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1">
           <h4 className="font-semibold text-gray-900 text-sm leading-tight">
-            {lead.company || 'No Company'}
+            {computedValues.displayName}
           </h4>
           <p className="text-gray-600 text-xs mt-1">
-            {lead.first_name && lead.last_name ? `${lead.first_name} ${lead.last_name}` : 'No Contact'}
+            {computedValues.contactName}
           </p>
         </div>
         <div className="flex items-center space-x-2">
@@ -77,7 +100,7 @@ const LeadCard = ({ lead, onDragStart, onDragEnd, onClick }) => {
             {lead.email}
           </div>
         )}
-        
+
         {lead.phone && (
           <div className="flex items-center text-xs text-gray-600">
             <svg className="w-3 h-3 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -96,30 +119,30 @@ const LeadCard = ({ lead, onDragStart, onDragEnd, onClick }) => {
           </div>
         )}
 
-        {lead.expected_close_date && (
+        {computedValues.formattedDate && (
           <div className="flex items-center text-xs text-gray-600">
             <svg className="w-3 h-3 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
-            {format(new Date(lead.expected_close_date), 'dd-MM-yyyy')}
+            {computedValues.formattedDate}
           </div>
         )}
       </div>
 
       {/* Assignment Info */}
-      {(lead.assigned_user_first_name || lead.assigned_user_last_name) && (
+      {computedValues.assignedUserName && (
         <div className="flex items-center text-xs text-gray-600 mt-2">
           <svg className="w-3 h-3 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
           </svg>
-          <span>Assigned to {lead.assigned_user_first_name} {lead.assigned_user_last_name}</span>
+          <span>Assigned to {computedValues.assignedUserName}</span>
         </div>
       )}
 
       {/* Lead Footer */}
       <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-100">
         <div className="flex items-center text-xs text-gray-500">
-          <span>Created {format(new Date(lead.created_at), 'MMM dd')}</span>
+          <span>Created {computedValues.formattedCreatedDate}</span>
         </div>
         {lead.probability && lead.probability > 0 && (
           <div className="text-xs font-medium text-gray-700">
@@ -131,4 +154,28 @@ const LeadCard = ({ lead, onDragStart, onDragEnd, onClick }) => {
   );
 };
 
-export default LeadCard;
+// Memoize the LeadCard component to prevent unnecessary re-renders
+// This is critical for list items in the pipeline board
+export default React.memo(LeadCard, (prevProps, nextProps) => {
+  // Custom comparison function for more fine-grained control
+  // Only re-render if the lead data actually changed
+  return (
+    prevProps.lead.id === nextProps.lead.id &&
+    prevProps.lead.company === nextProps.lead.company &&
+    prevProps.lead.first_name === nextProps.lead.first_name &&
+    prevProps.lead.last_name === nextProps.lead.last_name &&
+    prevProps.lead.email === nextProps.lead.email &&
+    prevProps.lead.phone === nextProps.lead.phone &&
+    prevProps.lead.deal_value === nextProps.lead.deal_value &&
+    prevProps.lead.expected_close_date === nextProps.lead.expected_close_date &&
+    prevProps.lead.assigned_user_first_name === nextProps.lead.assigned_user_first_name &&
+    prevProps.lead.assigned_user_last_name === nextProps.lead.assigned_user_last_name &&
+    prevProps.lead.status === nextProps.lead.status &&
+    prevProps.lead.priority === nextProps.lead.priority &&
+    prevProps.lead.probability === nextProps.lead.probability &&
+    prevProps.lead.created_at === nextProps.lead.created_at &&
+    prevProps.onDragStart === nextProps.onDragStart &&
+    prevProps.onDragEnd === nextProps.onDragEnd &&
+    prevProps.onClick === nextProps.onClick
+  );
+});

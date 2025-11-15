@@ -2,87 +2,55 @@ const { validationResult } = require('express-validator');
 const scoringService = require('../services/scoringService');
 const ApiError = require('../utils/ApiError');
 const { AuditActions, AuditSeverity, logAuditEvent } = require('../utils/auditLogger');
+const { BaseController, asyncHandler } = require('./baseController');
 
 /**
- * @desc    Get current score for a lead
- * @route   GET /api/leads/:id/score
- * @access  Private
+ * Scoring Controller
+ * Handles lead scoring operations
+ * Extends BaseController for standardized patterns
  */
-const getLeadScore = async (req, res, next) => {
-  try {
+class ScoringController extends BaseController {
+  /**
+   * Get current score for a lead
+   */
+  getLeadScore = asyncHandler(async (req, res) => {
     const { id } = req.params;
-
     const score = await scoringService.getLeadScore(id);
 
-    res.json({
-      success: true,
-      data: score
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    this.success(res, score, 200);
+  });
 
-/**
- * @desc    Get score breakdown and history for a lead
- * @route   GET /api/leads/:id/score-breakdown
- * @access  Private
- */
-const getScoreBreakdown = async (req, res, next) => {
-  try {
+  /**
+   * Get score breakdown and history for a lead
+   */
+  getScoreBreakdown = asyncHandler(async (req, res) => {
     const { id } = req.params;
-
     const breakdown = await scoringService.getScoreBreakdown(id, req.user);
 
-    res.json({
-      success: true,
-      data: breakdown
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    this.success(res, breakdown, 200);
+  });
 
-/**
- * @desc    Get all scoring rules for the company
- * @route   GET /api/scoring/rules
- * @access  Private (Manager+)
- */
-const getScoringRules = async (req, res, next) => {
-  try {
+  /**
+   * Get all scoring rules for the company
+   */
+  getScoringRules = asyncHandler(async (req, res) => {
     const rules = await scoringService.getScoringRules(req.user);
 
-    res.json({
-      success: true,
-      data: rules
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    this.success(res, rules, 200);
+  });
 
-/**
- * @desc    Create a new scoring rule
- * @route   POST /api/scoring/rules
- * @access  Private (Manager+)
- */
-const createScoringRule = async (req, res, next) => {
-  try {
+  /**
+   * Create a new scoring rule
+   */
+  createScoringRule = asyncHandler(async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors: errors.array()
-      });
+      throw ApiError.badRequest('Validation failed', errors.array());
     }
 
     // Check role permission
     if (!['company_admin', 'super_admin', 'manager'].includes(req.user.role)) {
-      return res.status(403).json({
-        success: false,
-        message: 'Insufficient permissions to create scoring rules'
-      });
+      throw ApiError.forbidden('Insufficient permissions to create scoring rules');
     }
 
     const rule = await scoringService.createScoringRule(req.body, req.user);
@@ -102,42 +70,24 @@ const createScoringRule = async (req, res, next) => {
       }
     });
 
-    res.status(201).json({
-      success: true,
-      data: rule,
-      message: 'Scoring rule created successfully'
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    this.created(res, rule, 'Scoring rule created successfully');
+  });
 
-/**
- * @desc    Update a scoring rule
- * @route   PUT /api/scoring/rules/:id
- * @access  Private (Manager+)
- */
-const updateScoringRule = async (req, res, next) => {
-  try {
+  /**
+   * Update a scoring rule
+   */
+  updateScoringRule = asyncHandler(async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors: errors.array()
-      });
+      throw ApiError.badRequest('Validation failed', errors.array());
     }
 
     // Check role permission
     if (!['company_admin', 'super_admin', 'manager'].includes(req.user.role)) {
-      return res.status(403).json({
-        success: false,
-        message: 'Insufficient permissions to update scoring rules'
-      });
+      throw ApiError.forbidden('Insufficient permissions to update scoring rules');
     }
 
     const { id } = req.params;
-
     const rule = await scoringService.updateScoringRule(id, req.body, req.user);
 
     // Log audit event
@@ -155,33 +105,19 @@ const updateScoringRule = async (req, res, next) => {
       }
     });
 
-    res.json({
-      success: true,
-      data: rule,
-      message: 'Scoring rule updated successfully'
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    this.success(res, rule, 200, 'Scoring rule updated successfully');
+  });
 
-/**
- * @desc    Delete a scoring rule
- * @route   DELETE /api/scoring/rules/:id
- * @access  Private (Manager+)
- */
-const deleteScoringRule = async (req, res, next) => {
-  try {
+  /**
+   * Delete a scoring rule
+   */
+  deleteScoringRule = asyncHandler(async (req, res) => {
     // Check role permission
     if (!['company_admin', 'super_admin', 'manager'].includes(req.user.role)) {
-      return res.status(403).json({
-        success: false,
-        message: 'Insufficient permissions to delete scoring rules'
-      });
+      throw ApiError.forbidden('Insufficient permissions to delete scoring rules');
     }
 
     const { id } = req.params;
-
     await scoringService.deleteScoringRule(id, req.user);
 
     // Log audit event
@@ -197,28 +133,16 @@ const deleteScoringRule = async (req, res, next) => {
       }
     });
 
-    res.json({
-      success: true,
-      message: 'Scoring rule deleted successfully'
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    this.success(res, null, 200, 'Scoring rule deleted successfully');
+  });
 
-/**
- * @desc    Recalculate all scores for the company
- * @route   POST /api/scoring/recalculate
- * @access  Private (Manager+)
- */
-const recalculateAllScores = async (req, res, next) => {
-  try {
+  /**
+   * Recalculate all scores for the company
+   */
+  recalculateAllScores = asyncHandler(async (req, res) => {
     // Check role permission
     if (!['company_admin', 'super_admin', 'manager'].includes(req.user.role)) {
-      return res.status(403).json({
-        success: false,
-        message: 'Insufficient permissions to recalculate scores'
-      });
+      throw ApiError.forbidden('Insufficient permissions to recalculate scores');
     }
 
     const result = await scoringService.recalculateAllScores(req.user);
@@ -236,25 +160,14 @@ const recalculateAllScores = async (req, res, next) => {
       }
     });
 
-    res.json({
-      success: true,
-      data: result,
-      message: `Successfully recalculated scores for ${result.updatedCount} leads`
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    this.success(res, result, 200, `Successfully recalculated scores for ${result.updatedCount} leads`);
+  });
 
-/**
- * @desc    Manually calculate score for a specific lead
- * @route   POST /api/leads/:id/calculate-score
- * @access  Private
- */
-const calculateLeadScore = async (req, res, next) => {
-  try {
+  /**
+   * Manually calculate score for a specific lead
+   */
+  calculateLeadScore = asyncHandler(async (req, res) => {
     const { id } = req.params;
-
     const score = await scoringService.calculateLeadScore(id);
 
     // Log audit event
@@ -270,23 +183,8 @@ const calculateLeadScore = async (req, res, next) => {
       }
     });
 
-    res.json({
-      success: true,
-      data: score,
-      message: 'Lead score calculated successfully'
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    this.success(res, score, 200, 'Lead score calculated successfully');
+  });
+}
 
-module.exports = {
-  getLeadScore,
-  getScoreBreakdown,
-  getScoringRules,
-  createScoringRule,
-  updateScoringRule,
-  deleteScoringRule,
-  recalculateAllScores,
-  calculateLeadScore
-};
+module.exports = new ScoringController();

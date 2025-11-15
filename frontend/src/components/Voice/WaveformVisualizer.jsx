@@ -2,7 +2,7 @@ import React, { forwardRef, useEffect, useState } from 'react'
 
 /**
  * Waveform Visualizer Component
- * Displays audio waveform during voice recording
+ * Displays real-time audio waveform during voice recording using Web Audio API
  */
 const WaveformVisualizer = forwardRef(({
   isListening = false,
@@ -16,28 +16,29 @@ const WaveformVisualizer = forwardRef(({
 }, ref) => {
   const [bars, setBars] = useState(Array(barCount).fill(0))
 
-  // Animate bars when listening
+  // Generate real waveform based on actual audio level
   useEffect(() => {
-    if (!isListening) {
-      // Reset bars when not listening
+    if (!isListening || audioLevel === 0) {
+      // Reset bars when not listening or no audio
       setBars(Array(barCount).fill(0))
       return
     }
 
-    const interval = setInterval(() => {
-      setBars(prevBars => {
-        return prevBars.map((_, index) => {
-          // Create a wave pattern based on audio level
-          const randomFactor = Math.random()
-          const wavePosition = Math.sin(Date.now() / 200 + index * 0.5) * 50
-          const baseHeight = Math.abs(wavePosition) + randomFactor * audioLevel
+    // Update bars based on real audio level
+    setBars(prevBars => {
+      return prevBars.map((_, index) => {
+        // Create a smooth waveform based on actual audio level
+        // Higher audio levels produce taller bars
+        const normalizedLevel = Math.min(audioLevel * 100, 100)
 
-          return Math.max(5, Math.min(100, baseHeight))
-        })
+        // Add some variation to make it look natural
+        // using the audio level as the primary factor
+        const variation = (index / barCount) * 0.3 + 0.7 // 0.7 to 1.0
+        const barHeight = normalizedLevel * variation
+
+        return Math.max(5, Math.min(100, barHeight))
       })
-    }, 100)
-
-    return () => clearInterval(interval)
+    })
   }, [isListening, audioLevel, barCount])
 
   return (
@@ -56,7 +57,7 @@ const WaveformVisualizer = forwardRef(({
             height: `${Math.max(barHeight * 0.6, 5)}px`,
             backgroundColor: color,
             borderRadius: '2px',
-            opacity: isListening ? 0.8 : 0.3,
+            opacity: isListening ? Math.min(0.3 + audioLevel, 1) : 0.2,
             transform: isListening ? 'scaleY(1)' : 'scaleY(0.5)',
           }}
         />

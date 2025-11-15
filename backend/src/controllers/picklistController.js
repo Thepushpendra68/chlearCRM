@@ -7,29 +7,18 @@ const {
   reorderPicklistOptions
 } = require('../services/picklistService');
 const ApiError = require('../utils/ApiError');
+const { BaseController, asyncHandler } = require('./baseController');
 
-const formatValidationErrors = (errors) => {
-  const errorMessages = errors.array().map(error => ({
-    field: error.path || error.param,
-    message: error.msg,
-    value: error.value
-  }));
-
-  const fieldErrors = errorMessages.map(err => `${err.field}: ${err.message}`).join(', ');
-
-  return {
-    success: false,
-    message: 'Validation failed',
-    errors: errorMessages,
-    error: {
-      message: `Please check the following fields: ${fieldErrors}`,
-      code: 'VALIDATION_ERROR'
-    }
-  };
-};
-
-const listLeadPicklists = async (req, res, next) => {
-  try {
+/**
+ * Picklist Controller
+ * Handles picklist option management for leads
+ * Extends BaseController for standardized patterns
+ */
+class PicklistController extends BaseController {
+  /**
+   * List lead picklists
+   */
+  listLeadPicklists = asyncHandler(async (req, res) => {
     const includeInactive = String(req.query.includeInactive || '').toLowerCase() === 'true';
     const companyId = req.user?.company_id || null;
 
@@ -38,21 +27,17 @@ const listLeadPicklists = async (req, res, next) => {
       forceRefresh: req.query.forceRefresh === 'true'
     });
 
-    res.json({
-      success: true,
-      data: picklists
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    this.success(res, picklists, 200, 'Picklists retrieved successfully');
+  });
 
-const createLeadPicklistOption = async (req, res, next) => {
-  try {
+  /**
+   * Create lead picklist option
+   */
+  createLeadPicklistOption = asyncHandler(async (req, res) => {
     const errors = validationResult(req);
 
     if (!errors.isEmpty()) {
-      return res.status(400).json(formatValidationErrors(errors));
+      throw ApiError.badRequest('Validation failed', errors.array());
     }
 
     const companyId = req.user?.company_id || null;
@@ -83,22 +68,17 @@ const createLeadPicklistOption = async (req, res, next) => {
       forceRefresh: true
     });
 
-    res.status(201).json({
-      success: true,
-      data: option,
-      picklists
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    this.created(res, { option, picklists }, 'Picklist option created successfully');
+  });
 
-const updateLeadPicklistOption = async (req, res, next) => {
-  try {
+  /**
+   * Update lead picklist option
+   */
+  updateLeadPicklistOption = asyncHandler(async (req, res) => {
     const errors = validationResult(req);
 
     if (!errors.isEmpty()) {
-      return res.status(400).json(formatValidationErrors(errors));
+      throw ApiError.badRequest('Validation failed', errors.array());
     }
 
     const companyId = req.user?.company_id || null;
@@ -113,18 +93,13 @@ const updateLeadPicklistOption = async (req, res, next) => {
       forceRefresh: true
     });
 
-    res.json({
-      success: true,
-      data: option,
-      picklists
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    this.updated(res, { option, picklists }, 'Picklist option updated successfully');
+  });
 
-const deleteLeadPicklistOption = async (req, res, next) => {
-  try {
+  /**
+   * Delete lead picklist option
+   */
+  deleteLeadPicklistOption = asyncHandler(async (req, res) => {
     const companyId = req.user?.company_id || null;
     const targetCompanyId = req.user?.role === 'super_admin' && req.query.scope === 'global'
       ? null
@@ -137,22 +112,17 @@ const deleteLeadPicklistOption = async (req, res, next) => {
       forceRefresh: true
     });
 
-    res.json({
-      success: true,
-      message: 'Picklist option deleted',
-      picklists
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    this.success(res, picklists, 200, 'Picklist option deleted successfully');
+  });
 
-const reorderLeadPicklistOptions = async (req, res, next) => {
-  try {
+  /**
+   * Reorder lead picklist options
+   */
+  reorderLeadPicklistOptions = asyncHandler(async (req, res) => {
     const errors = validationResult(req);
 
     if (!errors.isEmpty()) {
-      return res.status(400).json(formatValidationErrors(errors));
+      throw ApiError.badRequest('Validation failed', errors.array());
     }
 
     const { type, orderedIds } = req.body;
@@ -168,20 +138,8 @@ const reorderLeadPicklistOptions = async (req, res, next) => {
       forceRefresh: true
     });
 
-    res.json({
-      success: true,
-      message: 'Picklist order updated',
-      picklists
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    this.success(res, picklists, 200, 'Picklist order updated successfully');
+  });
+}
 
-module.exports = {
-  listLeadPicklists,
-  createLeadPicklistOption,
-  updateLeadPicklistOption,
-  deleteLeadPicklistOption,
-  reorderLeadPicklistOptions
-};
+module.exports = new PicklistController();

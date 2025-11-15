@@ -2,17 +2,20 @@
  * Voice Service
  * Business logic for voice functionality
  * Integrates with chatbot service and database
+ * Refactored to use commonService for DRY principle
  */
 
-const ApiError = require('../utils/ApiError')
 const chatbotService = require('./chatbotService')
+const { withErrorHandling, DatabaseService, ValidationService, LoggingService } = require('./commonService')
 
 class VoiceService {
   /**
    * Process voice input through chatbot
    */
-  async processVoiceInput(userId, transcript, user) {
-    try {
+  processVoiceInput = withErrorHandling(
+    async (userId, transcript, user) => {
+      LoggingService.logOperationStart('processVoiceInput', { userId })
+
       // Pre-process transcript
       const processedTranscript = this.preprocessTranscript(transcript)
 
@@ -23,6 +26,8 @@ class VoiceService {
         user
       )
 
+      LoggingService.logOperationSuccess('processVoiceInput')
+
       return {
         transcript: processedTranscript,
         response: result.response,
@@ -30,17 +35,17 @@ class VoiceService {
         requiresConfirmation: result.requiresConfirmation || false,
         actionData: result.actionData || null
       }
-    } catch (error) {
-      console.error('Voice input processing error:', error)
-      throw new ApiError('Failed to process voice input', 500)
-    }
-  }
+    },
+    'Failed to process voice input'
+  )
 
   /**
    * Process voice command for navigation/quick actions
    */
-  async processVoiceCommand(userId, transcript, user) {
-    try {
+  processVoiceCommand = withErrorHandling(
+    async (userId, transcript, user) => {
+      LoggingService.logOperationStart('processVoiceCommand', { userId })
+
       const command = this.parseCommand(transcript.toLowerCase())
 
       if (command.type === 'NAVIGATION') {
@@ -69,11 +74,9 @@ class VoiceService {
           requiresConfirmation: result.requiresConfirmation || false
         }
       }
-    } catch (error) {
-      console.error('Voice command processing error:', error)
-      throw new ApiError('Failed to process voice command', 500)
-    }
-  }
+    },
+    'Failed to process voice command'
+  )
 
   /**
    * Parse voice command
@@ -169,10 +172,44 @@ class VoiceService {
   /**
    * Get user voice settings from database
    */
-  async getUserVoiceSettings(userId) {
-    try {
-      // In a real implementation, query from Supabase
-      // For now, return default settings
+  getUserVoiceSettings = withErrorHandling(
+    async (userId) => {
+      LoggingService.logOperationStart('getUserVoiceSettings', { userId })
+      LoggingService.logDatabaseOperation('getUserVoiceSettings', 'user_voice_settings', 'select')
+
+      // Query user voice settings from Supabase
+      const data = await DatabaseService.safeQuery(
+        () => DatabaseService.getSupabaseAdmin()
+          .from('user_voice_settings')
+          .select('*')
+          .eq('user_id', userId)
+          .maybeSingle(), // maybeSingle doesn't throw on "not found"
+        'Failed to retrieve voice settings'
+      )
+
+      // Return settings if found, otherwise return defaults
+      if (data) {
+        LoggingService.logOperationSuccess('getUserVoiceSettings')
+        return {
+          enabled: data.enabled,
+          language: data.language,
+          autoSpeak: data.auto_speak,
+          voiceActivation: data.voice_activation,
+          wakeWord: data.wake_word,
+          rate: parseFloat(data.rate),
+          pitch: parseFloat(data.pitch),
+          volume: parseFloat(data.volume),
+          silenceDelay: data.silence_delay,
+          privacy: {
+            storeVoiceNotes: data.store_voice_notes,
+            allowVoiceAnalytics: data.allow_voice_analytics,
+            dataRetentionDays: data.data_retention_days
+          }
+        }
+      }
+
+      // Return default settings if not configured
+      LoggingService.logOperationSuccess('getUserVoiceSettings', { usingDefaults: true })
       return {
         enabled: true,
         language: 'en-US',
@@ -189,122 +226,129 @@ class VoiceService {
           dataRetentionDays: 30
         }
       }
-    } catch (error) {
-      console.error('Get voice settings error:', error)
-      throw new ApiError('Failed to retrieve voice settings', 500)
-    }
-  }
+    },
+    'Failed to retrieve voice settings'
+  )
 
   /**
    * Validate voice settings
+   * Uses ValidationService from commonService
    */
-  async validateVoiceSettings(settings) {
-    const validated = {}
-
-    // Validate language
-    const supportedLanguages = ['en-US', 'en-GB', 'hi-IN', 'es-ES', 'fr-FR', 'de-DE', 'zh-CN']
-    if (settings.language && !supportedLanguages.includes(settings.language)) {
-      throw new ApiError('Unsupported language', 400)
-    }
-    validated.language = settings.language || 'en-US'
-
-    // Validate rate
-    if (settings.rate !== undefined) {
-      const rate = parseFloat(settings.rate)
-      if (rate < 0.5 || rate > 2) {
-        throw new ApiError('Speech rate must be between 0.5 and 2', 400)
-      }
-      validated.rate = rate
-    }
-
-    // Validate pitch
-    if (settings.pitch !== undefined) {
-      const pitch = parseFloat(settings.pitch)
-      if (pitch < 0.5 || pitch > 2) {
-        throw new ApiError('Speech pitch must be between 0.5 and 2', 400)
-      }
-      validated.pitch = pitch
-    }
-
-    // Validate volume
-    if (settings.volume !== undefined) {
-      const volume = parseFloat(settings.volume)
-      if (volume < 0 || volume > 1) {
-        throw new ApiError('Volume must be between 0 and 1', 400)
-      }
-      validated.volume = volume
-    }
-
-    // Validate silence delay
-    if (settings.silenceDelay !== undefined) {
-      const delay = parseInt(settings.silenceDelay)
-      if (delay < 1000 || delay > 30000) {
-        throw new ApiError('Silence delay must be between 1 and 30 seconds', 400)
-      }
-      validated.silenceDelay = delay
-    }
-
-    // Validate privacy settings
-    if (settings.privacy) {
-      validated.privacy = {}
-
-      if (settings.privacy.dataRetentionDays !== undefined) {
-        const days = parseInt(settings.privacy.dataRetentionDays)
-        if (days < 1 || days > 365) {
-          throw new ApiError('Data retention must be between 1 and 365 days', 400)
-        }
-        validated.privacy.dataRetentionDays = days
-      }
-
-      if (settings.privacy.storeVoiceNotes !== undefined) {
-        validated.privacy.storeVoiceNotes = !!settings.privacy.storeVoiceNotes
-      }
-
-      if (settings.privacy.allowVoiceAnalytics !== undefined) {
-        validated.privacy.allowVoiceAnalytics = !!settings.privacy.allowVoiceAnalytics
-      }
-    }
-
-    // Validate booleans
-    validated.enabled = settings.enabled !== undefined ? !!settings.enabled : true
-    validated.autoSpeak = settings.autoSpeak !== undefined ? !!settings.autoSpeak : true
-    validated.voiceActivation = settings.voiceActivation !== undefined ? !!settings.voiceActivation : false
-
-    if (settings.wakeWord) {
-      validated.wakeWord = settings.wakeWord.slice(0, 50) // Limit length
-    }
-
-    return validated
+  validateVoiceSettings(settings) {
+    return ValidationService.validateVoiceSettings(settings)
   }
 
   /**
    * Update user voice settings
    */
-  async updateUserVoiceSettings(userId, settings) {
-    try {
-      // In a real implementation, save to Supabase
-      // user_voice_settings table
+  updateUserVoiceSettings = withErrorHandling(
+    async (userId, settings) => {
+      LoggingService.logOperationStart('updateUserVoiceSettings', { userId })
+      LoggingService.logDatabaseOperation('updateUserVoiceSettings', 'user_voice_settings', 'upsert')
 
-      // For now, return the settings
-      return {
-        ...await this.getUserVoiceSettings(userId),
-        ...settings
+      // Validate settings first
+      const validatedSettings = this.validateVoiceSettings(settings)
+
+      // Get company_id from user metadata
+      const userProfile = await DatabaseService.safeQuery(
+        () => DatabaseService.getSupabaseAdmin()
+          .from('user_profiles')
+          .select('company_id')
+          .eq('id', userId)
+          .single(),
+        'Failed to fetch user profile'
+      )
+
+      const companyId = userProfile?.company_id || null
+
+      // Prepare data for Supabase (using column names)
+      const supabaseData = {
+        user_id: userId,
+        company_id: companyId,
+        enabled: validatedSettings.enabled,
+        language: validatedSettings.language,
+        auto_speak: validatedSettings.autoSpeak,
+        voice_activation: validatedSettings.voiceActivation,
+        wake_word: validatedSettings.wakeWord,
+        rate: validatedSettings.rate,
+        pitch: validatedSettings.pitch,
+        volume: validatedSettings.volume,
+        silence_delay: validatedSettings.silenceDelay,
+        store_voice_notes: validatedSettings.privacy.storeVoiceNotes,
+        allow_voice_analytics: validatedSettings.privacy.allowVoiceAnalytics,
+        data_retention_days: validatedSettings.privacy.dataRetentionDays,
+        updated_at: new Date().toISOString()
       }
-    } catch (error) {
-      console.error('Update voice settings error:', error)
-      throw new ApiError('Failed to update voice settings', 500)
-    }
-  }
+
+      // Upsert using DatabaseService
+      const updatedSettings = await DatabaseService.upsert(
+        'user_voice_settings',
+        supabaseData,
+        { onConflict: 'user_id', errorMessage: 'Failed to update voice settings' }
+      )
+
+      LoggingService.logOperationSuccess('updateUserVoiceSettings')
+
+      // Return the updated settings in the expected format
+      return {
+        enabled: updatedSettings.enabled,
+        language: updatedSettings.language,
+        autoSpeak: updatedSettings.auto_speak,
+        voiceActivation: updatedSettings.voice_activation,
+        wakeWord: updatedSettings.wake_word,
+        rate: parseFloat(updatedSettings.rate),
+        pitch: parseFloat(updatedSettings.pitch),
+        volume: parseFloat(updatedSettings.volume),
+        silenceDelay: updatedSettings.silence_delay,
+        privacy: {
+          storeVoiceNotes: updatedSettings.store_voice_notes,
+          allowVoiceAnalytics: updatedSettings.allow_voice_analytics,
+          dataRetentionDays: updatedSettings.data_retention_days
+        }
+      }
+    },
+    'Failed to update voice settings'
+  )
 
   /**
    * Log voice event for analytics
    */
   async logVoiceEvent(userId, event, data) {
     try {
-      // In a real implementation, save to Supabase
-      // voice_analytics table
+      // Get company_id from user metadata
+      const { data: userProfile } = await supabaseAdmin
+        .from('user_profiles')
+        .select('company_id')
+        .eq('id', userId)
+        .single()
 
-      console.log('Voice event:', { userId, event, data, timestamp: new Date() })
+      const companyId = userProfile?.company_id || null
+
+      // Prepare analytics data
+      const analyticsData = {
+        user_id: userId,
+        company_id: companyId,
+        event_type: event.type || 'unknown',
+        event_data: data || {},
+        accuracy_score: data?.accuracy || null,
+        duration_ms: data?.duration || null,
+        transcript_length: data?.transcriptLength || null,
+        command_type: data?.commandType || null,
+        success: data?.success !== false, // Default to true if not specified
+        created_at: new Date().toISOString()
+      }
+
+      // Insert analytics record
+      const { error } = await supabaseAdmin
+        .from('voice_analytics')
+        .insert(analyticsData)
+
+      if (error) {
+        console.error('Error logging voice event:', error)
+        // Don't throw - analytics failure shouldn't break the app
+      }
+
+      console.log('Voice event logged:', { userId, event: event.type, success: analyticsData.success })
     } catch (error) {
       console.error('Log voice event error:', error)
       // Don't throw - analytics failure shouldn't break the app
@@ -314,17 +358,99 @@ class VoiceService {
   /**
    * Get voice analytics
    */
-  async getVoiceAnalytics(userId, period) {
+  async getVoiceAnalytics(userId, period = '7d') {
     try {
-      // In a real implementation, query from Supabase
-      // Return mock analytics for now
+      // Calculate date range based on period
+      const now = new Date()
+      let startDate = new Date()
+
+      switch (period) {
+        case '24h':
+          startDate.setHours(now.getHours() - 24)
+          break
+        case '7d':
+          startDate.setDate(now.getDate() - 7)
+          break
+        case '30d':
+          startDate.setDate(now.getDate() - 30)
+          break
+        default:
+          startDate.setDate(now.getDate() - 7)
+      }
+
+      // Get analytics data from Supabase
+      const { data: analytics, error } = await supabaseAdmin
+        .from('voice_analytics')
+        .select('*')
+        .eq('user_id', userId)
+        .gte('created_at', startDate.toISOString())
+        .lte('created_at', now.toISOString())
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        console.error('Error fetching voice analytics:', error)
+        throw new ApiError('Failed to retrieve voice analytics', 500)
+      }
+
+      // Get command history for top commands
+      const { data: commands } = await supabaseAdmin
+        .from('voice_commands')
+        .select('command_type, command_text, success')
+        .eq('user_id', userId)
+        .gte('created_at', startDate.toISOString())
+        .lte('created_at', now.toISOString())
+        .order('created_at', { ascending: false })
+
+      // Calculate statistics
+      const totalCommands = analytics?.length || 0
+      const successfulCommands = analytics?.filter(a => a.success).length || 0
+      const averageAccuracy = analytics?.length > 0
+        ? analytics.reduce((sum, a) => sum + (a.accuracy_score || 0), 0) / analytics.length
+        : 0
+
+      // Get top commands
+      const commandCounts = {}
+      commands?.forEach(cmd => {
+        const key = `${cmd.command_type}:${cmd.command_text}`
+        if (!commandCounts[key]) {
+          commandCounts[key] = {
+            type: cmd.command_type,
+            text: cmd.command_text,
+            count: 0,
+            success: 0
+          }
+        }
+        commandCounts[key].count++
+        if (cmd.success) commandCounts[key].success++
+      })
+
+      const topCommands = Object.values(commandCounts)
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10)
+        .map(cmd => ({
+          ...cmd,
+          successRate: cmd.count > 0 ? (cmd.success / cmd.count * 100).toFixed(1) : 0
+        }))
+
+      // Calculate daily usage
+      const dailyUsage = {}
+      analytics?.forEach(a => {
+        const date = new Date(a.created_at).toISOString().split('T')[0]
+        if (!dailyUsage[date]) {
+          dailyUsage[date] = { date, count: 0, successful: 0 }
+        }
+        dailyUsage[date].count++
+        if (a.success) dailyUsage[date].successful++
+      })
+
       return {
         period,
-        totalCommands: 0,
-        successfulCommands: 0,
-        averageAccuracy: 0,
-        topCommands: [],
-        dailyUsage: []
+        totalCommands,
+        successfulCommands,
+        averageAccuracy: averageAccuracy.toFixed(1),
+        successRate: totalCommands > 0 ? (successfulCommands / totalCommands * 100).toFixed(1) : 0,
+        topCommands,
+        dailyUsage: Object.values(dailyUsage).sort((a, b) => a.date.localeCompare(b.date))
       }
     } catch (error) {
       console.error('Get voice analytics error:', error)
@@ -337,16 +463,49 @@ class VoiceService {
    */
   async createVoiceNote(userId, noteData) {
     try {
-      // In a real implementation, save to Supabase
-      // voice_notes table
+      // Get company_id from user metadata
+      const { data: userProfile } = await supabaseAdmin
+        .from('user_profiles')
+        .select('company_id')
+        .eq('id', userId)
+        .single()
+
+      const companyId = userProfile?.company_id || null
+
+      // Prepare note data
+      const supabaseData = {
+        user_id: userId,
+        company_id: companyId,
+        transcription: noteData.transcription,
+        audio_url: noteData.audioData ? 'stored_audio_url' : null,
+        audio_size_bytes: noteData.audioSize || null,
+        context: noteData.context || null,
+        duration_ms: noteData.duration || null,
+        created_at: new Date().toISOString(),
+        expires_at: noteData.expiresAt || null
+      }
+
+      // Insert note
+      const { data: note, error } = await supabaseAdmin
+        .from('voice_notes')
+        .insert(supabaseData)
+        .select()
+        .single()
+
+      if (error) {
+        console.error('Error creating voice note:', error)
+        throw new ApiError('Failed to create voice note', 500)
+      }
 
       return {
-        id: `note_${Date.now()}`,
-        userId,
-        transcription: noteData.transcription,
-        audioUrl: noteData.audioData ? 'stored_audio_url' : null,
-        context: noteData.context,
-        createdAt: new Date()
+        id: note.id,
+        userId: note.user_id,
+        transcription: note.transcription,
+        audioUrl: note.audio_url,
+        context: note.context,
+        duration: note.duration_ms,
+        createdAt: note.created_at,
+        expiresAt: note.expires_at
       }
     } catch (error) {
       console.error('Create voice note error:', error)
@@ -359,10 +518,33 @@ class VoiceService {
    */
   async getUserVoiceNotes(userId, options = {}) {
     try {
-      // In a real implementation, query from Supabase
-      // voice_notes table
+      const { limit = 50, offset = 0 } = options
 
-      return []
+      // Query notes from Supabase
+      const { data: notes, error } = await supabaseAdmin
+        .from('voice_notes')
+        .select('*')
+        .eq('user_id', userId)
+        .is('expires_at', null) // Only get non-expired notes
+        .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1)
+
+      if (error) {
+        console.error('Error fetching voice notes:', error)
+        throw new ApiError('Failed to retrieve voice notes', 500)
+      }
+
+      return notes?.map(note => ({
+        id: note.id,
+        userId: note.user_id,
+        transcription: note.transcription,
+        audioUrl: note.audio_url,
+        context: note.context,
+        duration: note.duration_ms,
+        createdAt: note.created_at,
+        expiresAt: note.expires_at
+      })) || []
     } catch (error) {
       console.error('Get voice notes error:', error)
       throw new ApiError('Failed to retrieve voice notes', 500)
@@ -374,8 +556,17 @@ class VoiceService {
    */
   async deleteVoiceNote(userId, noteId) {
     try {
-      // In a real implementation, delete from Supabase
-      // voice_notes table
+      // Delete note from Supabase
+      const { error } = await supabaseAdmin
+        .from('voice_notes')
+        .delete()
+        .eq('id', noteId)
+        .eq('user_id', userId) // Ensure user can only delete their own notes
+
+      if (error) {
+        console.error('Error deleting voice note:', error)
+        throw new ApiError('Failed to delete voice note', 500)
+      }
 
       return true
     } catch (error) {

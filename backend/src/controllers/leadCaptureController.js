@@ -2,17 +2,43 @@ const leadService = require('../services/leadService');
 const customFieldService = require('../services/customFieldService');
 const ApiError = require('../utils/ApiError');
 const { logApiRequest } = require('../middleware/apiKeyMiddleware');
+const { BaseController, asyncHandler } = require('./baseController');
 const { AuditActions, logAuditEvent } = require('../utils/auditLogger');
 
 /**
- * Public endpoint for external lead capture
- * @route POST /api/v1/capture/lead
- * @access API Key authentication required
+ * Lead Capture Controller
+ * Handles public API lead capture operations
+ * Extends BaseController for standardized patterns
  */
-const captureLead = async (req, res, next) => {
-  const startTime = Date.now();
-  
-  try {
+class LeadCaptureController extends BaseController {
+  /**
+   * Helper function to apply custom field mapping
+   */
+  applyFieldMapping(customFields, mapping) {
+    const mapped = {};
+
+    for (const [sourceField, targetField] of Object.entries(mapping)) {
+      if (customFields[sourceField] !== undefined) {
+        mapped[targetField] = customFields[sourceField];
+      }
+    }
+
+    // Include unmapped fields as-is
+    for (const [field, value] of Object.entries(customFields)) {
+      if (!mapping[field]) {
+        mapped[field] = value;
+      }
+    }
+
+    return mapped;
+  }
+
+  /**
+   * Public endpoint for external lead capture
+   */
+  captureLead = asyncHandler(async (req, res) => {
+    const startTime = Date.now();
+
     const {
       first_name,
       last_name,
@@ -37,28 +63,19 @@ const captureLead = async (req, res, next) => {
     // Apply custom field mapping if configured
     let mappedCustomFields = custom_fields || {};
     if (req.apiClient.custom_field_mapping && Object.keys(req.apiClient.custom_field_mapping).length > 0) {
-      mappedCustomFields = applyFieldMapping(custom_fields || {}, req.apiClient.custom_field_mapping);
+      mappedCustomFields = this.applyFieldMapping(custom_fields || {}, req.apiClient.custom_field_mapping);
     }
 
     // Validate custom fields against definitions (if any exist)
     if (mappedCustomFields && Object.keys(mappedCustomFields).length > 0) {
-      try {
-        const validation = await customFieldService.validateCustomFields(
-          req.apiClient.company_id,
-          'lead',
-          mappedCustomFields
-        );
-        
-        if (!validation.valid) {
-          throw new ApiError(`Custom field validation failed: ${validation.errors.join(', ')}`, 400);
-        }
-      } catch (error) {
-        // If validation service fails, log but don't block (backward compatibility)
-        console.warn('Custom field validation error:', error.message);
-        // Only throw if it's a validation error, not a system error
-        if (error instanceof ApiError) {
-          throw error;
-        }
+      const validation = await customFieldService.validateCustomFields(
+        req.apiClient.company_id,
+        'lead',
+        mappedCustomFields
+      );
+
+      if (!validation.valid) {
+        throw new ApiError(`Custom field validation failed: ${validation.errors.join(', ')}`, 400);
       }
     }
 
@@ -106,38 +123,18 @@ const captureLead = async (req, res, next) => {
       }
     });
 
-    res.status(201).json({
-      success: true,
-      message: 'Lead captured successfully',
-      data: {
-        lead_id: lead.id,
-        status: lead.status
-      }
-    });
-  } catch (error) {
-    const responseTime = Date.now() - startTime;
-    await logApiRequest(
-      req.apiClient.id,
-      req,
-      error.statusCode || 500,
-      responseTime,
-      null,
-      error.message
-    );
-    
-    next(error);
-  }
-};
+    this.created(res, {
+      lead_id: lead.id,
+      status: lead.status
+    }, 'Lead captured successfully');
+  });
 
-/**
- * Bulk lead capture endpoint
- * @route POST /api/v1/capture/leads/bulk
- * @access API Key authentication required
- */
-const captureBulkLeads = async (req, res, next) => {
-  const startTime = Date.now();
-  
-  try {
+  /**
+   * Bulk lead capture endpoint
+   */
+  captureBulkLeads = asyncHandler(async (req, res) => {
+    const startTime = Date.now();
+
     const { leads } = req.body;
 
     if (!Array.isArray(leads) || leads.length === 0) {
@@ -154,22 +151,34 @@ const captureBulkLeads = async (req, res, next) => {
     };
 
     for (const leadData of leads) {
+      // Validate required fields
+      if (!leadData.first_name || !leadData.last_name) {
+        results.failed.push({
+          email: leadData.email,
+          first_name: leadData.first_name,
+          last_name: leadData.last_name,
+          error: 'First name and last name are required'
+        });
+        continue;
+      }
+
+      if (!leadData.email && !leadData.phone) {
+        results.failed.push({
+          email: leadData.email,
+          first_name: leadData.first_name,
+          last_name: leadData.last_name,
+          error: 'At least one contact method is required'
+        });
+        continue;
+      }
+
+      // Apply custom field mapping
+      let mappedCustomFields = leadData.custom_fields || {};
+      if (req.apiClient.custom_field_mapping && Object.keys(req.apiClient.custom_field_mapping).length > 0) {
+        mappedCustomFields = this.applyFieldMapping(leadData.custom_fields || {}, req.apiClient.custom_field_mapping);
+      }
+
       try {
-        // Validate required fields
-        if (!leadData.first_name || !leadData.last_name) {
-          throw new Error('First name and last name are required');
-        }
-
-        if (!leadData.email && !leadData.phone) {
-          throw new Error('At least one contact method is required');
-        }
-
-        // Apply custom field mapping
-        let mappedCustomFields = leadData.custom_fields || {};
-        if (req.apiClient.custom_field_mapping && Object.keys(req.apiClient.custom_field_mapping).length > 0) {
-          mappedCustomFields = applyFieldMapping(leadData.custom_fields || {}, req.apiClient.custom_field_mapping);
-        }
-
         const lead = await leadService.createLead({
           company_id: req.apiClient.company_id,
           first_name: leadData.first_name,
@@ -206,69 +215,21 @@ const captureBulkLeads = async (req, res, next) => {
     const responseTime = Date.now() - startTime;
     await logApiRequest(req.apiClient.id, req, 200, responseTime);
 
-    res.json({
-      success: true,
-      message: `Bulk capture completed. ${results.successful.length} successful, ${results.failed.length} failed.`,
-      data: results
-    });
-  } catch (error) {
-    const responseTime = Date.now() - startTime;
-    await logApiRequest(
-      req.apiClient.id,
-      req,
-      error.statusCode || 500,
-      responseTime,
-      null,
-      error.message
-    );
-    
-    next(error);
-  }
-};
+    this.success(res, results, 200, `Bulk capture completed. ${results.successful.length} successful, ${results.failed.length} failed.`);
+  });
 
-/**
- * Get API client info (for testing/debugging)
- * @route GET /api/v1/capture/info
- * @access API Key authentication required
- */
-const getApiInfo = async (req, res) => {
-  res.json({
-    success: true,
-    data: {
+  /**
+   * Get API client info (for testing/debugging)
+   */
+  getApiInfo = asyncHandler(async (req, res) => {
+    this.success(res, {
       client_name: req.apiClient.client_name,
       rate_limit: req.apiClient.rate_limit,
       default_lead_source: req.apiClient.default_lead_source,
       has_custom_field_mapping: Object.keys(req.apiClient.custom_field_mapping || {}).length > 0,
       allowed_origins: req.apiClient.allowed_origins
-    }
+    }, 200, 'API client info retrieved successfully');
   });
-};
+}
 
-/**
- * Helper function to apply custom field mapping
- */
-const applyFieldMapping = (customFields, mapping) => {
-  const mapped = {};
-  
-  for (const [sourceField, targetField] of Object.entries(mapping)) {
-    if (customFields[sourceField] !== undefined) {
-      mapped[targetField] = customFields[sourceField];
-    }
-  }
-  
-  // Include unmapped fields as-is
-  for (const [field, value] of Object.entries(customFields)) {
-    if (!mapping[field]) {
-      mapped[field] = value;
-    }
-  }
-  
-  return mapped;
-};
-
-module.exports = {
-  captureLead,
-  captureBulkLeads,
-  getApiInfo
-};
-
+module.exports = new LeadCaptureController();

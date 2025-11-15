@@ -1,65 +1,42 @@
 const searchService = require('../services/searchService');
 const ApiError = require('../utils/ApiError');
+const { BaseController, asyncHandler } = require('./baseController');
 
 /**
- * Global search across all modules
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- * @param {Function} next - Express next function
+ * Search Controller
+ * Handles global search operations
+ * Extends BaseController for standardized patterns
  */
-const globalSearch = async (req, res, next) => {
-  try {
+class SearchController extends BaseController {
+  /**
+   * Global search across all modules
+   */
+  globalSearch = asyncHandler(async (req, res) => {
     const { q: query, limit = 10 } = req.query;
 
     if (!query || query.trim().length < 1) {
-      return res.status(400).json({
-        success: false,
-        error: {
-          message: 'Search query cannot be empty'
-        }
-      });
+      throw new ApiError('Search query cannot be empty', 400);
     }
 
-    const results = await searchService.globalSearch(query, parseInt(limit));
-    
-    res.json({
-      success: true,
-      data: results
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    const results = await searchService.globalSearch(parseInt(limit));
 
-/**
- * Get search suggestions
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- * @param {Function} next - Express next function
- */
-const getSuggestions = async (req, res, next) => {
-  try {
+    this.success(res, results, 200, 'Search completed successfully');
+  });
+
+  /**
+   * Get search suggestions
+   */
+  getSuggestions = asyncHandler(async (req, res) => {
     const { q: query } = req.query;
 
     if (!query || query.trim().length < 1) {
-      return res.json({
-        success: true,
-        data: []
-      });
+      return this.success(res, [], 200, 'Suggestions retrieved successfully');
     }
 
     const suggestions = await searchService.getSuggestions(query);
-    
-    res.json({
-      success: true,
-      data: suggestions
-    });
-  } catch (error) {
-    next(error);
-  }
-};
 
-module.exports = {
-  globalSearch,
-  getSuggestions
-};
+    this.success(res, suggestions, 200, 'Suggestions retrieved successfully');
+  });
+}
+
+module.exports = new SearchController();

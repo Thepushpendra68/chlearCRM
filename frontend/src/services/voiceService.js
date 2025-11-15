@@ -17,6 +17,13 @@ class VoiceService {
     this.errorCallbacks = []
     this.audioLevelCallbacks = []
 
+    // Web Audio API properties
+    this.audioContext = null
+    this.analyser = null
+    this.microphone = null
+    this.audioData = null
+    this.animationFrame = null
+
     // Initialize speech recognition
     this.initSpeechRecognition()
   }
@@ -101,7 +108,7 @@ class VoiceService {
   /**
    * Start listening for speech
    */
-  startListening(options = {}) {
+  async startListening(options = {}) {
     if (!this.recognition) {
       throw new Error('Speech recognition not initialized')
     }
@@ -117,6 +124,19 @@ class VoiceService {
     }
 
     try {
+      // Initialize Web Audio API if not already done
+      if (this.isAudioContextSupported()) {
+        if (!this.audioContext) {
+          const audioInitialized = await this.initAudioContext()
+          if (audioInitialized) {
+            this.startAudioLevelMonitoring()
+          }
+        } else if (this.audioContext.state === 'suspended') {
+          await this.audioContext.resume()
+          this.startAudioLevelMonitoring()
+        }
+      }
+
       this.recognition.start()
       console.log('Started listening...')
     } catch (error) {
@@ -130,9 +150,19 @@ class VoiceService {
    */
   stopListening() {
     if (this.recognition && this.isListening) {
-      this.recognition.stop()
-      console.log('Stopped listening')
+      try {
+        this.recognition.stop()
+        console.log('Stopped listening')
+      } catch (error) {
+        console.warn('Error stopping recognition:', error)
+      }
     }
+
+    // Stop audio level monitoring
+    this.stopAudioLevelMonitoring()
+
+    // Reset listening state
+    this.isListening = false
   }
 
   /**
@@ -187,10 +217,16 @@ class VoiceService {
    */
   stopSpeaking() {
     if (this.synthesis && this.isSpeaking) {
-      this.synthesis.cancel()
-      this.isSpeaking = false
-      this.currentUtterance = null
+      try {
+        this.synthesis.cancel()
+      } catch (error) {
+        console.warn('Error stopping speech synthesis:', error)
+      }
     }
+
+    // Reset speaking state
+    this.isSpeaking = false
+    this.currentUtterance = null
   }
 
   /**
@@ -339,15 +375,216 @@ class VoiceService {
   }
 
   /**
+   * Initialize Web Audio API for real-time audio analysis
+   */
+  async initAudioContext() {
+    if (!window.AudioContext && !window.webkitAudioContext) {
+      console.warn('Web Audio API not supported')
+      return false
+    }
+
+    try {
+      // Create audio context
+      this.audioContext = new (window.AudioContext || window.webkitAudioContext)()
+
+      // Create analyser
+      this.analyser = this.audioContext.createAnalyser()
+      this.analyser.fftSize = 256
+      this.analyser.smoothingTimeConstant = 0.8
+
+      // Get microphone access
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      this.microphone = this.audioContext.createMediaStreamSource(stream)
+      this.microphone.connect(this.analyser)
+
+      // Create data array for audio frequencies
+      this.audioData = new Uint8Array(this.analyser.frequencyBinCount)
+
+      console.log('Web Audio API initialized successfully')
+      return true
+    } catch (error) {
+      console.error('Failed to initialize Web Audio API:', error)
+      return false
+    }
+  }
+
+  /**
+   * Start monitoring audio levels
+   */
+  startAudioLevelMonitoring() {
+    if (!this.analyser || !this.audioData) {
+      console.warn('Audio context not initialized')
+      return
+    }
+
+    const updateAudioLevel = () => {
+      if (!this.isListening) {
+        this.animationFrame = null
+        return
+      }
+
+      // Get frequency data
+      this.analyser.getByteFrequencyData(this.audioData)
+
+      // Calculate average volume
+      let sum = 0
+      for (let i = 0; i < this.audioData.length; i++) {
+        sum += this.audioData[i]
+      }
+      const average = sum / this.audioData.length
+      const normalizedLevel = average / 255 // Normalize to 0-1
+
+      // Update audio level
+      this.audioLevel = normalizedLevel
+
+      // Notify callbacks
+      this.audioLevelCallbacks.forEach(callback => callback(normalizedLevel))
+
+      // Continue monitoring
+      this.animationFrame = requestAnimationFrame(updateAudioLevel)
+    }
+
+    // Start monitoring
+    this.animationFrame = requestAnimationFrame(updateAudioLevel)
+  }
+
+  /**
+   * Stop monitoring audio levels
+   */
+  stopAudioLevelMonitoring() {
+    if (this.animationFrame) {
+      cancelAnimationFrame(this.animationFrame)
+      this.animationFrame = null
+    }
+    this.audioLevel = 0
+  }
+
+  /**
+   * Check if Web Audio API is supported
+   */
+  isAudioContextSupported() {
+    return !!(window.AudioContext || window.webkitAudioContext)
+  }
+
+  /**
+   * Check if microphone access is available
+   */
+  async isMicrophoneSupported() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      return false
+    }
+
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices()
+      return devices.some(device => device.kind === 'audioinput')
+    } catch (error) {
+      console.error('Error checking microphone support:', error)
+      return false
+    }
+  }
+
+  /**
    * Cleanup resources
    */
   destroy() {
+    // Stop all active operations
     this.stopListening()
     this.stopSpeaking()
     this.clearSilenceTimeout()
+    this.stopAudioLevelMonitoring()
+
+    // Cleanup SpeechRecognition
+    if (this.recognition) {
+      // Remove all event listeners to prevent memory leaks
+      this.recognition.onstart = null
+      this.recognition.onend = null
+      this.recognition.onerror = null
+      this.recognition.onresult = null
+
+      // Stop recognition if active
+      if (this.isListening) {
+        try {
+          this.recognition.stop()
+        } catch (error) {
+          // Ignore errors during cleanup
+          console.warn('Error stopping recognition during cleanup:', error)
+        }
+      }
+
+      this.recognition = null
+    }
+
+    // Cleanup SpeechSynthesis
+    if (this.synthesis) {
+      this.synthesis.cancel()
+      this.synthesis = null
+    }
+
+    this.currentUtterance = null
+
+    // Cleanup Web Audio API and MediaStream
+    this.cleanupAudioContext()
+
+    // Clear all callback arrays
     this.transcriptCallbacks = []
     this.errorCallbacks = []
     this.audioLevelCallbacks = []
+
+    // Reset all state
+    this.isListening = false
+    this.isSpeaking = false
+    this.audioLevel = 0
+  }
+
+  /**
+   * Cleanup Web Audio API resources
+   */
+  cleanupAudioContext() {
+    // Stop audio level monitoring
+    this.stopAudioLevelMonitoring()
+
+    // Cleanup MediaStream
+    if (this.microphone) {
+      try {
+        // Disconnect the microphone source
+        this.microphone.disconnect()
+
+        // Stop all tracks from the media stream
+        const stream = this.microphone.mediaStream
+        if (stream) {
+          stream.getTracks().forEach(track => {
+            track.stop()
+          })
+        }
+      } catch (error) {
+        console.warn('Error cleaning up microphone:', error)
+      }
+      this.microphone = null
+    }
+
+    // Cleanup analyser
+    if (this.analyser) {
+      try {
+        this.analyser.disconnect()
+      } catch (error) {
+        console.warn('Error cleaning up analyser:', error)
+      }
+      this.analyser = null
+      this.audioData = null
+    }
+
+    // Cleanup AudioContext
+    if (this.audioContext) {
+      try {
+        // Check if context is in a valid state before closing
+        if (this.audioContext.state !== 'closed') {
+          this.audioContext.close()
+        }
+      } catch (error) {
+        console.warn('Error closing audio context:', error)
+      }
+      this.audioContext = null
+    }
   }
 }
 

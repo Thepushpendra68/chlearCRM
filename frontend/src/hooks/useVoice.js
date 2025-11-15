@@ -13,28 +13,65 @@ export const useVoice = (options = {}) => {
   const [interimTranscript, setInterimTranscript] = useState('')
   const [isSupported, setIsSupported] = useState(false)
   const [error, setError] = useState(null)
+  const [audioLevel, setAudioLevel] = useState(0)
 
   const transcriptRef = useRef('')
   const interimRef = useRef('')
 
   // Initialize on mount
   useEffect(() => {
+    // Check browser compatibility
     const recognitionSupported = voiceService.isRecognitionSupported()
     const ttsSupported = voiceService.isTTSupported()
-    setIsSupported(recognitionSupported && ttsSupported)
+    const audioContextSupported = voiceService.isAudioContextSupported()
 
+    // Check for specific browser features
+    const hasGetUserMedia = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)
+    const hasWebKitGetUserMedia = !!(navigator.webkitGetUserMedia)
+
+    // Determine support level
+    const allSupported = recognitionSupported && ttsSupported && audioContextSupported && (hasGetUserMedia || hasWebKitGetUserMedia)
+
+    setIsSupported(allSupported)
+
+    // Provide specific error messages
     if (!recognitionSupported) {
-      setError('Speech recognition is not supported in this browser')
-      console.warn('Speech recognition not supported')
+      const browserInfo = getBrowserInfo()
+      setError(`Speech recognition is not supported in ${browserInfo.name}. Please use Chrome, Edge, or Safari.`)
+      console.warn('Speech recognition not supported in this browser')
     } else if (!ttsSupported) {
       setError('Text-to-speech is not supported in this browser')
       console.warn('Text-to-speech not supported')
+    } else if (!audioContextSupported) {
+      setError('Web Audio API is not supported in this browser')
+      console.warn('Web Audio API not supported')
+    } else if (!hasGetUserMedia && !hasWebKitGetUserMedia) {
+      setError('Microphone access is not supported in this browser')
+      console.warn('getUserMedia not supported')
     }
 
     return () => {
       voiceService.destroy()
     }
   }, [])
+
+  // Get browser information
+  const getBrowserInfo = () => {
+    const ua = navigator.userAgent
+    let name = 'Unknown Browser'
+
+    if (ua.indexOf('Chrome') > -1) {
+      name = 'Chrome'
+    } else if (ua.indexOf('Safari') > -1) {
+      name = 'Safari'
+    } else if (ua.indexOf('Firefox') > -1) {
+      name = 'Firefox'
+    } else if (ua.indexOf('Edge') > -1) {
+      name = 'Edge'
+    }
+
+    return { name }
+  }
 
   // Handle transcript updates
   const handleTranscript = useCallback((result) => {
@@ -79,18 +116,24 @@ export const useVoice = (options = {}) => {
     }
   }, [])
 
+  // Handle audio level updates
+  const handleAudioLevel = useCallback((level) => {
+    setAudioLevel(level)
+  }, [])
+
   // Register callbacks
   useEffect(() => {
     if (isSupported) {
       voiceService.onTranscript(handleTranscript)
       voiceService.onError(handleError)
+      voiceService.onAudioLevel(handleAudioLevel)
 
       return () => {
         voiceService.removeTranscriptCallback(handleTranscript)
         voiceService.removeErrorCallback(handleError)
       }
     }
-  }, [isSupported, handleTranscript, handleError])
+  }, [isSupported, handleTranscript, handleError, handleAudioLevel])
 
   // Start listening
   const startListening = useCallback((customOptions = {}) => {
@@ -214,6 +257,79 @@ export const useVoice = (options = {}) => {
     return voiceService.getVoices()
   }, [])
 
+  // Get detailed compatibility information
+  const getCompatibilityInfo = useCallback(() => {
+    const recognitionSupported = voiceService.isRecognitionSupported()
+    const ttsSupported = voiceService.isTTSupported()
+    const audioContextSupported = voiceService.isAudioContextSupported()
+    const hasGetUserMedia = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)
+    const browserInfo = getBrowserInfo()
+
+    return {
+      browser: browserInfo.name,
+      speechRecognition: recognitionSupported,
+      textToSpeech: ttsSupported,
+      webAudioAPI: audioContextSupported,
+      microphoneAccess: hasGetUserMedia,
+      fullySupported: recognitionSupported && ttsSupported && audioContextSupported && hasGetUserMedia,
+      recommendations: getRecommendations(browserInfo.name, {
+        recognitionSupported,
+        ttsSupported,
+        audioContextSupported,
+        hasGetUserMedia
+      })
+    }
+  }, [])
+
+  // Get recommendations based on browser and feature support
+  const getRecommendations = (browserName, features) => {
+    const recommendations = []
+
+    if (!features.recognitionSupported) {
+      if (browserName === 'Firefox') {
+        recommendations.push('Firefox does not support speech recognition. Please use Chrome, Edge, or Safari.')
+      } else if (browserName === 'Unknown Browser') {
+        recommendations.push('Your browser may not support voice features. Please use Chrome, Edge, or Safari for the best experience.')
+      }
+    }
+
+    if (!features.audioContextSupported) {
+      recommendations.push('Your browser does not support Web Audio API. Visual waveform may not work.')
+    }
+
+    if (!features.hasGetUserMedia) {
+      recommendations.push('Microphone access is not available. Please grant microphone permissions.')
+    }
+
+    if (features.recognitionSupported && !features.ttsSupported) {
+      recommendations.push('Speech recognition works but text-to-speech is not available.')
+    }
+
+    return recommendations
+  }
+
+  // Check specific feature support
+  const checkFeatureSupport = useCallback(async (feature) => {
+    switch (feature) {
+      case 'microphone':
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+          stream.getTracks().forEach(track => track.stop())
+          return true
+        } catch (error) {
+          return false
+        }
+      case 'speechRecognition':
+        return voiceService.isRecognitionSupported()
+      case 'textToSpeech':
+        return voiceService.isTTSupported()
+      case 'webAudio':
+        return voiceService.isAudioContextSupported()
+      default:
+        return false
+    }
+  }, [])
+
   return {
     // State
     isListening,
@@ -222,6 +338,7 @@ export const useVoice = (options = {}) => {
     interimTranscript,
     isSupported,
     error,
+    audioLevel,
 
     // Actions
     startListening,
@@ -236,7 +353,9 @@ export const useVoice = (options = {}) => {
     getSupportedLanguages,
     setVoiceSettings,
     preprocessTranscript,
-    getVoices
+    getVoices,
+    getCompatibilityInfo,
+    checkFeatureSupport
   }
 }
 

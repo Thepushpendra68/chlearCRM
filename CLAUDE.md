@@ -132,6 +132,7 @@ This is **Sakha**, a full-stack CRM application with separated backend and front
 - **Dashboard**: Real-time analytics with badge counts and recent activity
 - **User management**: Admin-level user administration with role assignment
 - **AI Chatbot**: Google Gemini-powered assistant for CRM insights and assistance
+- **Voice Interface**: Speech-to-text and text-to-speech for natural voice interactions with CRM operations, including voice commands, real-time audio visualization, and customizable voice settings
 
 ## Application Navigation & Features
 
@@ -315,7 +316,7 @@ Navigation items are dynamically shown/hidden based on user role:
 
 ### Backend Route Modules
 
-The backend implements **18 route modules** (`backend/src/routes/`) with 150+ endpoints:
+The backend implements **19 route modules** (`backend/src/routes/`) with 150+ endpoints:
 
 1. **authRoutes.js** (7 endpoints) - Authentication & registration
 2. **leadRoutes.js** (11 endpoints) - Lead management
@@ -331,10 +332,11 @@ The backend implements **18 route modules** (`backend/src/routes/`) with 150+ en
 12. **reportRoutes.js** (3+ endpoints) - Reporting system
 13. **importRoutes.js** (7 endpoints) - Import/Export system
 14. **chatbotRoutes.js** (3 endpoints) - AI chatbot
-15. **platformRoutes.js** - Platform administration (Super Admin)
-16. **leadCaptureRoutes.js** (3 endpoints) - Public API
-17. **picklistRoutes.js** - Picklist management
-18. **configRoutes.js** (5 endpoints) - System configuration
+15. **voiceRoutes.js** - Voice interface (speech-to-text, text-to-speech)
+16. **platformRoutes.js** - Platform administration (Super Admin)
+17. **leadCaptureRoutes.js** (3 endpoints) - Public API
+18. **picklistRoutes.js** - Picklist management
+19. **configRoutes.js** (5 endpoints) - System configuration
 
 ### API Key Features
 - **Role-based Access**: All endpoints include role-based authorization
@@ -504,8 +506,56 @@ FRONTEND_URL=http://localhost:3000
 - **Phone Validation**: Flexible regex `^[\+]?[0-9\s\-\(\)]{0,20}$` supports international formats
 - **Foreign Key Handling**: Empty string validation prevents constraint violations during updates
 
-# important-instruction-reminders
-Do what has been asked; nothing more, nothing less.
-NEVER create files unless they're absolutely necessary for achieving your goal.
-ALWAYS prefer editing an existing file to creating a new one.
-NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
+## Voice Interface Implementation
+
+### Overview
+The Voice Interface feature enables natural voice interactions with the CRM using the Web Speech API. It provides speech-to-text input, text-to-speech output, and voice commands for hands-free operation.
+
+### Frontend Components (`frontend/src/components/Voice/`)
+- **VoiceToggle.jsx** - Microphone toggle button with listening/speaking states
+- **VoiceInput.jsx** - Voice-enabled input component with waveform visualization
+- **WaveformVisualizer.jsx** - Real-time audio visualization during voice input
+- **VoiceSettings.jsx** - Settings modal for language, rate, pitch, volume, and privacy controls
+
+### Voice Context & Hook
+- **VoiceContext.jsx** - Global voice settings state management
+- **useVoice.js** - React hook providing voice functionality to components
+- **voiceService.js** - Web Speech API wrapper service
+
+### Backend Integration
+- **voiceController.js** - Voice request handlers
+- **voiceService.js** - Business logic for voice operations
+- **voiceRoutes.js** - API endpoints with rate limiting
+
+### Features
+- **Speech Recognition**: Converts voice to text using Web Speech API
+- **Text-to-Speech**: Reads chatbot responses and system messages aloud
+- **Voice Commands**: Navigate and perform actions using voice
+- **Real-time Visualization**: Audio waveform during voice input
+- **Customizable Settings**: Language selection, speech rate/pitch/volume
+- **Privacy Controls**: User-controlled data retention and analytics settings
+- **Wake Word Support**: Configurable wake phrase (default: "Hey Sakha")
+- **Keyboard Shortcuts**: Ctrl+Shift+V to toggle voice input
+
+### Browser Compatibility
+- ✅ **Chrome/Edge**: Full support (speech recognition + TTS)
+- ⚠️ **Firefox**: Limited support (TTS only, no speech recognition)
+- ⚠️ **Safari**: Partial support (webkit prefix required)
+
+### Usage Example
+```javascript
+const {
+  isListening,
+  isSpeaking,
+  transcript,
+  startListening,
+  stopListening,
+  speak
+} = useVoice();
+
+// Start voice recognition
+startListening();
+
+// Speak text
+speak("Lead created successfully", { rate: 1.0, pitch: 1.0 });
+```

@@ -3,37 +3,32 @@ const preferencesService = require('../services/preferencesService');
 const userService = require('../services/userService');
 const ApiError = require('../utils/ApiError');
 const { AuditActions, AuditSeverity, logAuditEvent } = require('../utils/auditLogger');
+const { BaseController, asyncHandler } = require('./baseController');
 
 /**
- * @desc    Get current user preferences
- * @route   GET /api/preferences
- * @access  Private
+ * Preferences Controller
+ * Handles user preferences management
+ * Extends BaseController for standardized patterns
  */
-const getPreferences = async (req, res, next) => {
-  try {
+class PreferencesController extends BaseController {
+  /**
+   * Get current user preferences
+   */
+  getPreferences = asyncHandler(async (req, res) => {
     const userId = req.user.id;
     const preferences = await preferencesService.getUserPreferences(userId);
 
-    res.json({
-      success: true,
-      data: preferences
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    this.success(res, preferences, 200);
+  });
 
-/**
- * @desc    Update current user preferences
- * @route   PUT /api/preferences
- * @access  Private
- */
-const updatePreferences = async (req, res, next) => {
-  try {
+  /**
+   * Update current user preferences
+   */
+  updatePreferences = asyncHandler(async (req, res) => {
     // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      throw new ApiError('Validation failed', 400, errors.array());
+      throw ApiError.badRequest('Validation failed', errors.array());
     }
 
     const userId = req.user.id;
@@ -56,14 +51,10 @@ const updatePreferences = async (req, res, next) => {
       updatedProfile = await userService.updateUser(userId, profileUpdates, req.user);
     }
 
-    res.json({
-      success: true,
-      data: {
-        preferences,
-        profile: updatedProfile
-      },
-      message: 'Preferences updated successfully'
-    });
+    this.success(res, {
+      preferences,
+      profile: updatedProfile
+    }, 200, 'Preferences updated successfully');
 
     await logAuditEvent(req, {
       action: AuditActions.USER_PREFERENCES_UPDATED,
@@ -76,26 +67,16 @@ const updatePreferences = async (req, res, next) => {
         updated_profile_fields: Object.keys(profileUpdates)
       }
     });
-  } catch (error) {
-    next(error);
-  }
-};
+  });
 
-/**
- * @desc    Reset current user preferences to defaults
- * @route   POST /api/preferences/reset
- * @access  Private
- */
-const resetPreferences = async (req, res, next) => {
-  try {
+  /**
+   * Reset current user preferences to defaults
+   */
+  resetPreferences = asyncHandler(async (req, res) => {
     const userId = req.user.id;
     const preferences = await preferencesService.resetUserPreferences(userId);
 
-    res.json({
-      success: true,
-      data: preferences,
-      message: 'Preferences reset to defaults'
-    });
+    this.success(res, preferences, 200, 'Preferences reset to defaults');
 
     await logAuditEvent(req, {
       action: AuditActions.USER_PREFERENCES_RESET,
@@ -104,13 +85,7 @@ const resetPreferences = async (req, res, next) => {
       resourceName: req.user.email || userId,
       companyId: req.user.company_id
     });
-  } catch (error) {
-    next(error);
-  }
-};
+  });
+}
 
-module.exports = {
-  getPreferences,
-  updatePreferences,
-  resetPreferences
-};
+module.exports = new PreferencesController();

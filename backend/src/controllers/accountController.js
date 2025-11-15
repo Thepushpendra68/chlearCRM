@@ -2,14 +2,18 @@ const { validationResult } = require('express-validator');
 const accountService = require('../services/accountService');
 const ApiError = require('../utils/ApiError');
 const { AuditActions, AuditSeverity, logAuditEvent } = require('../utils/auditLogger');
+const { BaseController, asyncHandler } = require('./baseController');
 
 /**
- * @desc    Get all accounts with pagination, search, and filtering
- * @route   GET /api/accounts
- * @access  Private
+ * Account Controller
+ * Handles account management operations
+ * Extends BaseController for standardized patterns
  */
-const getAccounts = async (req, res, next) => {
-  try {
+class AccountController extends BaseController {
+  /**
+   * Get all accounts with pagination, search, and filtering
+   */
+  getAccounts = asyncHandler(async (req, res) => {
     const {
       page = 1,
       limit = 20,
@@ -39,48 +43,22 @@ const getAccounts = async (req, res, next) => {
       filters
     );
 
-    res.json({
-      success: true,
-      data: result.accounts,
-      pagination: {
-        current_page: parseInt(page),
-        total_pages: result.totalPages,
-        total_items: result.totalItems,
-        items_per_page: parseInt(limit),
-        has_next: parseInt(page) < result.totalPages,
-        has_prev: parseInt(page) > 1
-      }
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    this.paginated(res, result.accounts, parseInt(page), parseInt(limit), result.totalItems, 200);
+  });
 
-/**
- * @desc    Get account by ID
- * @route   GET /api/accounts/:id
- * @access  Private
- */
-const getAccountById = async (req, res, next) => {
-  try {
+  /**
+   * Get account by ID
+   */
+  getAccountById = asyncHandler(async (req, res) => {
     const account = await accountService.getAccountById(req.params.id, req.user);
 
-    res.json({
-      success: true,
-      data: account
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    this.success(res, account, 200);
+  });
 
-/**
- * @desc    Create new account
- * @route   POST /api/accounts
- * @access  Private
- */
-const createAccount = async (req, res, next) => {
-  try {
+  /**
+   * Create new account
+   */
+  createAccount = asyncHandler(async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       const errorMessages = errors.array().map(error => ({
@@ -91,15 +69,7 @@ const createAccount = async (req, res, next) => {
 
       const fieldErrors = errorMessages.map(err => `${err.field}: ${err.message}`).join(', ');
 
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors: errorMessages,
-        error: {
-          message: `Please check the following fields: ${fieldErrors}`,
-          code: 'VALIDATION_ERROR'
-        }
-      });
+      throw ApiError.badRequest(`Please check the following fields: ${fieldErrors}`, errorMessages);
     }
 
     const account = await accountService.createAccount(req.body, req.user);
@@ -120,23 +90,13 @@ const createAccount = async (req, res, next) => {
       }
     });
 
-    res.status(201).json({
-      success: true,
-      data: account,
-      message: 'Account created successfully'
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    this.created(res, account, 'Account created successfully');
+  });
 
-/**
- * @desc    Update account
- * @route   PUT /api/accounts/:id
- * @access  Private
- */
-const updateAccount = async (req, res, next) => {
-  try {
+  /**
+   * Update account
+   */
+  updateAccount = asyncHandler(async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       const errorMessages = errors.array().map(error => ({
@@ -147,15 +107,7 @@ const updateAccount = async (req, res, next) => {
 
       const fieldErrors = errorMessages.map(err => `${err.field}: ${err.message}`).join(', ');
 
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors: errorMessages,
-        error: {
-          message: `Please check the following fields: ${fieldErrors}`,
-          code: 'VALIDATION_ERROR'
-        }
-      });
+      throw ApiError.badRequest(`Please check the following fields: ${fieldErrors}`, errorMessages);
     }
 
     const result = await accountService.updateAccount(req.params.id, req.body, req.user);
@@ -173,23 +125,13 @@ const updateAccount = async (req, res, next) => {
       }
     });
 
-    res.json({
-      success: true,
-      data: result.updatedAccount,
-      message: 'Account updated successfully'
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    this.success(res, result.updatedAccount, 200, 'Account updated successfully');
+  });
 
-/**
- * @desc    Delete account
- * @route   DELETE /api/accounts/:id
- * @access  Private (Admin only)
- */
-const deleteAccount = async (req, res, next) => {
-  try {
+  /**
+   * Delete account
+   */
+  deleteAccount = asyncHandler(async (req, res) => {
     const result = await accountService.deleteAccount(req.params.id, req.user);
 
     await logAuditEvent(req, {
@@ -201,77 +143,36 @@ const deleteAccount = async (req, res, next) => {
       severity: AuditSeverity.WARNING
     });
 
-    res.json({
-      success: true,
-      message: 'Account deleted successfully'
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    this.success(res, null, 200, 'Account deleted successfully');
+  });
 
-/**
- * @desc    Get account leads
- * @route   GET /api/accounts/:id/leads
- * @access  Private
- */
-const getAccountLeads = async (req, res, next) => {
-  try {
+  /**
+   * Get account leads
+   */
+  getAccountLeads = asyncHandler(async (req, res) => {
     const leads = await accountService.getAccountLeads(req.params.id, req.user);
 
-    res.json({
-      success: true,
-      data: leads
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    this.success(res, leads, 200);
+  });
 
-/**
- * @desc    Get account statistics
- * @route   GET /api/accounts/:id/stats
- * @access  Private
- */
-const getAccountStats = async (req, res, next) => {
-  try {
+  /**
+   * Get account statistics
+   */
+  getAccountStats = asyncHandler(async (req, res) => {
     const stats = await accountService.getAccountStats(req.params.id, req.user);
 
-    res.json({
-      success: true,
-      data: stats
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    this.success(res, stats, 200);
+  });
 
-/**
- * @desc    Get account timeline
- * @route   GET /api/accounts/:id/timeline
- * @access  Private
- */
-const getAccountTimeline = async (req, res, next) => {
-  try {
+  /**
+   * Get account timeline
+   */
+  getAccountTimeline = asyncHandler(async (req, res) => {
     const timeline = await accountService.getAccountTimeline(req.params.id, req.user);
 
-    res.json({
-      success: true,
-      data: timeline
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    this.success(res, timeline, 200);
+  });
+}
 
-module.exports = {
-  getAccounts,
-  getAccountById,
-  createAccount,
-  updateAccount,
-  deleteAccount,
-  getAccountLeads,
-  getAccountStats,
-  getAccountTimeline
-};
+module.exports = new AccountController();
 

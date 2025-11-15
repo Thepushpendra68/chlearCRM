@@ -1,13 +1,26 @@
 const customFieldService = require('../services/customFieldService');
 const ApiError = require('../utils/ApiError');
-const { AuditActions, logAuditEvent } = require('../utils/auditLogger');
+const { BaseController, asyncHandler } = require('./baseController');
+const { AuditActions, AuditSeverity, logAuditEvent } = require('../utils/auditLogger');
 
 /**
- * Get all custom fields for the company
- * @route GET /api/custom-fields
+ * Custom Field Controller
+ * Handles custom field management operations
+ * Extends BaseController for standardized patterns
  */
-const getCustomFields = async (req, res, next) => {
-  try {
+class CustomFieldController extends BaseController {
+  /**
+   * Describe custom field for logging
+   */
+  describeCustomField(field = {}) {
+    return field?.field_label || `Custom Field ${field?.id || ''}`.trim();
+  }
+
+  /**
+   * Get all custom fields for the company
+   * @route GET /api/custom-fields
+   */
+  getCustomFields = asyncHandler(async (req, res) => {
     const { entity_type, is_active, data_type, search } = req.query;
 
     const filters = {};
@@ -18,45 +31,31 @@ const getCustomFields = async (req, res, next) => {
 
     const customFields = await customFieldService.getCustomFields(req.user.company_id, filters);
 
-    res.json({
-      success: true,
-      data: customFields
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    this.success(res, customFields, 200, 'Custom fields retrieved successfully');
+  });
 
-/**
- * Get a single custom field by ID
- * @route GET /api/custom-fields/:id
- */
-const getCustomFieldById = async (req, res, next) => {
-  try {
+  /**
+   * Get a single custom field by ID
+   * @route GET /api/custom-fields/:id
+   */
+  getCustomFieldById = asyncHandler(async (req, res) => {
     const customField = await customFieldService.getCustomFieldById(
       req.user.company_id,
       req.params.id
     );
 
-    res.json({
-      success: true,
-      data: customField
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    if (!customField) {
+      return this.notFound(res, 'Custom field not found');
+    }
 
-/**
- * Create a new custom field
- * @route POST /api/custom-fields
- */
-const createCustomField = async (req, res, next) => {
-  try {
-    console.log('🔵 [CREATE CUSTOM FIELD] Request received');
-    console.log('🔵 [CREATE CUSTOM FIELD] Body:', JSON.stringify(req.body, null, 2));
-    console.log('🔵 [CREATE CUSTOM FIELD] User:', req.user.id, req.user.role);
-    
+    this.success(res, customField, 200, 'Custom field retrieved successfully');
+  });
+
+  /**
+   * Create a new custom field
+   * @route POST /api/custom-fields
+   */
+  createCustomField = asyncHandler(async (req, res) => {
     const {
       field_name,
       field_label,
@@ -77,27 +76,21 @@ const createCustomField = async (req, res, next) => {
 
     // Validate required fields
     if (!field_name) {
-      console.log('❌ [CREATE CUSTOM FIELD] Validation failed: field_name missing');
-      throw new ApiError('Field name is required', 400);
+      return this.validationError(res, 'Field name is required');
     }
 
     if (!field_label) {
-      console.log('❌ [CREATE CUSTOM FIELD] Validation failed: field_label missing');
-      throw new ApiError('Field label is required', 400);
+      return this.validationError(res, 'Field label is required');
     }
 
     if (!entity_type) {
-      console.log('❌ [CREATE CUSTOM FIELD] Validation failed: entity_type missing');
-      throw new ApiError('Entity type is required', 400);
+      return this.validationError(res, 'Entity type is required');
     }
 
     if (!data_type) {
-      console.log('❌ [CREATE CUSTOM FIELD] Validation failed: data_type missing');
-      throw new ApiError('Data type is required', 400);
+      return this.validationError(res, 'Data type is required');
     }
 
-    console.log('✅ [CREATE CUSTOM FIELD] Validation passed, calling service...');
-    
     const customField = await customFieldService.createCustomField(
       req.user.company_id,
       {
@@ -119,8 +112,6 @@ const createCustomField = async (req, res, next) => {
       },
       req.user.id
     );
-    
-    console.log('✅ [CREATE CUSTOM FIELD] Service completed successfully');
 
     // Log audit event
     await logAuditEvent(req, {
@@ -136,22 +127,14 @@ const createCustomField = async (req, res, next) => {
       }
     });
 
-    res.status(201).json({
-      success: true,
-      message: 'Custom field created successfully',
-      data: customField
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    this.created(res, customField, 'Custom field created successfully');
+  });
 
-/**
- * Update a custom field
- * @route PUT /api/custom-fields/:id
- */
-const updateCustomField = async (req, res, next) => {
-  try {
+  /**
+   * Update a custom field
+   * @route PUT /api/custom-fields/:id
+   */
+  updateCustomField = asyncHandler(async (req, res) => {
     const customField = await customFieldService.updateCustomField(
       req.user.company_id,
       req.params.id,
@@ -171,79 +154,60 @@ const updateCustomField = async (req, res, next) => {
       }
     });
 
-    res.json({
-      success: true,
-      message: 'Custom field updated successfully',
-      data: customField
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    this.updated(res, customField, 'Custom field updated successfully');
+  });
 
-/**
- * Delete a custom field
- * @route DELETE /api/custom-fields/:id
- */
-const deleteCustomField = async (req, res, next) => {
-  try {
-    console.log('🔴 [DELETE CUSTOM FIELD] Request received');
-    console.log('🔴 [DELETE CUSTOM FIELD] Field ID:', req.params.id);
-    console.log('🔴 [DELETE CUSTOM FIELD] User:', req.user.id, req.user.role);
-    console.log('🔴 [DELETE CUSTOM FIELD] Company:', req.user.company_id);
-    
+  /**
+   * Delete a custom field
+   * @route DELETE /api/custom-fields/:id
+   */
+  deleteCustomField = asyncHandler(async (req, res) => {
     // Get field info before deletion for audit log
-    console.log('🔴 [DELETE CUSTOM FIELD] Fetching field info...');
     const field = await customFieldService.getCustomFieldById(
       req.user.company_id,
       req.params.id
     );
-    console.log('🔴 [DELETE CUSTOM FIELD] Field found:', field.field_name);
 
-    console.log('🔴 [DELETE CUSTOM FIELD] Calling delete service...');
+    if (!field) {
+      return this.notFound(res, 'Custom field not found');
+    }
+
     await customFieldService.deleteCustomField(
       req.user.company_id,
       req.params.id,
       req.user.id
     );
-    console.log('✅ [DELETE CUSTOM FIELD] Delete service completed');
 
     // Log audit event
     await logAuditEvent(req, {
       action: AuditActions.CUSTOM_FIELD_DELETED,
       resourceType: 'custom_field',
       resourceId: req.params.id,
-      resourceName: field.field_label,
+      resourceName: this.describeCustomField(field),
       companyId: req.user.company_id,
+      severity: AuditSeverity.WARNING,
       details: {
         field_name: field.field_name,
         entity_type: field.entity_type
       }
     });
 
-    res.json({
-      success: true,
-      message: 'Custom field deleted successfully'
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    this.deleted(res, 'Custom field deleted successfully');
+  });
 
-/**
- * Reorder custom fields
- * @route POST /api/custom-fields/reorder
- */
-const reorderCustomFields = async (req, res, next) => {
-  try {
+  /**
+   * Reorder custom fields
+   * @route POST /api/custom-fields/reorder
+   */
+  reorderCustomFields = asyncHandler(async (req, res) => {
     const { entity_type, field_orders } = req.body;
 
     if (!entity_type) {
-      throw new ApiError('Entity type is required', 400);
+      return this.validationError(res, 'Entity type is required');
     }
 
     if (!Array.isArray(field_orders)) {
-      throw new ApiError('Field orders must be an array', 400);
+      return this.validationError(res, 'Field orders must be an array');
     }
 
     await customFieldService.reorderCustomFields(
@@ -265,45 +229,31 @@ const reorderCustomFields = async (req, res, next) => {
       }
     });
 
-    res.json({
-      success: true,
-      message: 'Custom fields reordered successfully'
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    this.success(res, { message: 'Custom fields reordered successfully' }, 200, 'Custom fields reordered successfully');
+  });
 
-/**
- * Get custom field usage statistics
- * @route GET /api/custom-fields/:id/usage
- */
-const getCustomFieldUsage = async (req, res, next) => {
-  try {
+  /**
+   * Get custom field usage statistics
+   * @route GET /api/custom-fields/:id/usage
+   */
+  getCustomFieldUsage = asyncHandler(async (req, res) => {
     const usage = await customFieldService.getCustomFieldUsage(
       req.user.company_id,
       req.params.id
     );
 
-    res.json({
-      success: true,
-      data: usage
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    this.success(res, usage, 200, 'Custom field usage retrieved successfully');
+  });
 
-/**
- * Get all custom fields usage statistics
- * @route GET /api/custom-fields/usage/all
- */
-const getAllCustomFieldsUsage = async (req, res, next) => {
-  try {
+  /**
+   * Get all custom fields usage statistics
+   * @route GET /api/custom-fields/usage/all
+   */
+  getAllCustomFieldsUsage = asyncHandler(async (req, res) => {
     const { entity_type } = req.query;
 
     if (!entity_type) {
-      throw new ApiError('Entity type is required', 400);
+      return this.validationError(res, 'Entity type is required');
     }
 
     const usageStats = await customFieldService.getAllCustomFieldsUsage(
@@ -311,25 +261,18 @@ const getAllCustomFieldsUsage = async (req, res, next) => {
       entity_type
     );
 
-    res.json({
-      success: true,
-      data: usageStats
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    this.success(res, usageStats, 200, 'Custom fields usage statistics retrieved successfully');
+  });
 
-/**
- * Validate custom fields
- * @route POST /api/custom-fields/validate
- */
-const validateCustomFields = async (req, res, next) => {
-  try {
+  /**
+   * Validate custom fields
+   * @route POST /api/custom-fields/validate
+   */
+  validateCustomFields = asyncHandler(async (req, res) => {
     const { entity_type, custom_fields } = req.body;
 
     if (!entity_type) {
-      throw new ApiError('Entity type is required', 400);
+      return this.validationError(res, 'Entity type is required');
     }
 
     const validation = await customFieldService.validateCustomFields(
@@ -338,24 +281,9 @@ const validateCustomFields = async (req, res, next) => {
       custom_fields
     );
 
-    res.json({
-      success: true,
-      data: validation
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    this.success(res, validation, 200, 'Custom fields validation completed');
+  });
+}
 
-module.exports = {
-  getCustomFields,
-  getCustomFieldById,
-  createCustomField,
-  updateCustomField,
-  deleteCustomField,
-  reorderCustomFields,
-  getCustomFieldUsage,
-  getAllCustomFieldsUsage,
-  validateCustomFields
-};
+module.exports = new CustomFieldController();
 

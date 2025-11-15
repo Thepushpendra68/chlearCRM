@@ -2,6 +2,7 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 const leadService = require("./leadService");
 const ApiError = require("../utils/ApiError");
 const chatbotFallback = require("./chatbotFallback");
+const { createPendingActionToken } = require("../utils/actionToken");
 
 const VALID_ACTIONS = new Set([
   "CHAT",
@@ -155,6 +156,48 @@ const DEFAULT_GEMINI_MODELS = [
   "gemini-pro-latest",
 ];
 
+// Model cost tracking (per 1K tokens - approximate)
+const MODEL_COSTS = {
+  "gemini-2.0-flash-exp": { input: 0.001, output: 0.004 },
+  "gemini-1.5-flash-latest": { input: 0.00035, output: 0.00105 },
+  "gemini-1.5-pro-latest": { input: 0.00125, output: 0.00375 },
+  "gemini-pro-latest": { input: 0.0005, output: 0.0015 },
+};
+
+// Rate limiting configuration
+const RATE_LIMIT_CONFIG = {
+  // Requests per minute
+  maxRequests: parseInt(process.env.CHATBOT_RATE_LIMIT_MAX || "30"),
+  minTime: parseInt(process.env.CHATBOT_RATE_LIMIT_MIN_TIME || "2000"), // 2 seconds between requests
+  // Budget limits (monthly)
+  monthlyBudgetLimit: parseFloat(process.env.CHATBOT_MONTHLY_BUDGET_LIMIT || "100"), // $100
+  dailyBudgetLimit: parseFloat(process.env.CHATBOT_DAILY_BUDGET_LIMIT || "5"), // $5
+};
+
+// Circuit breaker configuration
+const CIRCUIT_BREAKER_CONFIG = {
+  // Number of consecutive failures to open the circuit
+  failureThreshold: parseInt(process.env.CB_FAILURE_THRESHOLD || "5"),
+  // Reset timeout in milliseconds (time to wait before trying again)
+  resetTimeout: parseInt(process.env.CB_RESET_TIMEOUT || "30000"), // 30 seconds
+  // Expected test timeout
+  testTimeout: parseInt(process.env.CB_TEST_TIMEOUT || "5000"), // 5 seconds
+  // Monitoring window for success rate
+  monitoringPeriod: parseInt(process.env.CB_MONITORING_PERIOD || "60000"), // 1 minute
+};
+
+// Retry configuration
+const RETRY_CONFIG = {
+  // Max retry attempts
+  maxAttempts: parseInt(process.env.RETRY_MAX_ATTEMPTS || "3"),
+  // Initial backoff delay in ms
+  initialDelay: parseInt(process.env.RETRY_INITIAL_DELAY || "1000"), // 1 second
+  // Max backoff delay in ms
+  maxDelay: parseInt(process.env.RETRY_MAX_DELAY || "10000"), // 10 seconds
+  // Backoff multiplier
+  backoffMultiplier: parseFloat(process.env.RETRY_BACKOFF_MULTIPLIER || "2"),
+};
+
 /**
  * Chatbot Service for Lead Management
  * Uses Google Gemini AI to process natural language queries
@@ -166,6 +209,18 @@ class ChatbotService {
     this.modelCache = new Map();
     this.geminiModels = [];
 
+    // Initialize rate limiter
+    this.initializeRateLimiter();
+
+    // Initialize budget tracking
+    this.initializeBudgetTracking();
+
+    // Initialize circuit breaker for API failures
+    this.initializeCircuitBreaker();
+
+    // Initialize monitoring and logging
+    this.initializeMonitoring();
+
     // If fallback-only mode, skip AI initialization
     if (this.useFallbackOnly) {
       console.log("[CHATBOT] Running in FALLBACK-ONLY mode (AI disabled)");
@@ -175,10 +230,14 @@ class ChatbotService {
 
     const apiKey = process.env.GEMINI_API_KEY;
 
-    // Validate API key
-    if (!apiKey) {
+    // Log environment variable status on startup
+    this.logEnvironmentStatus();
+
+    // Validate API key format and presence
+    const keyValidation = this.validateApiKey(apiKey);
+    if (!keyValidation.isValid) {
       console.warn(
-        "[CHATBOT] GEMINI_API_KEY is not set - will use fallback pattern matching",
+        `[CHATBOT] GEMINI_API_KEY validation failed: ${keyValidation.error} - will use fallback pattern matching`,
       );
       this.useFallbackOnly = true;
       return;
@@ -241,6 +300,1297 @@ class ChatbotService {
    */
   clearHistory(userId) {
     this.conversationHistory.delete(userId);
+  }
+
+  /**
+   * Sanitize user input to prevent prompt injection attacks
+   * Removes dangerous patterns that could manipulate the AI
+   */
+  sanitizeInput(input) {
+    if (!input || typeof input !== "string") {
+      return "";
+    }
+
+    let sanitized = input
+      // Remove null bytes
+      .replace(/\0/g, "")
+      // Remove markdown code blocks that might contain malicious instructions
+      .replace(/```[\s\S]*?```/g, "")
+      // Remove single-line code blocks
+      .replace(/`([^`]+)`/g, "$1")
+      // Filter out common prompt injection patterns
+      .replace(/ignore\s+previous\s+instructions/gi, "")
+      .replace(/forget\s+all\s+previous\s+instructions/gi, "")
+      .replace(/ignore\s+system\s+prompts/gi, "")
+      .replace(/you\s+are\s+a\s+(different|new)\s+(assistant|AI|agent)/gi, "")
+      .replace(/new\s+system\s+(message|prompt)/gi, "")
+      .replace(/previous\s+system\s+(message|prompt)/gi, "")
+      .replace(/role\s*:\s*(assistant|AI|system|developer|user)/gi, "")
+      .replace(/system\s*:\s*/gi, "")
+      .replace(/assistant\s*:\s*/gi, "")
+      .replace(/AI\s*:\s*/gi, "")
+      // Prevent template injection by replacing braces in template-like strings
+      .replace(/\{\{[^}]+\}\}/g, "")
+      .replace(/\{[^}]+\}/g, "")
+      // Limit length to prevent excessively long inputs
+      .substring(0, 2000)
+      // Normalize whitespace
+      .replace(/\s+/g, " ")
+      .trim();
+
+    // Additional check for attempts to override system prompt
+    const dangerousPatterns = [
+      /act\s+as\s+if\s+you\s+are\s+(?:a\s+)?different/i,
+      /pretend\s+to\s+be\s+a\s+(?:different|new)\s+(?:AI|assistant)/i,
+      /override\s+your\s+(?:system|programming|guidelines)/i,
+      /ignore\s+all\s+(?:guidelines|rules|prompts|instructions)/i,
+    ];
+
+    for (const pattern of dangerousPatterns) {
+      if (pattern.test(sanitized)) {
+        console.warn("[CHATBOT] Potentially malicious input detected and sanitized");
+        return "";
+      }
+    }
+
+    return sanitized;
+  }
+
+  /**
+   * Validate Gemini API key format and structure
+   * @param {string} apiKey - The API key to validate
+   * @returns {Object} - Validation result with isValid flag and error message
+   */
+  validateApiKey(apiKey) {
+    // Check if API key is present
+    if (!apiKey) {
+      return {
+        isValid: false,
+        error: "API key is not set in environment variables",
+      };
+    }
+
+    // Check minimum length (Gemini API keys are typically 40+ characters)
+    if (apiKey.length < 20) {
+      return {
+        isValid: false,
+        error: `API key too short (${apiKey.length} chars), expected at least 20 characters`,
+      };
+    }
+
+    // Check for valid characters (should be alphanumeric with possible special chars)
+    const validKeyPattern = /^[A-Za-z0-9_\-]+$/;
+    if (!validKeyPattern.test(apiKey)) {
+      return {
+        isValid: false,
+        error: "API key contains invalid characters",
+      };
+    }
+
+    // Check for common invalid patterns
+    if (apiKey.includes("your-api-key-here") || apiKey.includes("placeholder")) {
+      return {
+        isValid: false,
+        error: "API key appears to be a placeholder value",
+      };
+    }
+
+    // Check for potential key rotation indicators
+    this.checkKeyRotationWarnings(apiKey);
+
+    return {
+      isValid: true,
+      error: null,
+    };
+  }
+
+  /**
+   * Log environment variable status on service initialization
+   */
+  logEnvironmentStatus() {
+    const envVars = {
+      GEMINI_API_KEY: process.env.GEMINI_API_KEY ? "✓ Set" : "✗ Not set",
+      GEMINI_API_KEY_LENGTH: process.env.GEMINI_API_KEY
+        ? process.env.GEMINI_API_KEY.length
+        : 0,
+      SUPABASE_URL: process.env.SUPABASE_URL ? "✓ Set" : "✗ Not set",
+      SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY
+        ? "✓ Set (length: " + process.env.SUPABASE_SERVICE_KEY.length + ")"
+        : "✗ Not set",
+      JWT_SECRET: process.env.JWT_SECRET ? "✓ Set" : "✗ Not set",
+      NODE_ENV: process.env.NODE_ENV || "development",
+    };
+
+    console.log("[CHATBOT] === Environment Status ===");
+    Object.entries(envVars).forEach(([key, value]) => {
+      console.log(`[CHATBOT] ${key}: ${value}`);
+    });
+    console.log("[CHATBOT] ===========================");
+
+    // Log security warnings
+    if (process.env.NODE_ENV === "development") {
+      console.warn(
+        "[CHATBOT] ⚠️ Running in DEVELOPMENT mode - DO NOT use production API keys",
+      );
+    }
+  }
+
+  /**
+   * Check for key rotation warnings and potential issues
+   * @param {string} apiKey - The API key to check
+   */
+  checkKeyRotationWarnings(apiKey) {
+    const warnings = [];
+
+    // Check if key might be close to expiry or recently rotated
+    // (Gemini API keys don't have explicit expiry, but this helps detect issues)
+    if (apiKey.length < 30) {
+      warnings.push("API key is shorter than typical");
+    }
+
+    // Check for repeated characters (potential invalid key)
+    const repeatedCharPattern = /(.)\1{10,}/;
+    if (repeatedCharPattern.test(apiKey)) {
+      warnings.push("API key has repeated character patterns");
+    }
+
+    // Log warnings
+    if (warnings.length > 0) {
+      console.warn("[CHATBOT] ⚠️ API Key Warnings:");
+      warnings.forEach((warning) => {
+        console.warn(`[CHATBOT]   - ${warning}`);
+      });
+    }
+  }
+
+  /**
+   * Health check endpoint for API key validation
+   * @returns {Object} - Health status with API key validation
+   */
+  async healthCheck() {
+    // Reset counters if needed
+    this.resetCountersIfNeeded();
+
+    const dailyPercent = (
+      (this.usageStats.dailyCost / RATE_LIMIT_CONFIG.dailyBudgetLimit) *
+      100
+    );
+    const monthlyPercent = (
+      (this.usageStats.monthlyCost / RATE_LIMIT_CONFIG.monthlyBudgetLimit) *
+      100
+    );
+
+    const health = {
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      services: {
+        ai: {
+          enabled: !this.useFallbackOnly,
+          models: this.useFallbackOnly ? [] : this.geminiModels,
+          apiKeyStatus: this.getApiKeyStatus(),
+        },
+        circuitBreaker: this.getCircuitBreakerStatus(),
+        errorRecovery: {
+          enabled: true,
+          retryConfig: RETRY_CONFIG,
+          features: {
+            circuitBreaker: "✓ Enabled",
+            exponentialBackoff: "✓ Enabled",
+            gracefulDegradation: "✓ Enabled",
+            conversationRecovery: "✓ Enabled (in-memory)",
+          },
+        },
+        rateLimiting: {
+          enabled: !this.useFallbackOnly,
+          maxRequests: RATE_LIMIT_CONFIG.maxRequests,
+          minTime: RATE_LIMIT_CONFIG.minTime,
+          reservoir: this.rateLimiter ? this.rateLimiter.opts.reservoir : 0,
+        },
+        budgetTracking: {
+          enabled: true,
+          monthly: {
+            limit: RATE_LIMIT_CONFIG.monthlyBudgetLimit,
+            used: this.usageStats.monthlyCost,
+            percentage: monthlyPercent.toFixed(2),
+            status:
+              monthlyPercent >= 90
+                ? "critical"
+                : monthlyPercent >= 80
+                ? "warning"
+                : "ok",
+          },
+          daily: {
+            limit: RATE_LIMIT_CONFIG.dailyBudgetLimit,
+            used: this.usageStats.dailyCost,
+            percentage: dailyPercent.toFixed(2),
+            status:
+              dailyPercent >= 90
+                ? "critical"
+                : dailyPercent >= 80
+                ? "warning"
+                : "ok",
+          },
+          total: {
+            requests: this.usageStats.requests,
+            cost: this.usageStats.totalCost,
+          },
+          byModel: this.usageStats.byModel,
+        },
+      },
+    };
+
+    return health;
+  }
+
+  /**
+   * Get current API key status
+   * @returns {Object} - API key status information
+   */
+  getApiKeyStatus() {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return {
+        present: false,
+        validated: false,
+        message: "API key not set",
+      };
+    }
+
+    const validation = this.validateApiKey(apiKey);
+    return {
+      present: true,
+      validated: validation.isValid,
+      length: apiKey.length,
+      prefix: apiKey.substring(0, 6) + "...",
+      message: validation.isValid
+        ? "API key is valid"
+        : `Validation failed: ${validation.error}`,
+    };
+  }
+
+  /**
+   * Initialize rate limiter using Bottleneck
+   */
+  initializeRateLimiter() {
+    const Bottleneck = require("bottleneck");
+
+    // Create rate limiter with token bucket algorithm
+    this.rateLimiter = new Bottleneck({
+      reservoir: RATE_LIMIT_CONFIG.maxRequests, // Initial tokens
+      reservoirRefreshAmount: RATE_LIMIT_CONFIG.maxRequests, // Refill to max
+      reservoirRefreshInterval: 60 * 1000, // Refill every minute
+      maxConcurrent: 1, // Only 1 request at a time
+      minTime: RATE_LIMIT_CONFIG.minTime, // Minimum time between requests
+    });
+
+    // Add event listeners for monitoring
+    this.rateLimiter.on("error", (error) => {
+      console.error("[CHATBOT] Rate limiter error:", error);
+    });
+
+    this.rateLimiter.on("depleted", () => {
+      console.warn("[CHATBOT] Rate limit reservoir depleted - throttling requests");
+    });
+
+    console.log(
+      `[CHATBOT] Rate limiter initialized: max ${RATE_LIMIT_CONFIG.maxRequests} requests/min`,
+    );
+  }
+
+  /**
+   * Initialize budget tracking
+   */
+  initializeBudgetTracking() {
+    // Usage statistics
+    this.usageStats = {
+      requests: 0,
+      totalCost: 0,
+      dailyCost: 0,
+      monthlyCost: 0,
+      lastResetDate: new Date().toDateString(),
+      lastResetMonth: new Date().getMonth(),
+      byModel: {}, // Track usage per model
+    };
+
+    // Check for existing stats in storage (could be database in production)
+    this.loadUsageStats();
+
+    console.log("[CHATBOT] Budget tracking initialized:");
+    console.log(`  Monthly budget limit: $${RATE_LIMIT_CONFIG.monthlyBudgetLimit}`);
+    console.log(`  Daily budget limit: $${RATE_LIMIT_CONFIG.dailyBudgetLimit}`);
+  }
+
+  /**
+   * Load usage statistics from storage
+   */
+  loadUsageStats() {
+    // In production, this would load from database
+    // For now, we keep in memory
+    console.log("[CHATBOT] Usage stats loaded from memory");
+  }
+
+  /**
+   * Save usage statistics to storage
+   */
+  saveUsageStats() {
+    // In production, this would save to database
+    console.log("[CHATBOT] Usage stats saved (in-memory)");
+  }
+
+  /**
+   * Check if rate limit allows the request
+   * @returns {Promise<boolean>} - Whether the request is allowed
+   */
+  async checkRateLimit() {
+    try {
+      await this.rateLimiter.schedule(() => Promise.resolve());
+      return {
+        allowed: true,
+        remaining: this.rateLimiter.opts.reservoir,
+      };
+    } catch (error) {
+      if (error.name === "BottleneckError") {
+        return {
+          allowed: false,
+          error: "Rate limit exceeded. Please try again later.",
+          retryAfter: this.rateLimiter.opts.minTime,
+        };
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Check if budget allows the request
+   * @param {string} modelName - The model that would be used
+   * @param {number} estimatedInputTokens - Estimated input tokens
+   * @param {number} estimatedOutputTokens - Estimated output tokens
+   * @returns {Object} - Budget check result
+   */
+  checkBudget(modelName, estimatedInputTokens = 1000, estimatedOutputTokens = 500) {
+    // Reset daily/monthly counters if needed
+    this.resetCountersIfNeeded();
+
+    // Calculate estimated cost
+    const modelCosts = MODEL_COSTS[modelName] || MODEL_COSTS["gemini-1.5-flash-latest"];
+    const estimatedCost =
+      (estimatedInputTokens / 1000) * modelCosts.input +
+      (estimatedOutputTokens / 1000) * modelCosts.output;
+
+    // Check daily budget
+    if (this.usageStats.dailyCost + estimatedCost > RATE_LIMIT_CONFIG.dailyBudgetLimit) {
+      return {
+        allowed: false,
+        reason: "daily_budget_exceeded",
+        currentDailyCost: this.usageStats.dailyCost,
+        dailyLimit: RATE_LIMIT_CONFIG.dailyBudgetLimit,
+        estimatedCost,
+      };
+    }
+
+    // Check monthly budget
+    if (this.usageStats.monthlyCost + estimatedCost > RATE_LIMIT_CONFIG.monthlyBudgetLimit) {
+      return {
+        allowed: false,
+        reason: "monthly_budget_exceeded",
+        currentMonthlyCost: this.usageStats.monthlyCost,
+        monthlyLimit: RATE_LIMIT_CONFIG.monthlyBudgetLimit,
+        estimatedCost,
+      };
+    }
+
+    return {
+      allowed: true,
+      estimatedCost,
+    };
+  }
+
+  /**
+   * Record API usage and update statistics
+   * @param {string} modelName - Model used
+   * @param {number} inputTokens - Input tokens consumed
+   * @param {number} outputTokens - Output tokens consumed
+   * @param {number} cost - Actual cost
+   */
+  recordUsage(modelName, inputTokens, outputTokens, cost) {
+    this.usageStats.requests += 1;
+    this.usageStats.totalCost += cost;
+    this.usageStats.dailyCost += cost;
+    this.usageStats.monthlyCost += cost;
+
+    // Track per-model usage
+    if (!this.usageStats.byModel[modelName]) {
+      this.usageStats.byModel[modelName] = {
+        requests: 0,
+        tokens: { input: 0, output: 0 },
+        cost: 0,
+      };
+    }
+
+    this.usageStats.byModel[modelName].requests += 1;
+    this.usageStats.byModel[modelName].tokens.input += inputTokens;
+    this.usageStats.byModel[modelName].tokens.output += outputTokens;
+    this.usageStats.byModel[modelName].cost += cost;
+
+    // Log usage statistics periodically
+    if (this.usageStats.requests % 10 === 0) {
+      this.logUsageStatistics();
+    }
+
+    // Save stats periodically
+    if (this.usageStats.requests % 50 === 0) {
+      this.saveUsageStats();
+    }
+
+    // Check for budget alerts
+    this.checkBudgetAlerts();
+
+    // Update AI metrics for monitoring
+    this.updateAIMetrics(modelName, { inputTokens, outputTokens }, cost);
+
+    // Log structured AI usage event
+    this.createLogEntry("INFO", "ai_usage_recorded", {
+      modelName,
+      inputTokens,
+      outputTokens,
+      totalTokens: inputTokens + outputTokens,
+      cost,
+      totalRequests: this.usageStats.requests,
+      totalCost: this.usageStats.totalCost,
+    });
+  }
+
+  /**
+   * Log usage statistics
+   */
+  logUsageStatistics() {
+    const dailyPercent = (
+      (this.usageStats.dailyCost / RATE_LIMIT_CONFIG.dailyBudgetLimit) *
+      100
+    ).toFixed(1);
+    const monthlyPercent = (
+      (this.usageStats.monthlyCost / RATE_LIMIT_CONFIG.monthlyBudgetLimit) *
+      100
+    ).toFixed(1);
+
+    console.log("[CHATBOT] === Usage Statistics ===");
+    console.log(`[CHATBOT] Total requests: ${this.usageStats.requests}`);
+    console.log(`[CHATBOT] Total cost: $${this.usageStats.totalCost.toFixed(4)}`);
+    console.log(`[CHATBOT] Daily cost: $${this.usageStats.dailyCost.toFixed(4)} / $${RATE_LIMIT_CONFIG.dailyBudgetLimit} (${dailyPercent}%)`);
+    console.log(`[CHATBOT] Monthly cost: $${this.usageStats.monthlyCost.toFixed(4)} / $${RATE_LIMIT_CONFIG.monthlyBudgetLimit} (${monthlyPercent}%)`);
+    console.log("[CHATBOT] By model:");
+    Object.entries(this.usageStats.byModel).forEach(([model, stats]) => {
+      console.log(`[CHATBOT]   ${model}: ${stats.requests} req, $${stats.cost.toFixed(4)}`);
+    });
+    console.log("[CHATBOT] ========================");
+  }
+
+  /**
+   * Check for budget alerts
+   */
+  checkBudgetAlerts() {
+    const dailyPercent = (this.usageStats.dailyCost / RATE_LIMIT_CONFIG.dailyBudgetLimit) * 100;
+    const monthlyPercent = (this.usageStats.monthlyCost / RATE_LIMIT_CONFIG.monthlyBudgetLimit) * 100;
+
+    // Alert at 80% threshold
+    if (dailyPercent >= 80 && dailyPercent < 90) {
+      console.warn(`[CHATBOT] ⚠️ Daily budget at ${dailyPercent.toFixed(1)}% (${
+        this.usageStats.dailyCost.toFixed(2)
+      } / $${RATE_LIMIT_CONFIG.dailyBudgetLimit})`);
+    } else if (dailyPercent >= 90) {
+      console.error(`[CHATBOT] 🚨 Daily budget at ${dailyPercent.toFixed(1)}% - CRITICAL!`);
+    }
+
+    if (monthlyPercent >= 80 && monthlyPercent < 90) {
+      console.warn(`[CHATBOT] ⚠️ Monthly budget at ${monthlyPercent.toFixed(1)}% (${
+        this.usageStats.monthlyCost.toFixed(2)
+      } / $${RATE_LIMIT_CONFIG.monthlyBudgetLimit})`);
+    } else if (monthlyPercent >= 90) {
+      console.error(`[CHATBOT] 🚨 Monthly budget at ${monthlyPercent.toFixed(1)}% - CRITICAL!`);
+    }
+  }
+
+  /**
+   * Reset daily/monthly counters if needed
+   */
+  resetCountersIfNeeded() {
+    const now = new Date();
+    const today = now.toDateString();
+    const thisMonth = now.getMonth();
+
+    // Reset daily counter
+    if (this.usageStats.lastResetDate !== today) {
+      console.log("[CHATBOT] Resetting daily usage statistics");
+      this.usageStats.dailyCost = 0;
+      this.usageStats.lastResetDate = today;
+    }
+
+    // Reset monthly counter
+    if (this.usageStats.lastResetMonth !== thisMonth) {
+      console.log("[CHATBOT] Resetting monthly usage statistics");
+      this.usageStats.monthlyCost = 0;
+      this.usageStats.lastResetMonth = thisMonth;
+    }
+  }
+
+  /**
+   * Initialize circuit breaker for API failures
+   */
+  initializeCircuitBreaker() {
+    this.circuitBreaker = {
+      // States: CLOSED, OPEN, HALF_OPEN
+      state: "CLOSED",
+      failureCount: 0,
+      successCount: 0,
+      lastFailureTime: null,
+      nextAttempt: null,
+      // Track request history for success rate calculation
+      requestHistory: [],
+      // Options
+      options: CIRCUIT_BREAKER_CONFIG,
+    };
+
+    console.log("[CHATBOT] Circuit breaker initialized:");
+    console.log(`  Failure threshold: ${CIRCUIT_BREAKER_CONFIG.failureThreshold} consecutive failures`);
+    console.log(`  Reset timeout: ${CIRCUIT_BREAKER_CONFIG.resetTimeout / 1000}s`);
+    console.log(`  State: CLOSED`);
+  }
+
+  /**
+   * Check if circuit breaker allows request
+   * @returns {Object} - Object with { allowed: boolean, state: string }
+   */
+  checkCircuitBreaker() {
+    const now = Date.now();
+
+    // If circuit is OPEN, check if we should try again
+    if (this.circuitBreaker.state === "OPEN") {
+      if (now < this.circuitBreaker.nextAttempt) {
+        return {
+          allowed: false,
+          state: "OPEN",
+          reason: "Circuit breaker is OPEN - too many failures",
+          retryAfter: Math.ceil((this.circuitBreaker.nextAttempt - now) / 1000),
+        };
+      } else {
+        // Transition to HALF_OPEN state
+        this.circuitBreaker.state = "HALF_OPEN";
+        this.circuitBreaker.successCount = 0;
+        console.log("[CHATBOT] Circuit breaker transitioning to HALF_OPEN state");
+        return {
+          allowed: true,
+          state: "HALF_OPEN",
+          reason: "Testing if service has recovered",
+        };
+      }
+    }
+
+    // CLOSED or HALF_OPEN - allow request
+    return {
+      allowed: true,
+      state: this.circuitBreaker.state,
+    };
+  }
+
+  /**
+   * Record success for circuit breaker
+   */
+  recordCircuitBreakerSuccess() {
+    // Add to request history
+    this.circuitBreaker.requestHistory.push({
+      timestamp: Date.now(),
+      success: true,
+    });
+
+    // Clean old history (older than monitoring period)
+    const cutoff = Date.now() - CIRCUIT_BREAKER_CONFIG.monitoringPeriod;
+    this.circuitBreaker.requestHistory = this.circuitBreaker.requestHistory.filter(
+      (req) => req.timestamp > cutoff,
+    );
+
+    if (this.circuitBreaker.state === "HALF_OPEN") {
+      this.circuitBreaker.successCount++;
+      // If we've had successful requests in HALF_OPEN, close the circuit
+      if (this.circuitBreaker.successCount >= 2) {
+        const oldState = this.circuitBreaker.state;
+        this.circuitBreaker.state = "CLOSED";
+        this.circuitBreaker.failureCount = 0;
+
+        // Log state change to CLOSED
+        this.logCircuitBreakerStateChange(oldState, "CLOSED", "Successful recovery");
+        console.log("[CHATBOT] Circuit breaker recovered - transitioning to CLOSED state");
+      }
+    } else if (this.circuitBreaker.state === "CLOSED") {
+      this.circuitBreaker.failureCount = 0;
+    }
+  }
+
+  /**
+   * Record failure for circuit breaker
+   */
+  recordCircuitBreakerFailure() {
+    // Add to request history
+    this.circuitBreaker.requestHistory.push({
+      timestamp: Date.now(),
+      success: false,
+    });
+
+    // Clean old history
+    const cutoff = Date.now() - CIRCUIT_BREAKER_CONFIG.monitoringPeriod;
+    this.circuitBreaker.requestHistory = this.circuitBreaker.requestHistory.filter(
+      (req) => req.timestamp > cutoff,
+    );
+
+    this.circuitBreaker.failureCount++;
+    this.circuitBreaker.lastFailureTime = Date.now();
+
+    // Calculate success rate in the monitoring window
+    const recentRequests = this.circuitBreaker.requestHistory.length;
+    const recentFailures = this.circuitBreaker.requestHistory.filter((r) => !r.success).length;
+    const successRate = recentRequests > 0 ? (recentRequests - recentFailures) / recentRequests : 1;
+
+    if (this.circuitBreaker.state === "HALF_OPEN") {
+      // Any failure in HALF_OPEN opens the circuit again
+      this.openCircuit("Failed during HALF_OPEN recovery test");
+    } else if (
+      this.circuitBreaker.failureCount >= CIRCUIT_BREAKER_CONFIG.failureThreshold ||
+      successRate < 0.5
+    ) {
+      // Open circuit if too many failures or success rate drops below 50%
+      this.openCircuit(
+        `Too many failures (${this.circuitBreaker.failureCount}) or low success rate (${(successRate * 100).toFixed(1)}%)`,
+      );
+    }
+  }
+
+  /**
+   * Open the circuit breaker
+   * @param {string} reason - Reason for opening
+   */
+  openCircuit(reason) {
+    const oldState = this.circuitBreaker.state;
+    this.circuitBreaker.state = "OPEN";
+    this.circuitBreaker.nextAttempt = Date.now() + CIRCUIT_BREAKER_CONFIG.resetTimeout;
+
+    // Log circuit breaker state change
+    this.logCircuitBreakerStateChange(oldState, "OPEN", reason);
+
+    console.error(`[CHATBOT] 🚨 Circuit breaker OPENED: ${reason}`);
+    console.error(
+      `[CHATBOT] Will retry after ${CIRCUIT_BREAKER_CONFIG.resetTimeout / 1000}s`,
+    );
+  }
+
+  /**
+   * Get circuit breaker status
+   * @returns {Object} - Circuit breaker status
+   */
+  getCircuitBreakerStatus() {
+    const recentRequests = this.circuitBreaker.requestHistory.length;
+    const recentFailures = this.circuitBreaker.requestHistory.filter((r) => !r.success).length;
+    const recentSuccesses = recentRequests - recentFailures;
+    const successRate =
+      recentRequests > 0 ? ((recentSuccesses / recentRequests) * 100).toFixed(1) : "100.0";
+
+    return {
+      state: this.circuitBreaker.state,
+      failureCount: this.circuitBreaker.failureCount,
+      successCount: this.circuitBreaker.successCount,
+      lastFailureTime: this.circuitBreaker.lastFailureTime
+        ? new Date(this.circuitBreaker.lastFailureTime).toISOString()
+        : null,
+      nextAttempt: this.circuitBreaker.nextAttempt
+        ? new Date(this.circuitBreaker.nextAttempt).toISOString()
+        : null,
+      recentStats: {
+        requests: recentRequests,
+        successes: recentSuccesses,
+        failures: recentFailures,
+        successRate: `${successRate}%`,
+      },
+      config: this.circuitBreaker.options,
+    };
+  }
+
+  /**
+   * Execute with retry logic and exponential backoff
+   * @param {Function} operation - Async operation to execute
+   * @param {Object} options - Retry options
+   * @returns {Promise} - Operation result
+   */
+  async executeWithRetry(operation, options = {}) {
+    const maxAttempts = options.maxAttempts || RETRY_CONFIG.maxAttempts;
+    const initialDelay = options.initialDelay || RETRY_CONFIG.initialDelay;
+    const maxDelay = options.maxDelay || RETRY_CONFIG.maxDelay;
+    const backoffMultiplier = options.backoffMultiplier || RETRY_CONFIG.backoffMultiplier;
+
+    let lastError;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const result = await operation();
+        return { success: true, result, attempts: attempt };
+      } catch (error) {
+        lastError = error;
+
+        // Don't retry on certain errors
+        if (
+          error.code === 400 ||
+          error.code === 401 ||
+          error.code === 403 ||
+          error.code === 429
+        ) {
+          throw error;
+        }
+
+        // If it's the last attempt, throw the error
+        if (attempt === maxAttempts) {
+          throw error;
+        }
+
+        // Calculate delay with exponential backoff and jitter
+        const baseDelay = Math.min(
+          initialDelay * Math.pow(backoffMultiplier, attempt - 1),
+          maxDelay,
+        );
+        const jitter = baseDelay * 0.1 * Math.random(); // Add 10% jitter
+        const delay = baseDelay + jitter;
+
+        console.warn(
+          `[CHATBOT] Attempt ${attempt}/${maxAttempts} failed, retrying in ${delay.toFixed(0)}ms...`,
+        );
+        console.warn(`[CHATBOT] Error: ${error.message}`);
+
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+
+    throw lastError;
+  }
+
+  /**
+   * Graceful degradation when AI is unavailable
+   * @param {string} userMessage - Original user message
+   * @param {string} reason - Reason for degradation
+   * @returns {Object} - Fallback response
+   */
+  gracefulDegradation(userMessage, reason) {
+    console.warn(`[CHATBOT] Graceful degradation activated: ${reason}`);
+
+    // Attempt to use pattern matching fallback
+    try {
+      const fallbackResponse = this.buildFallbackResponse(
+        userMessage,
+        `degradation_${reason.replace(/\s+/g, "_")}`,
+      );
+
+      return {
+        response:
+          fallbackResponse.payload.response ||
+          "I'm experiencing technical difficulties. I've used a simplified response mode to help you.",
+        fallback: true,
+        degradationReason: reason,
+        canAssistWith: [
+          "Basic lead information",
+          "Simple lead searches",
+          "Common CRM tasks",
+        ],
+        contactForHelp: true,
+        suggestedActions: [
+          "Try rephrasing your question",
+          "Check your internet connection",
+          "Contact support if the issue persists",
+        ],
+      };
+    } catch (error) {
+      // If even fallback fails, return basic response
+      return {
+        response:
+          "I'm temporarily unable to process your request due to technical issues. Please try again in a moment.",
+        fallback: true,
+        degradationReason: reason,
+        error: error.message,
+        contactForHelp: true,
+      };
+    }
+  }
+
+  /**
+   * Store conversation state for recovery
+   * @param {string} userId - User ID
+   * @param {Object} conversation - Conversation data to store
+   * @returns {Promise} - Storage operation
+   */
+  async storeConversationState(userId, conversation) {
+    try {
+      // In production, this would save to a database
+      // For now, we'll use memory storage
+      if (!this.conversationRecoveryStore) {
+        this.conversationRecoveryStore = new Map();
+      }
+
+      this.conversationRecoveryStore.set(userId, {
+        ...conversation,
+        timestamp: Date.now(),
+        saved: true,
+      });
+
+      console.log(`[CHATBOT] Conversation state saved for user ${userId}`);
+
+      // In production, also save to persistent storage
+      // await this.saveToDatabase(userId, conversation);
+
+      return { success: true, userId };
+    } catch (error) {
+      console.error("[CHATBOT] Failed to store conversation state:", error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Retrieve conversation state for recovery
+   * @param {string} userId - User ID
+   * @returns {Promise} - Retrieved conversation
+   */
+  async retrieveConversationState(userId) {
+    try {
+      // First try memory storage
+      if (this.conversationRecoveryStore && this.conversationRecoveryStore.has(userId)) {
+        const conversation = this.conversationRecoveryStore.get(userId);
+        console.log(`[CHATBOT] Conversation state retrieved from memory for user ${userId}`);
+        return { success: true, conversation, source: "memory" };
+      }
+
+      // In production, try database storage
+      // const conversation = await this.loadFromDatabase(userId);
+      // if (conversation) {
+      //   return { success: true, conversation, source: "database" };
+      // }
+
+      return { success: false, reason: "No saved conversation found" };
+    } catch (error) {
+      console.error("[CHATBOT] Failed to retrieve conversation state:", error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Clear stored conversation state
+   * @param {string} userId - User ID
+   */
+  clearConversationState(userId) {
+    if (this.conversationRecoveryStore && this.conversationRecoveryStore.has(userId)) {
+      this.conversationRecoveryStore.delete(userId);
+      console.log(`[CHATBOT] Conversation state cleared for user ${userId}`);
+    }
+  }
+
+  /**
+   * Initialize monitoring and logging
+   */
+  initializeMonitoring() {
+    // Performance metrics tracking
+    this.metrics = {
+      requests: {
+        total: 0,
+        successful: 0,
+        failed: 0,
+        degraded: 0,
+      },
+      responseTimes: {
+        average: 0,
+        p50: 0,
+        p95: 0,
+        p99: 0,
+        min: Infinity,
+        max: 0,
+        samples: [],
+      },
+      errors: {
+        byType: {},
+        byMessage: {},
+      },
+      ai: {
+        totalTokens: 0,
+        totalCost: 0,
+        byModel: {},
+      },
+      circuitBreaker: {
+        stateChanges: [],
+        lastStateChange: null,
+      },
+      // Structured log entries
+      logs: [],
+      // Alert thresholds
+      alerts: {
+        responseTimeP95: parseInt(process.env.MONITOR_ALERT_RESPONSE_TIME_P95 || "5000"), // 5s
+        errorRate: parseFloat(process.env.MONITOR_ALERT_ERROR_RATE || "0.1"), // 10%
+        circuitBreakerState: process.env.MONITOR_ALERT_CB_STATE || "OPEN",
+      },
+    };
+
+    // Log rotation setup
+    this.maxLogEntries = parseInt(process.env.MONITOR_MAX_LOG_ENTRIES || "1000");
+
+    console.log("[CHATBOT] Monitoring initialized:");
+    console.log(`  Max log entries: ${this.maxLogEntries}`);
+    console.log(`  P95 response time alert: ${this.metrics.alerts.responseTimeP95}ms`);
+    console.log(`  Error rate alert: ${(this.metrics.alerts.errorRate * 100)}%`);
+  }
+
+  /**
+   * Create structured log entry
+   * @param {string} level - Log level (DEBUG, INFO, WARN, ERROR)
+   * @param {string} event - Event name
+   * @param {Object} data - Additional data
+   * @returns {Object} - Structured log entry
+   */
+  createLogEntry(level, event, data = {}) {
+    const logEntry = {
+      timestamp: new Date().toISOString(),
+      level,
+      event,
+      service: "chatbot",
+      ...data,
+      // Add correlation ID for tracking requests across services
+      correlationId: data.correlationId || this.generateCorrelationId(),
+    };
+
+    // Store in memory for now (in production, send to ELK, Datadog, etc.)
+    this.metrics.logs.push(logEntry);
+
+    // Rotate logs if exceeding max
+    if (this.metrics.logs.length > this.maxLogEntries) {
+      this.metrics.logs = this.metrics.logs.slice(-this.maxLogEntries / 2);
+    }
+
+    // Output to console in JSON format for easy parsing
+    console.log(JSON.stringify({ chatbot: logEntry }));
+
+    return logEntry;
+  }
+
+  /**
+   * Generate unique correlation ID
+   * @returns {string} - Correlation ID
+   */
+  generateCorrelationId() {
+    return `cb_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  /**
+   * Log AI request start
+   * @param {string} userId - User ID
+   * @param {string} message - User message
+   * @param {Object} options - Request options
+   * @returns {string} - Correlation ID
+   */
+  logAIRequestStart(userId, message, options = {}) {
+    const correlationId = this.generateCorrelationId();
+
+    this.createLogEntry("INFO", "ai_request_start", {
+      userId,
+      messageLength: message.length,
+      model: options.model,
+      estimatedTokens: options.estimatedTokens,
+      correlationId,
+    });
+
+    // Track request metrics
+    this.metrics.requests.total++;
+
+    return correlationId;
+  }
+
+  /**
+   * Log AI request completion
+   * @param {Object} result - Request result
+   * @param {string} correlationId - Correlation ID from request
+   */
+  logAIRequestComplete(result, correlationId) {
+    const duration = Date.now() - result.startTime;
+    const isError = result.error !== undefined;
+
+    this.createLogEntry(
+      isError ? "ERROR" : "INFO",
+      "ai_request_complete",
+      {
+        correlationId,
+        duration,
+        success: !isError,
+        error: result.error,
+        model: result.model,
+        tokens: result.usage,
+        cost: result.cost,
+      },
+    );
+
+    // Update response time metrics
+    this.updateResponseTimeMetrics(duration);
+
+    // Update success/failure metrics
+    if (isError) {
+      this.metrics.requests.failed++;
+      this.updateErrorMetrics(result.error);
+    } else {
+      this.metrics.requests.successful++;
+    }
+
+    // Check for alerts
+    this.checkAlertThresholds();
+  }
+
+  /**
+   * Update response time metrics
+   * @param {number} duration - Response time in ms
+   */
+  updateResponseTimeMetrics(duration) {
+    const samples = this.metrics.responseTimes.samples;
+
+    // Add new sample
+    samples.push(duration);
+
+    // Keep only recent samples (last 100 requests)
+    if (samples.length > 100) {
+      samples.shift();
+    }
+
+    // Calculate percentiles
+    samples.sort((a, b) => a - b);
+    const p50Index = Math.floor(samples.length * 0.5);
+    const p95Index = Math.floor(samples.length * 0.95);
+    const p99Index = Math.floor(samples.length * 0.99);
+
+    this.metrics.responseTimes.p50 = samples[p50Index] || 0;
+    this.metrics.responseTimes.p95 = samples[p95Index] || 0;
+    this.metrics.responseTimes.p99 = samples[p99Index] || 0;
+    this.metrics.responseTimes.min = samples[0] || 0;
+    this.metrics.responseTimes.max = samples[samples.length - 1] || 0;
+
+    // Calculate average
+    const sum = samples.reduce((a, b) => a + b, 0);
+    this.metrics.responseTimes.average = samples.length > 0 ? sum / samples.length : 0;
+  }
+
+  /**
+   * Update error metrics
+   * @param {Error} error - Error object
+   */
+  updateErrorMetrics(error) {
+    if (!error) return;
+
+    const errorType = error.name || error.constructor.name;
+    const errorMessage = error.message || "Unknown error";
+
+    // Count by type
+    this.metrics.errors.byType[errorType] = (this.metrics.errors.byType[errorType] || 0) + 1;
+
+    // Count by message (truncated)
+    const shortMessage = errorMessage.substring(0, 100);
+    this.metrics.errors.byMessage[shortMessage] = (this.metrics.errors.byMessage[shortMessage] || 0) + 1;
+  }
+
+  /**
+   * Update AI metrics (tokens, cost, model usage)
+   * @param {string} model - Model name
+   * @param {Object} usage - Token usage
+   * @param {number} cost - Cost
+   */
+  updateAIMetrics(model, usage, cost) {
+    const inputTokens = usage?.inputTokens || 0;
+    const outputTokens = usage?.outputTokens || 0;
+
+    this.metrics.ai.totalTokens += inputTokens + outputTokens;
+    this.metrics.ai.totalCost += cost || 0;
+
+    if (!this.metrics.ai.byModel[model]) {
+      this.metrics.ai.byModel[model] = {
+        requests: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        totalTokens: 0,
+        totalCost: 0,
+      };
+    }
+
+    const modelStats = this.metrics.ai.byModel[model];
+    modelStats.requests++;
+    modelStats.inputTokens += inputTokens;
+    modelStats.outputTokens += outputTokens;
+    modelStats.totalTokens += inputTokens + outputTokens;
+    modelStats.totalCost += cost || 0;
+  }
+
+  /**
+   * Log circuit breaker state change
+   * @param {string} oldState - Previous state
+   * @param {string} newState - New state
+   * @param {string} reason - Reason for change
+   */
+  logCircuitBreakerStateChange(oldState, newState, reason) {
+    const stateChange = {
+      timestamp: new Date().toISOString(),
+      from: oldState,
+      to: newState,
+      reason,
+    };
+
+    this.metrics.circuitBreaker.stateChanges.push(stateChange);
+    this.metrics.circuitBreaker.lastStateChange = stateChange;
+
+    // Keep only last 50 state changes
+    if (this.metrics.circuitBreaker.stateChanges.length > 50) {
+      this.metrics.circuitBreaker.stateChanges.shift();
+    }
+
+    this.createLogEntry("WARN", "circuit_breaker_state_change", stateChange);
+
+    // Alert if circuit breaker opens
+    if (newState === "OPEN") {
+      this.createLogEntry("ERROR", "circuit_breaker_opened", {
+        previousState: oldState,
+        reason,
+        alert: true,
+      });
+    }
+  }
+
+  /**
+   * Check alert thresholds
+   */
+  checkAlertThresholds() {
+    // Check error rate
+    const totalRequests = this.metrics.requests.total;
+    if (totalRequests > 10) {
+      const errorRate = this.metrics.requests.failed / totalRequests;
+      if (errorRate > this.metrics.alerts.errorRate) {
+        this.createLogEntry("ERROR", "high_error_rate", {
+          errorRate,
+          threshold: this.metrics.alerts.errorRate,
+          totalRequests,
+          failedRequests: this.metrics.requests.failed,
+          alert: true,
+        });
+      }
+    }
+
+    // Check P95 response time
+    const p95 = this.metrics.responseTimes.p95;
+    if (p95 > this.metrics.alerts.responseTimeP95) {
+      this.createLogEntry("WARN", "high_response_time", {
+        p95ResponseTime: p95,
+        threshold: this.metrics.alerts.responseTimeP95,
+        alert: true,
+      });
+    }
+  }
+
+  /**
+   * Get monitoring metrics
+   * @returns {Object} - Current metrics
+   */
+  getMetrics() {
+    // Calculate current error rate
+    const totalRequests = this.metrics.requests.total;
+    const errorRate =
+      totalRequests > 0 ? (this.metrics.requests.failed / totalRequests).toFixed(4) : "0.0000";
+
+    return {
+      timestamp: new Date().toISOString(),
+      requests: {
+        ...this.metrics.requests,
+        errorRate,
+      },
+      responseTimes: {
+        ...this.metrics.responseTimes,
+        samplesCount: this.metrics.responseTimes.samples.length,
+      },
+      errors: this.metrics.errors,
+      ai: this.metrics.ai,
+      circuitBreaker: {
+        currentState: this.circuitBreaker?.state || "UNKNOWN",
+        lastStateChange: this.metrics.circuitBreaker.lastStateChange,
+        recentStateChanges: this.metrics.circuitBreaker.stateChanges.slice(-5),
+      },
+      alerts: {
+        thresholds: this.metrics.alerts,
+        activeAlerts: this.metrics.logs.filter(
+          (log) => log.alert === true && Date.now() - new Date(log.timestamp).getTime() < 300000,
+        ).length,
+      },
+    };
+  }
+
+  /**
+   * Export logs in JSON format
+   * @param {Object} filters - Optional filters (level, event, since)
+   * @returns {Array} - Filtered log entries
+   */
+  exportLogs(filters = {}) {
+    let logs = this.metrics.logs;
+
+    if (filters.level) {
+      logs = logs.filter((log) => log.level === filters.level);
+    }
+
+    if (filters.event) {
+      logs = logs.filter((log) => log.event === filters.event);
+    }
+
+    if (filters.since) {
+      const sinceTime = new Date(filters.since).getTime();
+      logs = logs.filter((log) => new Date(log.timestamp).getTime() >= sinceTime);
+    }
+
+    if (filters.limit) {
+      logs = logs.slice(-filters.limit);
+    }
+
+    return logs;
+  }
+
+  /**
+   * Reset metrics (useful for testing or periodic resets)
+   */
+  resetMetrics() {
+    const currentState = this.circuitBreaker?.state;
+    const lastStateChange = this.metrics.circuitBreaker.lastStateChange;
+
+    this.metrics.requests = {
+      total: 0,
+      successful: 0,
+      failed: 0,
+      degraded: 0,
+    };
+
+    this.metrics.responseTimes = {
+      average: 0,
+      p50: 0,
+      p95: 0,
+      p99: 0,
+      min: Infinity,
+      max: 0,
+      samples: [],
+    };
+
+    this.metrics.errors = {
+      byType: {},
+      byMessage: {},
+    };
+
+    this.metrics.ai = {
+      totalTokens: 0,
+      totalCost: 0,
+      byModel: {},
+    };
+
+    // Keep circuit breaker state changes
+    this.metrics.circuitBreaker.lastStateChange = lastStateChange;
+
+    console.log("[CHATBOT] Metrics reset");
+    if (currentState) {
+      console.log(`[CHATBOT] Circuit breaker state: ${currentState}`);
+    }
   }
 
   /**
@@ -858,61 +2208,152 @@ Response:
       throw new Error("Gemini models are not available");
     }
 
-    let lastError = null;
-
-    for (const modelName of this.geminiModels) {
-      try {
-        if (!this.modelCache.has(modelName)) {
-          this.modelCache.set(
-            modelName,
-            this.genAI.getGenerativeModel({ model: modelName }),
-          );
-        }
-
-        const model = this.modelCache.get(modelName);
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        const text = response.text();
-
-        if (!text || !text.trim()) {
-          throw new Error("Empty response from Gemini");
-        }
-
-        console.log(
-          `[CHATBOT] Gemini model ${modelName} responded successfully`,
-        );
-        return { text, modelName };
-      } catch (error) {
-        lastError = error;
-        console.error(
-          `[CHATBOT] Gemini model ${modelName} error:`,
-          error.message,
-        );
-      }
+    // Check circuit breaker before attempting request
+    const circuitCheck = this.checkCircuitBreaker();
+    if (!circuitCheck.allowed) {
+      console.warn(`[CHATBOT] Circuit breaker blocked request: ${circuitCheck.reason}`);
+      this.recordCircuitBreakerFailure();
+      throw new Error(`Circuit breaker is OPEN - ${circuitCheck.reason}`);
     }
 
-    throw lastError || new Error("All Gemini models failed");
-  }
-  async processMessage(userId, userMessage, currentUser) {
-    try {
-      // Add user message to history
-      this.addToHistory(userId, "user", userMessage);
+    // Execute with retry logic and circuit breaker tracking
+    const result = await this.executeWithRetry(async () => {
+      let lastError = null;
 
-      // Build conversation context
+      for (const modelName of this.geminiModels) {
+        try {
+          // Check circuit breaker before each model attempt
+          const cbCheck = this.checkCircuitBreaker();
+          if (!cbCheck.allowed && cbCheck.state === "OPEN") {
+            throw new Error(`Circuit breaker is OPEN - cannot proceed`);
+          }
+
+          if (!this.modelCache.has(modelName)) {
+            this.modelCache.set(
+              modelName,
+              this.genAI.getGenerativeModel({ model: modelName }),
+            );
+          }
+
+          const model = this.modelCache.get(modelName);
+          const result = await Promise.race([
+            model.generateContent(prompt),
+            new Promise((_, reject) =>
+              setTimeout(
+                () => reject(new Error("Request timeout")),
+                CIRCUIT_BREAKER_CONFIG.testTimeout,
+              ),
+            ),
+          ]);
+          const response = await result.response;
+          const text = response.text();
+
+          if (!text || !text.trim()) {
+            throw new Error("Empty response from Gemini");
+          }
+
+          // Extract token usage information if available
+          let usage = {
+            inputTokens: 0,
+            outputTokens: 0,
+            cost: 0,
+          };
+
+          try {
+            // Try to get usage metadata from response
+            if (response.usageMetadata) {
+              usage.inputTokens = response.usageMetadata.promptTokenCount || 0;
+              usage.outputTokens = response.usageMetadata.candidatesTokenCount || 0;
+            } else {
+              // Fallback: estimate tokens (roughly 4 characters per token)
+              usage.inputTokens = Math.ceil(prompt.length / 4);
+              usage.outputTokens = Math.ceil(text.length / 4);
+            }
+
+            // Calculate cost based on model
+            const modelCosts = MODEL_COSTS[modelName] || MODEL_COSTS["gemini-1.5-flash-latest"];
+            usage.cost =
+              (usage.inputTokens / 1000) * modelCosts.input +
+              (usage.outputTokens / 1000) * modelCosts.output;
+          } catch (usageError) {
+            console.warn("[CHATBOT] Could not extract token usage:", usageError.message);
+            // Continue with zero usage - not critical
+          }
+
+          // Record circuit breaker success
+          this.recordCircuitBreakerSuccess();
+
+          console.log(
+            `[CHATBOT] Gemini model ${modelName} responded successfully (${usage.inputTokens} in, ${usage.outputTokens} out, $${usage.cost.toFixed(6)})`,
+          );
+          return { text, modelName, usage };
+        } catch (error) {
+          lastError = error;
+          console.error(
+            `[CHATBOT] Gemini model ${modelName} error:`,
+            error.message,
+          );
+
+          // Record circuit breaker failure
+          this.recordCircuitBreakerFailure();
+        }
+      }
+
+      throw lastError || new Error("All Gemini models failed");
+    });
+
+    return result;
+  }
+
+  async processMessage(userId, userMessage, currentUser) {
+    const startTime = Date.now();
+    const correlationId = this.logAIRequestStart(userId, userMessage, {
+      userRole: currentUser?.role,
+      companyId: currentUser?.company_id,
+    });
+
+    try {
+      // Log user context
+      this.createLogEntry("DEBUG", "user_context", {
+        correlationId,
+        userId,
+        userRole: currentUser?.role,
+        companyId: currentUser?.company_id,
+      });
+
+      // Sanitize user input to prevent prompt injection
+      const sanitizedMessage = this.sanitizeInput(userMessage);
+
+      // If message is empty after sanitization, return error
+      if (!sanitizedMessage) {
+        throw new ApiError(
+          "Your message contained potentially harmful content and could not be processed.",
+          400,
+        );
+      }
+
+      // Add sanitized user message to history
+      this.addToHistory(userId, "user", sanitizedMessage);
+
+      // Build conversation context with sanitized history
       const history = this.getConversationHistory(userId);
       const contextMessages = history
         .slice(-5) // Last 5 messages
-        .map((h) => `${h.role}: ${h.content}`)
+        .map((h) => {
+          // Sanitize each history entry
+          const sanitizedContent = this.sanitizeInput(h.content);
+          return `${h.role}: ${sanitizedContent}`;
+        })
         .join("\n");
 
-      // Create prompt with system context and user message
+      // Create prompt with system context and sanitized user message
       const prompt = `${this.getSystemPrompt()}
 
 **Previous Conversation:**
 ${contextMessages}
 
 **Current User Message:**
-${userMessage}
+${sanitizedMessage}
 
 **User Context:**
 - User ID: ${currentUser.id}
@@ -920,6 +2361,40 @@ ${userMessage}
 - Company ID: ${currentUser.company_id}
 
 Analyze the message and respond ONLY with valid JSON. Do not include any markdown formatting or code blocks.`;
+
+      // Check rate limit before processing
+      if (!this.useFallbackOnly) {
+        const rateLimitCheck = await this.checkRateLimit();
+        if (!rateLimitCheck.allowed) {
+          console.warn(`[CHATBOT] Rate limit exceeded for user ${userId}`);
+          throw new ApiError(
+            `Rate limit exceeded. ${rateLimitCheck.error}`,
+            429,
+          );
+        }
+      }
+
+      // Check budget before AI generation
+      let budgetCheck = null;
+      if (!this.useFallbackOnly && this.geminiModels.length > 0) {
+        const primaryModel = this.geminiModels[0];
+        const estimatedTokens = prompt.length / 4; // Rough estimate: 4 chars per token
+        budgetCheck = this.checkBudget(
+          primaryModel,
+          estimatedTokens,
+          500, // Estimated output tokens
+        );
+
+        if (!budgetCheck.allowed) {
+          console.warn(
+            `[CHATBOT] Budget check failed: ${budgetCheck.reason} for user ${userId}`,
+          );
+          throw new ApiError(
+            `Budget limit exceeded (${budgetCheck.reason.replace(/_/g, " ")}). Please try again later.`,
+            429,
+          );
+        }
+      }
 
       let parsedResponse;
       let source = "gemini";
@@ -935,12 +2410,23 @@ Analyze the message and respond ONLY with valid JSON. Do not include any markdow
         modelUsed = fallback.model;
       } else {
         try {
-          const { text, modelName } = await this.generateWithGemini(prompt);
+          const { text, modelName, usage } = await this.generateWithGemini(prompt);
           modelUsed = modelName;
           parsedResponse = this.parseGeminiResponse(text);
 
           if (!this.isValidResponse(parsedResponse)) {
             throw new Error("Invalid response structure from Gemini");
+          }
+
+          // Record usage for successful AI request
+          if (usage && budgetCheck) {
+            const actualCost = usage.cost || budgetCheck.estimatedCost || 0;
+            this.recordUsage(
+              modelName,
+              usage.inputTokens || 0,
+              usage.outputTokens || 0,
+              actualCost,
+            );
           }
         } catch (geminiError) {
           console.error("[CHATBOT] Gemini processing error:", geminiError);
@@ -965,53 +2451,144 @@ Analyze the message and respond ONLY with valid JSON. Do not include any markdow
       // Execute action if needed
       let actionResult = null;
       if (parsedResponse.action && parsedResponse.action !== "CHAT") {
-        console.log(`[CHATBOT] Executing action: ${parsedResponse.action}`);
-        console.log(
-          `[CHATBOT] Parameters: ${JSON.stringify(parsedResponse.parameters)}`,
-        );
-        console.log(
-          `[CHATBOT] Needs confirmation: ${parsedResponse.needsConfirmation === true}`,
-        );
-
         actionResult = await this.executeAction(
           parsedResponse.action,
           parsedResponse.parameters,
           currentUser,
           parsedResponse.needsConfirmation,
         );
-
-        if (actionResult?.leads) {
-          console.log(`[CHATBOT] Found leads: ${actionResult.leads.length}`);
-        }
       }
 
-      return {
+      const needsConfirmation =
+        Boolean(parsedResponse.needsConfirmation) &&
+        parsedResponse.action !== "CHAT";
+
+      const result = {
         success: true,
         response: parsedResponse.response,
         action: parsedResponse.action || "CHAT",
         intent: parsedResponse.intent || null,
         parameters: parsedResponse.parameters,
-        needsConfirmation:
-          Boolean(parsedResponse.needsConfirmation) &&
-          parsedResponse.action !== "CHAT",
+        needsConfirmation,
         missingFields: Array.isArray(parsedResponse.missingFields)
           ? parsedResponse.missingFields
           : [],
-        data: actionResult,
+        data: actionResult && !actionResult.pending ? actionResult : null,
+        pendingActionToken:
+          actionResult && actionResult.pending
+            ? actionResult.confirmationToken
+            : null,
+        pendingActionExpiresAt:
+          actionResult && actionResult.pending ? actionResult.expiresAt : null,
         source,
         model: modelUsed,
       };
-    } catch (error) {
-      console.error("Chatbot processing error:", error);
 
+      // Log successful completion
+      const duration = Date.now() - startTime;
+      this.logAIRequestComplete(
+        {
+          startTime,
+          duration,
+          success: true,
+          model: modelUsed,
+          usage: { inputTokens: 0, outputTokens: 0 }, // Will be updated by recordUsage
+          cost: 0,
+        },
+        correlationId,
+      );
+
+      // Track metrics
+      this.createLogEntry("INFO", "message_processed", {
+        correlationId,
+        duration,
+        action: result.action,
+        intent: result.intent,
+        source: result.source,
+        model: result.model,
+        needsConfirmation: result.needsConfirmation,
+        hasData: !!result.data,
+      });
+
+      return result;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+
+      // Log error details
+      this.createLogEntry("ERROR", "message_processing_error", {
+        correlationId,
+        duration,
+        errorType: error.constructor.name,
+        errorMessage: error.message,
+        isApiError: error instanceof ApiError,
+        stack: error.stack?.split('\n').slice(0, 5).join('\n'), // First 5 stack lines
+      });
+
+      // Log to monitoring system
+      this.logAIRequestComplete(
+        {
+          startTime,
+          duration,
+          error: error.message,
+        },
+        correlationId,
+      );
+
+      console.error("[CHATBOT] Chatbot processing error:", error);
+
+      // If it's already an ApiError (like rate limit, budget, validation), re-throw it
       if (error instanceof ApiError) {
         throw error;
       }
 
-      throw new ApiError(
-        "Failed to process your message. Please try again.",
-        500,
+      // Store conversation state for recovery before failing
+      try {
+        await this.storeConversationState(userId, {
+          message: userMessage,
+          user: currentUser,
+          error: error.message,
+        });
+      } catch (storeError) {
+        console.warn("[CHATBOT] Failed to store conversation state:", storeError);
+      }
+
+      // Use graceful degradation for unexpected errors
+      console.warn("[CHATBOT] Using graceful degradation due to error:", error.message);
+      const degradationResponse = this.gracefulDegradation(
+        userMessage,
+        error.message || "unknown_error",
       );
+
+      // Log degradation
+      this.createLogEntry("WARN", "graceful_degradation_activated", {
+        correlationId,
+        reason: error.message || "unknown_error",
+        degradationResponse: degradationResponse.degradationReason,
+      });
+
+      // Track degradation count
+      this.metrics.requests.degraded++;
+
+      // Return a graceful degradation response instead of throwing
+      return {
+        success: true,
+        response: degradationResponse.response,
+        action: "CHAT",
+        intent: null,
+        parameters: {},
+        needsConfirmation: false,
+        missingFields: [],
+        data: null,
+        pendingActionToken: null,
+        pendingActionExpiresAt: null,
+        source: "degradation",
+        model: "fallback",
+        fallback: true,
+        degradationReason: degradationResponse.degradationReason,
+        canAssistWith: degradationResponse.canAssistWith,
+        contactForHelp: degradationResponse.contactForHelp,
+        suggestedActions: degradationResponse.suggestedActions,
+      };
     }
   }
 
@@ -1022,7 +2599,18 @@ Analyze the message and respond ONLY with valid JSON. Do not include any markdow
     try {
       // If confirmation is needed, don't execute yet
       if (needsConfirmation) {
-        return { pending: true, parameters };
+        const { token, expiresAt } = createPendingActionToken({
+          userId: currentUser.id,
+          action,
+          parameters,
+        });
+        return {
+          pending: true,
+          action,
+          parameters,
+          confirmationToken: token,
+          expiresAt,
+        };
       }
 
       switch (action) {

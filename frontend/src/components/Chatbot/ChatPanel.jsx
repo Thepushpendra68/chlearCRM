@@ -3,12 +3,16 @@ import ChatMessage from './ChatMessage';
 import ChatInput from './ChatInput';
 import chatbotService from '../../services/chatbotService';
 import { useAuth } from '../../context/AuthContext';
+import { useVoice } from '../../hooks/useVoice';
+import VoiceInput from '../Voice/VoiceInput';
+import VoiceToggle from '../Voice/VoiceToggle';
+import audioService from '../../services/audioService';
 import toast from 'react-hot-toast';
 import { Button } from '../ui/button';
 import { Card, CardHeader, CardContent, CardFooter } from '../ui/card';
 import { ScrollArea } from '../ui/scroll-area';
 import { Separator } from '../ui/separator';
-import { Trash2, X, AlertCircle } from 'lucide-react';
+import { Trash2, X, AlertCircle, Mic, MicOff } from 'lucide-react';
 
 const ACTION_LABELS = {
   CREATE_LEAD: 'Create lead',
@@ -111,9 +115,21 @@ const ChatPanel = () => {
   const [pendingAction, setPendingAction] = useState(null);
   const [isResizing, setIsResizing] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [voiceMode, setVoiceMode] = useState(false);
   const messagesEndRef = useRef(null);
   const chatContainerRef = useRef(null);
   const resizeHandleRef = useRef(null);
+
+  // Voice functionality
+  const {
+    isListening,
+    transcript,
+    interimTranscript,
+    isSupported: isVoiceSupported,
+    startListening,
+    stopListening,
+    speak
+  } = useVoice();
 
   // Calculate width as percentage of viewport (20% default, 30% max)
   const getDefaultWidth = () => {
@@ -248,17 +264,32 @@ const ChatPanel = () => {
 
       addChatMessage(assistantMessage);
 
+      // Play notification sound for new message
+      audioService.playPattern('message-received');
+
+      // Speak the response if voice mode is enabled
+      if (voiceMode && response.response) {
+        speak(response.response);
+      }
+
       if (response.needsConfirmation && response.action !== 'CHAT') {
         const pendingParameters = response.data?.parameters || normalizedParameters;
-        setPendingAction({
-          action: response.action,
-          parameters: pendingParameters,
-          summary: buildActionSummary(response.action, pendingParameters),
-          missingFields: normalizedMissingFields,
-          intent: response.intent,
-          source: response.source,
-          model: response.model
-        });
+        if (!response.pendingActionToken) {
+          toast.error('Unable to prepare confirmation token. Please try again.');
+          setPendingAction(null);
+        } else {
+          setPendingAction({
+            action: response.action,
+            parameters: pendingParameters,
+            summary: buildActionSummary(response.action, pendingParameters),
+            missingFields: normalizedMissingFields,
+            intent: response.intent,
+            source: response.source,
+            model: response.model,
+            confirmationToken: response.pendingActionToken,
+            expiresAt: response.pendingActionExpiresAt
+          });
+        }
       } else {
         setPendingAction(null);
       }
@@ -274,20 +305,51 @@ const ChatPanel = () => {
         meta: { source: 'system' }
       };
       addChatMessage(errorMessage);
+      // Play error sound
+      audioService.playPattern('action-error');
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Handle voice transcript
+  useEffect(() => {
+    if (transcript && voiceMode) {
+      sendMessage(transcript);
+    }
+  }, [transcript]);
+
+  // Toggle voice mode
+  const toggleVoiceMode = () => {
+    if (isListening) {
+      stopListening();
+    }
+    setVoiceMode(!voiceMode);
+  };
+
   const confirmAction = async () => {
     if (!pendingAction) return;
+
+    if (
+      pendingAction.expiresAt &&
+      new Date(pendingAction.expiresAt).getTime() < Date.now()
+    ) {
+      toast.error('This confirmation expired. Please ask again.');
+      setPendingAction(null);
+      return;
+    }
+
+    if (!pendingAction.confirmationToken) {
+      toast.error('Missing confirmation token. Please try again.');
+      setPendingAction(null);
+      return;
+    }
 
     setIsLoading(true);
 
     try {
       const response = await chatbotService.confirmAction(
-        pendingAction.action,
-        pendingAction.parameters
+        pendingAction.confirmationToken
       );
 
       const assistantMessage = {
@@ -304,6 +366,8 @@ const ChatPanel = () => {
       addChatMessage(assistantMessage);
       setPendingAction(null);
       toast.success('Action completed');
+      // Play success sound
+      audioService.playPattern('action-success');
     } catch (error) {
       console.error('Error confirming action:', error);
       const errorMessage = {
@@ -315,6 +379,8 @@ const ChatPanel = () => {
         meta: { source: 'system' }
       };
       addChatMessage(errorMessage);
+      // Play error sound
+      audioService.playPattern('action-error');
     } finally {
       setIsLoading(false);
     }
@@ -381,6 +447,17 @@ const ChatPanel = () => {
             <p className="text-[10px] opacity-90 mt-0.5">Powered by Gemini AI</p>
           </div>
           <div className="flex items-center gap-1">
+            {isVoiceSupported && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleVoiceMode}
+                className={`h-7 w-7 hover:bg-primary/80 rounded ${voiceMode ? 'bg-primary/60' : ''}`}
+                title={voiceMode ? 'Switch to text mode' : 'Switch to voice mode'}
+              >
+                {voiceMode ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="icon"
@@ -494,7 +571,22 @@ const ChatPanel = () => {
         )}
 
       {/* Input Area */}
-      <ChatInput onSendMessage={sendMessage} disabled={isLoading} />
+      {voiceMode ? (
+        <div className="border-t p-3 bg-card flex-shrink-0">
+          <VoiceInput
+            onTranscript={setTranscript}
+            onInterimTranscript={setInterimTranscript}
+            disabled={isLoading}
+          />
+          {interimTranscript && (
+            <div className="mt-2 p-2 bg-muted/50 rounded text-xs text-muted-foreground italic">
+              {interimTranscript}
+            </div>
+          )}
+        </div>
+      ) : (
+        <ChatInput onSendMessage={sendMessage} disabled={isLoading} />
+      )}
 
       {/* Resize Handle - Only on desktop */}
       <div 

@@ -1,25 +1,38 @@
 const apiClientService = require('../services/apiClientService');
 const ApiError = require('../utils/ApiError');
-const { AuditActions, logAuditEvent } = require('../utils/auditLogger');
+const { BaseController, asyncHandler } = require('./baseController');
+const { AuditActions, AuditSeverity, logAuditEvent } = require('../utils/auditLogger');
 
 /**
- * Create new API client
+ * API Client Controller
+ * Handles API client management operations
+ * Extends BaseController for standardized patterns
  */
-const createApiClient = async (req, res, next) => {
-  try {
-    const { 
-      client_name, 
-      rate_limit, 
-      allowed_origins, 
-      webhook_url, 
+class ApiClientController extends BaseController {
+  /**
+   * Describe API client for logging
+   */
+  describeApiClient(client = {}) {
+    return client?.client_name || `API Client ${client?.id || ''}`.trim();
+  }
+
+  /**
+   * Create new API client
+   */
+  createApiClient = asyncHandler(async (req, res) => {
+    const {
+      client_name,
+      rate_limit,
+      allowed_origins,
+      webhook_url,
       custom_field_mapping,
       default_lead_source,
       default_assigned_to,
-      metadata 
+      metadata
     } = req.body;
 
     if (!client_name) {
-      throw new ApiError('Client name is required', 400);
+      return this.validationError(res, 'Client name is required');
     }
 
     const apiClient = await apiClientService.createApiClient(
@@ -49,58 +62,36 @@ const createApiClient = async (req, res, next) => {
       }
     });
 
-    res.status(201).json({
-      success: true,
-      message: 'API client created successfully. IMPORTANT: Save the API secret securely - it will not be shown again!',
-      data: apiClient
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    this.created(res, apiClient, 'API client created successfully. IMPORTANT: Save the API secret securely - it will not be shown again!');
+  });
 
-/**
- * Get all API clients for company
- */
-const getApiClients = async (req, res, next) => {
-  try {
+  /**
+   * Get all API clients for company
+   */
+  getApiClients = asyncHandler(async (req, res) => {
     const apiClients = await apiClientService.getApiClients(req.user.company_id);
 
-    res.json({
-      success: true,
-      data: apiClients
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    this.success(res, apiClients, 200, 'API clients retrieved successfully');
+  });
 
-/**
- * Get API client by ID
- */
-const getApiClientById = async (req, res, next) => {
-  try {
+  /**
+   * Get API client by ID
+   */
+  getApiClientById = asyncHandler(async (req, res) => {
     const { id } = req.params;
     const apiClient = await apiClientService.getApiClientById(id, req.user.company_id);
 
     if (!apiClient) {
-      throw new ApiError('API client not found', 404);
+      return this.notFound(res, 'API client not found');
     }
 
-    res.json({
-      success: true,
-      data: apiClient
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    this.success(res, apiClient, 200, 'API client retrieved successfully');
+  });
 
-/**
- * Update API client
- */
-const updateApiClient = async (req, res, next) => {
-  try {
+  /**
+   * Update API client
+   */
+  updateApiClient = asyncHandler(async (req, res) => {
     const { id } = req.params;
     const updateData = req.body;
 
@@ -118,21 +109,13 @@ const updateApiClient = async (req, res, next) => {
       }
     });
 
-    res.json({
-      success: true,
-      message: 'API client updated successfully',
-      data: apiClient
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    this.updated(res, apiClient, 'API client updated successfully');
+  });
 
-/**
- * Regenerate API secret
- */
-const regenerateSecret = async (req, res, next) => {
-  try {
+  /**
+   * Regenerate API secret
+   */
+  regenerateSecret = asyncHandler(async (req, res) => {
     const { id } = req.params;
 
     const apiClient = await apiClientService.regenerateApiSecret(id, req.user.company_id);
@@ -148,31 +131,23 @@ const regenerateSecret = async (req, res, next) => {
       }
     });
 
-    res.json({
-      success: true,
-      message: 'API secret regenerated successfully. IMPORTANT: Save it securely - it will not be shown again!',
-      data: {
-        api_key: apiClient.api_key,
-        api_secret: apiClient.api_secret
-      }
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    this.success(res, {
+      api_key: apiClient.api_key,
+      api_secret: apiClient.api_secret
+    }, 200, 'API secret regenerated successfully. IMPORTANT: Save it securely - it will not be shown again!');
+  });
 
-/**
- * Delete API client
- */
-const deleteApiClient = async (req, res, next) => {
-  try {
+  /**
+   * Delete API client
+   */
+  deleteApiClient = asyncHandler(async (req, res) => {
     const { id } = req.params;
 
     // Get client info before deletion for audit log
     const apiClient = await apiClientService.getApiClientById(id, req.user.company_id);
-    
+
     if (!apiClient) {
-      throw new ApiError('API client not found', 404);
+      return this.notFound(res, 'API client not found');
     }
 
     await apiClientService.deleteApiClient(id, req.user.company_id);
@@ -181,55 +156,36 @@ const deleteApiClient = async (req, res, next) => {
       action: AuditActions.COMPANY_SETTINGS_UPDATED,
       resourceType: 'api_client',
       resourceId: id,
-      resourceName: apiClient.client_name,
+      resourceName: this.describeApiClient(apiClient),
       companyId: req.user.company_id,
+      severity: AuditSeverity.WARNING,
       details: {
         action: 'deleted'
       }
     });
 
-    res.json({
-      success: true,
-      message: 'API client deleted successfully'
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    this.deleted(res, 'API client deleted successfully');
+  });
 
-/**
- * Get API client statistics
- */
-const getApiClientStats = async (req, res, next) => {
-  try {
+  /**
+   * Get API client statistics
+   */
+  getApiClientStats = asyncHandler(async (req, res) => {
     const { id } = req.params;
     const { days = 30 } = req.query;
 
     // Verify the API client belongs to the user's company
     const apiClient = await apiClientService.getApiClientById(id, req.user.company_id);
-    
+
     if (!apiClient) {
-      throw new ApiError('API client not found', 404);
+      return this.notFound(res, 'API client not found');
     }
 
     const stats = await apiClientService.getApiClientStats(id, parseInt(days));
 
-    res.json({
-      success: true,
-      data: stats
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    this.success(res, stats, 200, 'API client statistics retrieved successfully');
+  });
+}
 
-module.exports = {
-  createApiClient,
-  getApiClients,
-  getApiClientById,
-  updateApiClient,
-  regenerateSecret,
-  deleteApiClient,
-  getApiClientStats
-};
+module.exports = new ApiClientController();
 

@@ -230,15 +230,24 @@ const ChatbotWidget = () => {
       if (response.needsConfirmation && response.action !== "CHAT") {
         const pendingParameters =
           response.data?.parameters || normalizedParameters;
-        setPendingAction({
-          action: response.action,
-          parameters: pendingParameters,
-          summary: buildActionSummary(response.action, pendingParameters),
-          missingFields: normalizedMissingFields,
-          intent: response.intent,
-          source: response.source,
-          model: response.model,
-        });
+        if (!response.pendingActionToken) {
+          toast.error(
+            "Unable to prepare confirmation token. Please repeat your request.",
+          );
+          setPendingAction(null);
+        } else {
+          setPendingAction({
+            action: response.action,
+            parameters: pendingParameters,
+            summary: buildActionSummary(response.action, pendingParameters),
+            missingFields: normalizedMissingFields,
+            intent: response.intent,
+            source: response.source,
+            model: response.model,
+            confirmationToken: response.pendingActionToken,
+            expiresAt: response.pendingActionExpiresAt,
+          });
+        }
       } else {
         setPendingAction(null);
       }
@@ -263,12 +272,26 @@ const ChatbotWidget = () => {
   const confirmAction = async () => {
     if (!pendingAction) return;
 
+    if (
+      pendingAction.expiresAt &&
+      new Date(pendingAction.expiresAt).getTime() < Date.now()
+    ) {
+      toast.error("This confirmation expired. Please ask again.");
+      setPendingAction(null);
+      return;
+    }
+
+    if (!pendingAction.confirmationToken) {
+      toast.error("Missing confirmation token. Please try again.");
+      setPendingAction(null);
+      return;
+    }
+
     setIsLoading(true);
 
     try {
       const response = await chatbotService.confirmAction(
-        pendingAction.action,
-        pendingAction.parameters,
+        pendingAction.confirmationToken,
       );
 
       const assistantMessage = {

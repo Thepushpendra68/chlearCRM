@@ -1,54 +1,66 @@
 const { validationResult } = require('express-validator');
 const leadService = require('../services/leadService');
 const ApiError = require('../utils/ApiError');
+const { BaseController, asyncHandler } = require('./baseController');
 const { AuditActions, AuditSeverity, logAuditEvent } = require('../utils/auditLogger');
 
-const buildLeadDisplayName = (lead = {}) => {
-  const name = `${lead.first_name || ''} ${lead.last_name || ''}`.trim();
-  return name || lead.name || lead.email || lead.company || `Lead ${lead.id}`;
-};
-
-const computeLeadChanges = (before = {}, after = {}) => {
-  const trackedFields = [
-    ['first_name', 'first_name'],
-    ['last_name', 'last_name'],
-    ['email', 'email'],
-    ['phone', 'phone'],
-    ['company', 'company'],
-    ['title', 'job_title'],
-    ['source', 'lead_source'],
-    ['status', 'status'],
-    ['deal_value', 'deal_value'],
-    ['expected_close_date', 'expected_close_date'],
-    ['notes', 'notes'],
-    ['priority', 'priority'],
-    ['assigned_to', 'assigned_to'],
-    ['pipeline_stage_id', 'pipeline_stage_id']
-  ];
-
-  return trackedFields.reduce((changes, [field, alias]) => {
-    const beforeValue = before[field] ?? null;
-    const afterValue = after[field] ?? null;
-
-    if (beforeValue !== afterValue) {
-      changes.push({
-        field: alias,
-        before: beforeValue,
-        after: afterValue
-      });
-    }
-
-    return changes;
-  }, []);
-};
-
 /**
- * @desc    Get all leads with pagination, search, and filtering
- * @route   GET /api/leads
- * @access  Private
+ * Lead Controller
+ * Handles all lead-related operations (CRUD, search, stats)
+ * Extends BaseController for standardized patterns
  */
-const getLeads = async (req, res, next) => {
-  try {
+class LeadController extends BaseController {
+  /**
+   * Build display name for a lead
+   */
+  buildLeadDisplayName(lead = {}) {
+    const name = `${lead.first_name || ''} ${lead.last_name || ''}`.trim();
+    return name || lead.name || lead.email || lead.company || `Lead ${lead.id}`;
+  }
+
+  /**
+   * Compute changes between lead states
+   */
+  computeLeadChanges(before = {}, after = {}) {
+    const trackedFields = [
+      ['first_name', 'first_name'],
+      ['last_name', 'last_name'],
+      ['email', 'email'],
+      ['phone', 'phone'],
+      ['company', 'company'],
+      ['title', 'job_title'],
+      ['source', 'lead_source'],
+      ['status', 'status'],
+      ['deal_value', 'deal_value'],
+      ['expected_close_date', 'expected_close_date'],
+      ['notes', 'notes'],
+      ['priority', 'priority'],
+      ['assigned_to', 'assigned_to'],
+      ['pipeline_stage_id', 'pipeline_stage_id']
+    ];
+
+    return trackedFields.reduce((changes, [field, alias]) => {
+      const beforeValue = before[field] ?? null;
+      const afterValue = after[field] ?? null;
+
+      if (beforeValue !== afterValue) {
+        changes.push({
+          field: alias,
+          before: beforeValue,
+          after: afterValue
+        });
+      }
+
+      return changes;
+    }, []);
+  }
+
+  /**
+   * @desc    Get all leads with pagination, search, and filtering
+   * @route   GET /api/leads
+   * @access  Private
+   */
+  getLeads = asyncHandler(async (req, res) => {
     const {
       page = 1,
       limit = 20,
@@ -76,53 +88,37 @@ const getLeads = async (req, res, next) => {
       filters
     );
 
-    res.json({
-      success: true,
-      data: result.leads,
-      pagination: {
-        current_page: parseInt(page),
-        total_pages: result.totalPages,
-        total_items: result.totalItems,
-        items_per_page: parseInt(limit),
-        has_next: parseInt(page) < result.totalPages,
-        has_prev: parseInt(page) > 1
-      }
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    const pagination = this.getPaginationMeta(
+      result.totalItems,
+      parseInt(page),
+      parseInt(limit)
+    );
 
-/**
- * @desc    Get lead by ID
- * @route   GET /api/leads/:id
- * @access  Private
- */
-const getLeadById = async (req, res, next) => {
-  try {
+    this.paginated(res, result.leads, pagination, 200, 'Leads retrieved successfully');
+  });
+
+  /**
+   * @desc    Get lead by ID
+   * @route   GET /api/leads/:id
+   * @access  Private
+   */
+  getLeadById = asyncHandler(async (req, res) => {
     const { id } = req.params;
     const lead = await leadService.getLeadById(id);
 
     if (!lead) {
-      throw new ApiError('Lead not found', 404);
+      return this.notFound(res, 'Lead not found');
     }
 
-    res.json({
-      success: true,
-      data: lead
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    this.success(res, lead, 200, 'Lead retrieved successfully');
+  });
 
-/**
- * @desc    Create new lead
- * @route   POST /api/leads
- * @access  Private
- */
-const createLead = async (req, res, next) => {
-  try {
+  /**
+   * @desc    Create new lead
+   * @route   POST /api/leads
+   * @access  Private
+   */
+  createLead = asyncHandler(async (req, res) => {
     // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -132,18 +128,7 @@ const createLead = async (req, res, next) => {
         value: error.value
       }));
 
-      // Create a more user-friendly error message
-      const fieldErrors = errorMessages.map(err => `${err.field}: ${err.message}`).join(', ');
-
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors: errorMessages,
-        error: {
-          message: `Please check the following fields: ${fieldErrors}`,
-          code: 'VALIDATION_ERROR'
-        }
-      });
+      return this.validationError(res, 'Validation failed', errorMessages);
     }
 
     const leadData = {
@@ -158,7 +143,7 @@ const createLead = async (req, res, next) => {
       action: AuditActions.LEAD_CREATED,
       resourceType: 'lead',
       resourceId: lead.id,
-      resourceName: buildLeadDisplayName(lead),
+      resourceName: this.buildLeadDisplayName(lead),
       companyId: lead.company_id,
       details: {
         status: lead.status,
@@ -171,23 +156,15 @@ const createLead = async (req, res, next) => {
       }
     });
 
-    res.status(201).json({
-      success: true,
-      data: lead,
-      message: 'Lead created successfully'
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    this.created(res, lead, 'Lead created successfully');
+  });
 
-/**
- * @desc    Update lead
- * @route   PUT /api/leads/:id
- * @access  Private
- */
-const updateLead = async (req, res, next) => {
-  try {
+  /**
+   * @desc    Update lead
+   * @route   PUT /api/leads/:id
+   * @access  Private
+   */
+  updateLead = asyncHandler(async (req, res) => {
     // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -197,18 +174,7 @@ const updateLead = async (req, res, next) => {
         value: error.value
       }));
 
-      // Create a more user-friendly error message
-      const fieldErrors = errorMessages.map(err => `${err.field}: ${err.message}`).join(', ');
-
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors: errorMessages,
-        error: {
-          message: `Please check the following fields: ${fieldErrors}`,
-          code: 'VALIDATION_ERROR'
-        }
-      });
+      return this.validationError(res, 'Validation failed', errorMessages);
     }
 
     const { id } = req.params;
@@ -217,18 +183,18 @@ const updateLead = async (req, res, next) => {
     const leadResult = await leadService.updateLead(id, leadData, req.user);
 
     if (!leadResult) {
-      throw new ApiError('Lead not found', 404);
+      return this.notFound(res, 'Lead not found');
     }
 
     const { updatedLead, previousLead } = leadResult;
-    const changes = computeLeadChanges(previousLead, updatedLead);
+    const changes = this.computeLeadChanges(previousLead, updatedLead);
 
     if (changes.length > 0) {
       await logAuditEvent(req, {
         action: AuditActions.LEAD_UPDATED,
         resourceType: 'lead',
         resourceId: updatedLead.id,
-        resourceName: buildLeadDisplayName(updatedLead),
+        resourceName: this.buildLeadDisplayName(updatedLead),
         companyId: updatedLead.company_id,
         details: {
           changes
@@ -241,7 +207,7 @@ const updateLead = async (req, res, next) => {
           action: AuditActions.LEAD_STATUS_CHANGED,
           resourceType: 'lead',
           resourceId: updatedLead.id,
-          resourceName: buildLeadDisplayName(updatedLead),
+          resourceName: this.buildLeadDisplayName(updatedLead),
           companyId: updatedLead.company_id,
           severity: AuditSeverity.INFO,
           details: {
@@ -257,7 +223,7 @@ const updateLead = async (req, res, next) => {
           action: AuditActions.LEAD_OWNER_CHANGED,
           resourceType: 'lead',
           resourceId: updatedLead.id,
-          resourceName: buildLeadDisplayName(updatedLead),
+          resourceName: this.buildLeadDisplayName(updatedLead),
           companyId: updatedLead.company_id,
           severity: AuditSeverity.INFO,
           details: {
@@ -268,28 +234,20 @@ const updateLead = async (req, res, next) => {
       }
     }
 
-    res.json({
-      success: true,
-      data: updatedLead,
-      message: 'Lead updated successfully'
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    this.updated(res, updatedLead, 'Lead updated successfully');
+  });
 
-/**
- * @desc    Delete lead
- * @route   DELETE /api/leads/:id
- * @access  Private
- */
-const deleteLead = async (req, res, next) => {
-  try {
+  /**
+   * @desc    Delete lead
+   * @route   DELETE /api/leads/:id
+   * @access  Private
+   */
+  deleteLead = asyncHandler(async (req, res) => {
     const { id } = req.params;
     const result = await leadService.deleteLead(id, req.user);
 
     if (!result) {
-      throw new ApiError('Lead not found', 404);
+      return this.notFound(res, 'Lead not found');
     }
 
     if (result.deletedLead) {
@@ -297,7 +255,7 @@ const deleteLead = async (req, res, next) => {
         action: AuditActions.LEAD_DELETED,
         resourceType: 'lead',
         resourceId: result.deletedLead.id,
-        resourceName: buildLeadDisplayName(result.deletedLead),
+        resourceName: this.buildLeadDisplayName(result.deletedLead),
         companyId: result.deletedLead.company_id,
         severity: AuditSeverity.WARNING,
         details: {
@@ -307,68 +265,34 @@ const deleteLead = async (req, res, next) => {
       });
     }
 
-    res.json({
-      success: true,
-      message: 'Lead deleted successfully'
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    this.deleted(res, 'Lead deleted successfully');
+  });
 
-/**
- * @desc    Get lead statistics
- * @route   GET /api/leads/stats
- * @access  Private
- */
-const getLeadStats = async (req, res, next) => {
-  try {
+  /**
+   * @desc    Get lead statistics
+   * @route   GET /api/leads/stats
+   * @access  Private
+   */
+  getLeadStats = asyncHandler(async (req, res) => {
     const stats = await leadService.getLeadStats(req.user);
+    this.success(res, stats, 200, 'Lead statistics retrieved successfully');
+  });
 
-    res.json({
-      success: true,
-      data: stats
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * @desc    Search leads
- * @route   GET /api/leads/search
- * @access  Private
- */
-const searchLeads = async (req, res, next) => {
-  try {
+  /**
+   * @desc    Search leads
+   * @route   GET /api/leads/search
+   * @access  Private
+   */
+  searchLeads = asyncHandler(async (req, res) => {
     const { q: query, limit = 5 } = req.query;
 
     if (!query || query.trim().length < 2) {
-      return res.status(400).json({
-        success: false,
-        error: {
-          message: 'Search query must be at least 2 characters long'
-        }
-      });
+      return this.validationError(res, 'Search query must be at least 2 characters long');
     }
 
     const results = await leadService.searchLeads(query, parseInt(limit));
-    
-    res.json({
-      success: true,
-      data: results
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    this.success(res, results, 200, 'Search completed successfully');
+  });
+}
 
-module.exports = {
-  getLeads,
-  getLeadById,
-  createLead,
-  updateLead,
-  deleteLead,
-  getLeadStats,
-  searchLeads
-};
+module.exports = new LeadController();

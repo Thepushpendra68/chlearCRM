@@ -1,277 +1,288 @@
 const emailTemplateService = require('../services/emailTemplateService');
 const { supabaseAdmin } = require('../config/supabase');
 const ApiError = require('../utils/ApiError');
+const { BaseController, asyncHandler } = require('./baseController');
+const { AuditActions, AuditSeverity, logAuditEvent } = require('../utils/auditLogger');
 
 /**
  * Email Template Controller
  * Handles HTTP requests for email template management
+ * Extends BaseController for standardized patterns
  */
-class EmailTemplateController {
+class EmailTemplateController extends BaseController {
+  /**
+   * Build template description for logging
+   */
+  describeTemplate(template = {}) {
+    return template?.name || `Template ${template?.id || ''}`.trim();
+  }
+
   /**
    * Get all templates
    * GET /api/email/templates
    */
-  async getTemplates(req, res, next) {
-    try {
-      const { folder, category, is_active, search } = req.query;
-      
-      const templates = await emailTemplateService.getTemplates(req.user, {
-        folder,
-        category,
-        is_active: is_active !== undefined ? is_active === 'true' : undefined,
-        search
-      });
+  getTemplates = asyncHandler(async (req, res) => {
+    const { folder, category, is_active, search } = req.query;
 
-      res.json({
-        success: true,
-        data: templates
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
+    const templates = await emailTemplateService.getTemplates(req.user, {
+      folder,
+      category,
+      is_active: is_active !== undefined ? is_active === 'true' : undefined,
+      search
+    });
+
+    this.success(res, templates, 200, 'Templates retrieved successfully');
+  });
 
   /**
    * Get template by ID
    * GET /api/email/templates/:id
    */
-  async getTemplateById(req, res, next) {
-    try {
-      const { id } = req.params;
-      const template = await emailTemplateService.getTemplateById(id, req.user);
+  getTemplateById = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const template = await emailTemplateService.getTemplateById(id, req.user);
 
-      res.json({
-        success: true,
-        data: template
-      });
-    } catch (error) {
-      next(error);
+    if (!template) {
+      return this.notFound(res, 'Template not found');
     }
-  }
+
+    this.success(res, template, 200, 'Template retrieved successfully');
+  });
 
   /**
    * Create template
    * POST /api/email/templates
    */
-  async createTemplate(req, res, next) {
-    try {
-      const template = await emailTemplateService.createTemplate(req.body, req.user);
+  createTemplate = asyncHandler(async (req, res) => {
+    const template = await emailTemplateService.createTemplate(req.body, req.user);
 
-      res.status(201).json({
-        success: true,
-        data: template,
-        message: 'Template created successfully'
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
+    await logAuditEvent(req, {
+      action: AuditActions.EMAIL_TEMPLATE_CREATED,
+      resourceType: 'email_template',
+      resourceId: template.id,
+      resourceName: this.describeTemplate(template),
+      companyId: req.user.company_id,
+      details: {
+        name: template.name,
+        category: template.category,
+        folder: template.folder
+      }
+    });
+
+    this.created(res, template, 'Template created successfully');
+  });
 
   /**
    * Update template
    * PUT /api/email/templates/:id
    */
-  async updateTemplate(req, res, next) {
-    try {
-      const { id } = req.params;
-      const template = await emailTemplateService.updateTemplate(id, req.body, req.user);
+  updateTemplate = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const result = await emailTemplateService.updateTemplate(id, req.body, req.user);
 
-      res.json({
-        success: true,
-        data: template,
-        message: 'Template updated successfully'
-      });
-    } catch (error) {
-      next(error);
+    if (!result.success) {
+      return this.validationError(res, result.error);
     }
-  }
+
+    await logAuditEvent(req, {
+      action: AuditActions.EMAIL_TEMPLATE_UPDATED,
+      resourceType: 'email_template',
+      resourceId: id,
+      resourceName: this.describeTemplate(result.data),
+      companyId: req.user.company_id,
+      details: {
+        name: result.data?.name
+      }
+    });
+
+    this.updated(res, result.data, 'Template updated successfully');
+  });
 
   /**
    * Delete template
    * DELETE /api/email/templates/:id
    */
-  async deleteTemplate(req, res, next) {
-    try {
-      const { id } = req.params;
-      await emailTemplateService.deleteTemplate(id, req.user);
+  deleteTemplate = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const result = await emailTemplateService.deleteTemplate(id, req.user);
 
-      res.json({
-        success: true,
-        message: 'Template deleted successfully'
-      });
-    } catch (error) {
-      next(error);
+    if (!result.success) {
+      return this.notFound(res, result.error);
     }
-  }
+
+    await logAuditEvent(req, {
+      action: AuditActions.EMAIL_TEMPLATE_DELETED,
+      resourceType: 'email_template',
+      resourceId: id,
+      resourceName: this.describeTemplate(result.deletedTemplate || { id }),
+      companyId: req.user.company_id,
+      severity: AuditSeverity.WARNING
+    });
+
+    this.deleted(res, 'Template deleted successfully');
+  });
 
   /**
    * Create template version
    * POST /api/email/templates/:id/versions
    */
-  async createVersion(req, res, next) {
-    try {
-      const { id } = req.params;
-      const version = await emailTemplateService.createVersion(id, req.body, req.user);
+  createVersion = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const version = await emailTemplateService.createVersion(id, req.body, req.user);
 
-      res.status(201).json({
-        success: true,
-        data: version,
-        message: 'Template version created successfully'
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
+    await logAuditEvent(req, {
+      action: AuditActions.EMAIL_TEMPLATE_VERSION_CREATED,
+      resourceType: 'email_template_version',
+      resourceId: version.id,
+      resourceName: `Version ${version.version} of template ${id}`,
+      companyId: req.user.company_id,
+      details: {
+        template_id: id,
+        version: version.version,
+        is_published: version.is_published
+      }
+    });
+
+    this.created(res, version, 'Template version created successfully');
+  });
 
   /**
    * Publish template version
    * POST /api/email/templates/versions/:versionId/publish
    */
-  async publishVersion(req, res, next) {
-    try {
-      const { versionId } = req.params;
-      const version = await emailTemplateService.publishVersion(versionId, req.user);
+  publishVersion = asyncHandler(async (req, res) => {
+    const { versionId } = req.params;
+    const version = await emailTemplateService.publishVersion(versionId, req.user);
 
-      res.json({
-        success: true,
-        data: version,
-        message: 'Template version published successfully'
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
+    await logAuditEvent(req, {
+      action: AuditActions.EMAIL_TEMPLATE_VERSION_PUBLISHED,
+      resourceType: 'email_template_version',
+      resourceId: versionId,
+      resourceName: `Version ${version.version}`,
+      companyId: req.user.company_id,
+      details: {
+        template_id: version.template_id,
+        version: version.version
+      }
+    });
+
+    this.success(res, version, 200, 'Template version published successfully');
+  });
 
   /**
    * Compile MJML
    * POST /api/email/templates/compile-mjml
    */
-  async compileMJML(req, res, next) {
-    try {
-      const { mjml } = req.body;
+  compileMJML = asyncHandler(async (req, res) => {
+    const { mjml } = req.body;
 
-      if (!mjml) {
-        throw new ApiError('MJML content is required', 400);
-      }
-
-      const result = emailTemplateService.compileMJML(mjml);
-
-      res.json({
-        success: true,
-        data: result
-      });
-    } catch (error) {
-      next(error);
+    if (!mjml) {
+      return this.validationError(res, 'MJML content is required');
     }
-  }
+
+    const result = emailTemplateService.compileMJML(mjml);
+
+    this.success(res, result, 200, 'MJML compiled successfully');
+  });
 
   /**
    * Render template preview
    * POST /api/email/templates/versions/:versionId/preview
    */
-  async previewTemplate(req, res, next) {
-    try {
-      const { versionId } = req.params;
-      const { data } = req.body;
+  previewTemplate = asyncHandler(async (req, res) => {
+    const { versionId } = req.params;
+    const { data } = req.body;
 
-      const rendered = await emailTemplateService.renderTemplate(versionId, data || {}, req.user);
+    const rendered = await emailTemplateService.renderTemplate(versionId, data || {}, req.user);
 
-      res.json({
-        success: true,
-        data: rendered
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
+    this.success(res, rendered, 200, 'Template rendered successfully');
+  });
 
   /**
    * Get folders
    * GET /api/email/templates/folders
    */
-  async getFolders(req, res, next) {
-    try {
-      const folders = await emailTemplateService.getFolders(req.user);
+  getFolders = asyncHandler(async (req, res) => {
+    const folders = await emailTemplateService.getFolders(req.user);
 
-      res.json({
-        success: true,
-        data: folders
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
+    this.success(res, folders, 200, 'Folders retrieved successfully');
+  });
 
   /**
    * GET /api/email/settings/integration
    */
-  async getIntegrationSettings(req, res, next) {
-    try {
-      const { data, error } = await supabaseAdmin
-        .from('integration_settings')
-        .select('*')
-        .eq('company_id', req.user.company_id)
-        .eq('type', 'email')
-        .single();
+  getIntegrationSettings = asyncHandler(async (req, res) => {
+    const { data, error } = await supabaseAdmin
+      .from('integration_settings')
+      .select('*')
+      .eq('company_id', req.user.company_id)
+      .eq('type', 'email')
+      .single();
 
-      if (error && error.code !== 'PGRST116') throw error; // ignore 'no rows'
+    if (error && error.code !== 'PGRST116') throw error; // ignore 'no rows'
 
-      res.json({ success: true, data: data || null });
-    } catch (error) {
-      next(error);
-    }
-  }
+    this.success(res, data || null, 200, 'Integration settings retrieved successfully');
+  });
 
   /**
    * POST /api/email/settings/integration
    */
-  async upsertIntegrationSettings(req, res, next) {
-    try {
-      const { provider, config } = req.body;
-      if (!provider || !config) throw new ApiError('provider and config are required', 400);
-
-      const { data: existing } = await supabaseAdmin
-        .from('integration_settings')
-        .select('id')
-        .eq('company_id', req.user.company_id)
-        .eq('type', 'email')
-        .single();
-
-      const payload = {
-        company_id: req.user.company_id,
-        type: 'email',
-        provider,
-        config,
-        is_active: true,
-        created_by: req.user.id,
-        updated_at: new Date().toISOString()
-      };
-
-      let query;
-      if (existing) {
-        query = supabaseAdmin
-          .from('integration_settings')
-          .update(payload)
-          .eq('id', existing.id)
-          .select()
-          .single();
-      } else {
-        query = supabaseAdmin
-          .from('integration_settings')
-          .insert(payload)
-          .select()
-          .single();
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-
-      res.json({ success: true, data });
-    } catch (error) {
-      next(error);
+  upsertIntegrationSettings = asyncHandler(async (req, res) => {
+    const { provider, config } = req.body;
+    if (!provider || !config) {
+      return this.validationError(res, 'provider and config are required');
     }
-  }
+
+    const { data: existing } = await supabaseAdmin
+      .from('integration_settings')
+      .select('id')
+      .eq('company_id', req.user.company_id)
+      .eq('type', 'email')
+      .single();
+
+    const payload = {
+      company_id: req.user.company_id,
+      type: 'email',
+      provider,
+      config,
+      is_active: true,
+      created_by: req.user.id,
+      updated_at: new Date().toISOString()
+    };
+
+    let query;
+    if (existing) {
+      query = supabaseAdmin
+        .from('integration_settings')
+        .update(payload)
+        .eq('id', existing.id)
+        .select()
+        .single();
+    } else {
+      query = supabaseAdmin
+        .from('integration_settings')
+        .insert(payload)
+        .select()
+        .single();
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    await logAuditEvent(req, {
+      action: existing ? AuditActions.INTEGRATION_UPDATED : AuditActions.INTEGRATION_CREATED,
+      resourceType: 'email_integration',
+      resourceId: data.id,
+      resourceName: `Email integration: ${provider}`,
+      companyId: req.user.company_id,
+      details: {
+        provider,
+        is_active: true
+      }
+    });
+
+    this.success(res, data, existing ? 200 : 201, 'Integration settings saved successfully');
+  });
 }
 
 module.exports = new EmailTemplateController();
-

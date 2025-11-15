@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { format, formatDistanceToNow } from 'date-fns';
 
 const ActivityList = ({
@@ -21,48 +21,45 @@ const ActivityList = ({
     date_to: '',
     ...filters
   });
-  const [filteredActivities, setFilteredActivities] = useState([]);
 
-  // Apply client-side filtering to activities
-  useEffect(() => {
-    console.log('ActivityList filtering activities:', activities.length, 'total activities');
-    console.log('Activities received:', activities);
+  // Memoize filtered activities to prevent unnecessary recalculation
+  // This is critical for large activity lists
+  const filteredActivities = useMemo(() => {
     let filtered = [...activities];
-    
+
     // Filter by leadId if provided
     if (leadId) {
       filtered = filtered.filter(activity => activity.lead_id === leadId);
     }
-    
+
     // Filter by userId if provided
     if (userId) {
       filtered = filtered.filter(activity => activity.user_id === userId);
     }
-    
+
     // Apply local filters
     if (localFilters.activity_type) {
       filtered = filtered.filter(activity => activity.activity_type === localFilters.activity_type);
     }
-    
+
     if (localFilters.is_completed !== '') {
       const isCompleted = localFilters.is_completed === 'true';
       filtered = filtered.filter(activity => activity.is_completed === isCompleted);
     }
-    
+
     if (localFilters.date_from) {
       const fromDate = new Date(localFilters.date_from);
       filtered = filtered.filter(activity => new Date(activity.created_at) >= fromDate);
     }
-    
+
     if (localFilters.date_to) {
       const toDate = new Date(localFilters.date_to);
       toDate.setHours(23, 59, 59, 999); // Include the whole day
       filtered = filtered.filter(activity => new Date(activity.created_at) <= toDate);
     }
-    
-    console.log('ActivityList filtered to:', filtered.length, 'activities');
-    setFilteredActivities(filtered);
-  }, [activities, leadId, userId, localFilters]);
+
+    return filtered;
+  }, [activities, leadId, userId, localFilters.activity_type, localFilters.is_completed, localFilters.date_from, localFilters.date_to]);
 
   const handleFilterChange = (key, value) => {
     setLocalFilters(prev => ({
@@ -80,77 +77,80 @@ const ActivityList = ({
     });
   };
 
-  const getActivityIcon = (type) => {
+  // Memoize activity icon map to prevent recreation
+  const activityIcons = useMemo(() => {
     const iconClass = "w-5 h-5";
-    
-    switch (type) {
-      case 'call':
-        return (
-          <svg className={`${iconClass} text-blue-500`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-          </svg>
-        );
-      case 'email':
-        return (
-          <svg className={`${iconClass} text-green-500`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-          </svg>
-        );
-      case 'meeting':
-        return (
-          <svg className={`${iconClass} text-purple-500`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-          </svg>
-        );
-      case 'note':
-        return (
-          <svg className={`${iconClass} text-yellow-500`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-          </svg>
-        );
-      case 'task':
-        return (
-          <svg className={`${iconClass} text-orange-500`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-          </svg>
-        );
-      case 'sms':
-        return (
-          <svg className={`${iconClass} text-indigo-500`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-          </svg>
-        );
-      default:
-        return (
-          <svg className={`${iconClass} text-gray-400`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        );
-    }
+    return {
+      call: (
+        <svg className={`${iconClass} text-blue-500`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+        </svg>
+      ),
+      email: (
+        <svg className={`${iconClass} text-green-500`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+        </svg>
+      ),
+      meeting: (
+        <svg className={`${iconClass} text-purple-500`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+      ),
+      note: (
+        <svg className={`${iconClass} text-yellow-500`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+        </svg>
+      ),
+      task: (
+        <svg className={`${iconClass} text-orange-500`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+        </svg>
+      ),
+      sms: (
+        <svg className={`${iconClass} text-indigo-500`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+        </svg>
+      ),
+      default: (
+        <svg className={`${iconClass} text-gray-400`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      )
+    };
+  }, []);
+
+  // Memoize activity colors
+  const activityColors = useMemo(() => ({
+    call: 'bg-blue-100 border-blue-200',
+    email: 'bg-green-100 border-green-200',
+    meeting: 'bg-purple-100 border-purple-200',
+    note: 'bg-yellow-100 border-yellow-200',
+    task: 'bg-orange-100 border-orange-200',
+    sms: 'bg-indigo-100 border-indigo-200',
+    default: 'bg-gray-100 border-gray-200'
+  }), []);
+
+  // Memoize time formatter
+  const formatActivityTime = useMemo(() => {
+    return (timestamp) => {
+      const date = new Date(timestamp);
+      const now = new Date();
+      const diffInHours = (now - date) / (1000 * 60 * 60);
+
+      if (diffInHours < 24) {
+        return formatDistanceToNow(date, { addSuffix: true });
+      } else {
+        return format(date, 'MMM dd, yyyy h:mm a');
+      }
+    };
+  }, []);
+
+  const getActivityIcon = (type) => {
+    return activityIcons[type] || activityIcons.default;
   };
 
   const getActivityColor = (type) => {
-    switch (type) {
-      case 'call': return 'bg-blue-100 border-blue-200';
-      case 'email': return 'bg-green-100 border-green-200';
-      case 'meeting': return 'bg-purple-100 border-purple-200';
-      case 'note': return 'bg-yellow-100 border-yellow-200';
-      case 'task': return 'bg-orange-100 border-orange-200';
-      case 'sms': return 'bg-indigo-100 border-indigo-200';
-      default: return 'bg-gray-100 border-gray-200';
-    }
-  };
-
-  const formatActivityTime = (timestamp) => {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffInHours = (now - date) / (1000 * 60 * 60);
-
-    if (diffInHours < 24) {
-      return formatDistanceToNow(date, { addSuffix: true });
-    } else {
-      return format(date, 'MMM dd, yyyy h:mm a');
-    }
+    return activityColors[type] || activityColors.default;
   };
 
   if (loading) {
@@ -376,4 +376,22 @@ const ActivityList = ({
   );
 };
 
-export default ActivityList;
+// Memoize the ActivityList component to prevent unnecessary re-renders
+// This is important for large lists with complex filtering
+export default React.memo(ActivityList, (prevProps, nextProps) => {
+  // Custom comparison function for better control
+  // Only re-render if props that affect the output have changed
+  return (
+    prevProps.activities === nextProps.activities &&
+    prevProps.loading === nextProps.loading &&
+    prevProps.error === nextProps.error &&
+    prevProps.leadId === nextProps.leadId &&
+    prevProps.userId === nextProps.userId &&
+    prevProps.filters === nextProps.filters &&
+    prevProps.onActivityClick === nextProps.onActivityClick &&
+    prevProps.onEditActivity === nextProps.onEditActivity &&
+    prevProps.onDeleteActivity === nextProps.onDeleteActivity &&
+    prevProps.onRefresh === nextProps.onRefresh &&
+    prevProps.showFilters === nextProps.showFilters
+  );
+});

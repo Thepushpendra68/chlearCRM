@@ -3,6 +3,7 @@ import useVoice from '../../hooks/useVoice'
 import VoiceToggle from './VoiceToggle'
 import WaveformVisualizer from './WaveformVisualizer'
 import { useVoiceContext } from '../../context/VoiceContext'
+import audioService from '../../services/audioService'
 
 /**
  * Voice Input Component
@@ -20,7 +21,6 @@ const VoiceInput = ({
   ...props
 }) => {
   const [localValue, setLocalValue] = useState(value)
-  const [audioLevel, setAudioLevel] = useState(0)
   const inputRef = useRef(null)
   const waveformRef = useRef(null)
 
@@ -32,6 +32,7 @@ const VoiceInput = ({
     error,
     transcript,
     interimTranscript,
+    audioLevel,
     startListening,
     stopListening,
     toggleListening,
@@ -87,16 +88,20 @@ const VoiceInput = ({
   }
 
   // Handle voice toggle
-  const handleVoiceToggle = () => {
+  const handleVoiceToggle = async () => {
     if (!isSupported) {
       return
     }
 
     if (isListening) {
       stopListening()
+      // Play stop recording sound
+      audioService.playPattern('voice-stop')
     } else {
       clearTranscript()
       startListening()
+      // Play start recording sound
+      audioService.playPattern('voice-start')
     }
   }
 
@@ -108,19 +113,6 @@ const VoiceInput = ({
       handleVoiceToggle()
     }
   }
-
-  // Simulate audio level (in real implementation, this would come from Web Audio API)
-  useEffect(() => {
-    if (isListening) {
-      const interval = setInterval(() => {
-        setAudioLevel(Math.random() * 100)
-      }, 100)
-
-      return () => clearInterval(interval)
-    } else {
-      setAudioLevel(0)
-    }
-  }, [isListening])
 
   if (!isSupported) {
     return (

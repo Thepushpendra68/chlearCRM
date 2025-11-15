@@ -16,9 +16,9 @@ const chatbotService = {
   /**
    * Confirm and execute pending action
    */
-  confirmAction: async (action, parameters) => {
+  confirmAction: async (confirmationToken) => {
     try {
-      const response = await api.post('/chatbot/confirm', { action, parameters });
+      const response = await api.post('/chatbot/confirm', { confirmationToken });
       return response.data.data;
     } catch (error) {
       throw error.response?.data?.error || error;

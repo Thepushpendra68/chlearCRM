@@ -6,13 +6,18 @@
 const configLoader = require('../config/industry/configLoader');
 const { supabaseAdmin } = require('../config/supabase');
 const ApiError = require('../utils/ApiError');
+const { BaseController, asyncHandler } = require('./baseController');
 
 /**
- * Get industry configuration for current user's company
- * GET /api/config/industry
+ * Config Controller
+ * Handles configuration operations
+ * Extends BaseController for standardized patterns
  */
-const getIndustryConfig = async (req, res, next) => {
-  try {
+class ConfigController extends BaseController {
+  /**
+   * Get industry configuration for current user's company
+   */
+  getIndustryConfig = asyncHandler(async (req, res) => {
     const { user } = req;
 
     if (!user || !user.company_id) {
@@ -34,40 +39,31 @@ const getIndustryConfig = async (req, res, next) => {
     const config = configLoader.getConfigForCompany(company);
 
     // Return configuration with company info
-    res.json({
-      success: true,
-      data: {
-        company: {
-          id: company.id,
-          name: company.name,
-          industry_type: company.industry_type || 'generic',
-        },
-        config: {
-          industryType: config.industryType,
-          industryName: config.industryName,
-          terminology: config.terminology,
-          coreFields: config.coreFields,
-          customFields: config.customFields,
-          formLayout: config.formLayout,
-          listView: config.listView,
-          pipeline: config.pipeline,
-          validation: config.validation,
-          reports: config.reports,
-        },
+    this.success(res, {
+      company: {
+        id: company.id,
+        name: company.name,
+        industry_type: company.industry_type || 'generic',
       },
-    });
-  } catch (error) {
-    console.error('Error fetching industry config:', error);
-    next(error);
-  }
-};
+      config: {
+        industryType: config.industryType,
+        industryName: config.industryName,
+        terminology: config.terminology,
+        coreFields: config.coreFields,
+        customFields: config.customFields,
+        formLayout: config.formLayout,
+        listView: config.listView,
+        pipeline: config.pipeline,
+        validation: config.validation,
+        reports: config.reports,
+      },
+    }, 200, 'Industry configuration retrieved successfully');
+  });
 
-/**
- * Get form layout for current user's company
- * GET /api/config/form-layout
- */
-const getFormLayout = async (req, res, next) => {
-  try {
+  /**
+   * Get form layout for current user's company
+   */
+  getFormLayout = asyncHandler(async (req, res) => {
     const { user } = req;
 
     if (!user || !user.company_id) {
@@ -91,43 +87,25 @@ const getFormLayout = async (req, res, next) => {
     // Get formatted form layout with field definitions
     const formLayout = configLoader.getFormLayout(config);
 
-    res.json({
-      success: true,
-      data: {
-        formLayout,
-        terminology: config.terminology,
-      },
-    });
-  } catch (error) {
-    console.error('Error fetching form layout:', error);
-    next(error);
-  }
-};
+    this.success(res, {
+      formLayout,
+      terminology: config.terminology,
+    }, 200, 'Form layout retrieved successfully');
+  });
 
-/**
- * Get all available industries
- * GET /api/config/industries
- */
-const getAvailableIndustries = async (req, res, next) => {
-  try {
+  /**
+   * Get all available industries
+   */
+  getAvailableIndustries = asyncHandler(async (req, res) => {
     const industries = configLoader.getAvailableIndustries();
 
-    res.json({
-      success: true,
-      data: industries,
-    });
-  } catch (error) {
-    console.error('Error fetching available industries:', error);
-    next(error);
-  }
-};
+    this.success(res, industries, 200, 'Available industries retrieved successfully');
+  });
 
-/**
- * Get terminology for current user's company
- * GET /api/config/terminology
- */
-const getTerminology = async (req, res, next) => {
-  try {
+  /**
+   * Get terminology for current user's company
+   */
+  getTerminology = asyncHandler(async (req, res) => {
     const { user } = req;
 
     if (!user || !user.company_id) {
@@ -148,22 +126,13 @@ const getTerminology = async (req, res, next) => {
     // Load industry configuration
     const config = configLoader.getConfigForCompany(company);
 
-    res.json({
-      success: true,
-      data: config.terminology,
-    });
-  } catch (error) {
-    console.error('Error fetching terminology:', error);
-    next(error);
-  }
-};
+    this.success(res, config.terminology, 200, 'Terminology retrieved successfully');
+  });
 
-/**
- * Get field definitions for current user's company
- * GET /api/config/fields
- */
-const getFieldDefinitions = async (req, res, next) => {
-  try {
+  /**
+   * Get field definitions for current user's company
+   */
+  getFieldDefinitions = asyncHandler(async (req, res) => {
     const { user } = req;
 
     if (!user || !user.company_id) {
@@ -187,24 +156,12 @@ const getFieldDefinitions = async (req, res, next) => {
     // Get all fields (core + custom)
     const allFields = configLoader.getAllFields(config);
 
-    res.json({
-      success: true,
-      data: {
-        coreFields: config.coreFields,
-        customFields: config.customFields,
-        allFields,
-      },
-    });
-  } catch (error) {
-    console.error('Error fetching field definitions:', error);
-    next(error);
-  }
-};
+    this.success(res, {
+      coreFields: config.coreFields,
+      customFields: config.customFields,
+      allFields,
+    }, 200, 'Field definitions retrieved successfully');
+  });
+}
 
-module.exports = {
-  getIndustryConfig,
-  getFormLayout,
-  getAvailableIndustries,
-  getTerminology,
-  getFieldDefinitions,
-};
+module.exports = new ConfigController();
