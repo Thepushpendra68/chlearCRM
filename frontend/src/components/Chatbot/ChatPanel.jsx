@@ -574,13 +574,16 @@ const ChatPanel = () => {
       {voiceMode ? (
         <div className="border-t p-3 bg-card flex-shrink-0">
           <VoiceInput
-            onTranscript={setTranscript}
-            onInterimTranscript={setInterimTranscript}
+            onTranscript={(text) => {
+              if (text && !isLoading) {
+                sendMessage(text);
+              }
+            }}
             disabled={isLoading}
           />
-          {interimTranscript && (
+          {transcript && (
             <div className="mt-2 p-2 bg-muted/50 rounded text-xs text-muted-foreground italic">
-              {interimTranscript}
+              Listening: {transcript}
             </div>
           )}
         </div>
