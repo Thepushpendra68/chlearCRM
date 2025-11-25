@@ -30,6 +30,10 @@ module.exports = {
     '**/*.config.js',
     '*.config.js',
     'src/test/setup.js',
+    'tests/**/*.js',
+    'tests/**/*.jsx',
+    '**/*.test.js',
+    '**/*.test.jsx',
   ],
   rules: {
     'react/prop-types': 'off',
