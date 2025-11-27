@@ -55,6 +55,11 @@ const EmailSequenceBuilder = lazy(() => import("./pages/EmailSequenceBuilder"));
 const EmailAnalytics = lazy(() => import("./pages/EmailAnalytics"));
 const WorkflowLibrary = lazy(() => import("./pages/WorkflowLibrary"));
 const ScoringRules = lazy(() => import("./pages/ScoringRules"));
+const WhatsApp = lazy(() => import("./pages/WhatsApp"));
+const WhatsAppBroadcasts = lazy(() => import("./pages/WhatsAppBroadcasts"));
+const WhatsAppSequences = lazy(() => import("./pages/WhatsAppSequences"));
+const WhatsAppSequenceBuilder = lazy(() => import("./pages/WhatsAppSequenceBuilder"));
+const WhatsAppSequenceEnrollments = lazy(() => import("./pages/WhatsAppSequenceEnrollments"));
 
 const RouteLoadingFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -224,6 +229,26 @@ function App() {
                       <Route
                         path="email/workflow-library"
                         element={<WorkflowLibrary />}
+                      />
+                      <Route
+                        path="whatsapp"
+                        element={<WhatsApp />}
+                      />
+                      <Route
+                        path="whatsapp/broadcasts"
+                        element={<WhatsAppBroadcasts />}
+                      />
+                      <Route
+                        path="whatsapp/sequences"
+                        element={<WhatsAppSequences />}
+                      />
+                      <Route
+                        path="whatsapp/sequences/:id"
+                        element={<WhatsAppSequenceBuilder />}
+                      />
+                      <Route
+                        path="whatsapp/sequences/:id/enrollments"
+                        element={<WhatsAppSequenceEnrollments />}
                       />
                     </Route>
 

@@ -51,7 +51,12 @@
       "Bash(node -c:*)",
       "Bash(npx --yes jest@29.7.0:*)",
       "Bash(node:*)",
-      "Bash(mkdir -p archive/legacy-custom-fields archive/legacy-2025-migrations archive/legacy-import-system archive/legacy-lead-features archive/utility-files)"
+      "Bash(mkdir -p archive/legacy-custom-fields archive/legacy-2025-migrations archive/legacy-import-system archive/legacy-lead-features archive/utility-files)",
+      "Bash(echo:*)",
+      "Bash(timeout 5 npm start:*)",
+      "Bash(timeout 10 npm:*)",
+      "Bash(npm run build)",
+      "Bash(git cherry-pick:*)"
     ],
     "deny": [],
     "ask": []

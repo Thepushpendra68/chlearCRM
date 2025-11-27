@@ -68,6 +68,9 @@ console.log("✅ [APP] Scoring routes loaded successfully:", !!scoringRoutes);
 console.log("📦 [APP] Loading voice routes...");
 const voiceRoutes = require("./routes/voiceRoutes");
 console.log("✅ [APP] Voice routes loaded successfully:", !!voiceRoutes);
+console.log("📦 [APP] Loading WhatsApp routes...");
+const whatsappRoutes = require("./routes/whatsappRoutes");
+console.log("✅ [APP] WhatsApp routes loaded successfully:", !!whatsappRoutes);
 
 // Import middleware
 const errorHandler = require("./middleware/errorMiddleware");
@@ -239,6 +242,9 @@ console.log("✅ [APP] /api/scoring routes registered");
 console.log("🔗 [APP] Registering /api/voice routes...");
 app.use("/api/voice", voiceRoutes); // Voice interface (speech-to-text, commands, TTS)
 console.log("✅ [APP] /api/voice routes registered");
+console.log("🔗 [APP] Registering /api/whatsapp routes...");
+app.use("/api/whatsapp", whatsappRoutes); // WhatsApp Business API integration
+console.log("✅ [APP] /api/whatsapp routes registered");
 
 // 404 handler
 app.use("*", (req, res) => {
