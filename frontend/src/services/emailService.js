@@ -381,6 +381,209 @@ class EmailService {
       throw error;
     }
   }
+
+  // ================== WORKFLOW TEMPLATE LIBRARY ==================
+
+  /**
+   * Get workflow templates (optionally including public ones)
+   */
+  async getWorkflowTemplates(filters = {}) {
+    try {
+      const params = new URLSearchParams();
+      if (filters.category && filters.category !== 'all') params.append('category', filters.category);
+      if (filters.industry && filters.industry !== 'all') params.append('industry', filters.industry);
+      if (filters.search) params.append('search', filters.search);
+      if (filters.is_active !== undefined) params.append('is_active', filters.is_active);
+      if (filters.include_public !== undefined) params.append('include_public', filters.include_public);
+
+      const query = params.toString();
+      const response = await api.get(
+        `/email/workflow-templates${query ? `?${query}` : ''}`,
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching workflow templates:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get workflow template packs (public collections)
+   */
+  async getWorkflowTemplatePacks(filters = {}) {
+    try {
+      const params = new URLSearchParams();
+      if (filters.industry && filters.industry !== 'all') params.append('industry', filters.industry);
+      if (filters.search) params.append('search', filters.search);
+
+      const query = params.toString();
+      const response = await api.get(
+        `/email/workflow-templates/packs${query ? `?${query}` : ''}`,
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching workflow template packs:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get a single workflow template pack by ID
+   */
+  async getWorkflowTemplatePack(packId) {
+    try {
+      const response = await api.get(`/email/workflow-templates/packs/${packId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching workflow template pack:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Create a new sequence from a workflow template
+   */
+  async createSequenceFromTemplate(templateId, payload) {
+    try {
+      const response = await api.post(
+        `/email/workflow-templates/${templateId}/create-sequence`,
+        payload,
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error creating sequence from workflow template:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Export a workflow template as downloadable JSON
+   */
+  async exportWorkflowTemplate(templateId) {
+    try {
+      const response = await api.get(
+        `/email/workflow-templates/${templateId}/export`,
+      );
+
+      const exportData = response.data?.data || response.data;
+      const fileName = `${(exportData?.name || 'workflow_template')
+        .replace(/[^a-zA-Z0-9-_]/g, '_')}.json`;
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+        type: 'application/json',
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      return response.data;
+    } catch (error) {
+      console.error('Error exporting workflow template:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Import a workflow template from JSON data
+   */
+  async importWorkflowTemplate(templateData) {
+    try {
+      const response = await api.post(
+        '/email/workflow-templates/import',
+        templateData,
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error importing workflow template:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete a workflow template
+   */
+  async deleteWorkflowTemplate(templateId) {
+    try {
+      const response = await api.delete(`/email/workflow-templates/${templateId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting workflow template:', error);
+      throw error;
+    }
+  }
+
+  // ================== AI FEATURES ==================
+
+  /**
+   * Generate an email template from a natural language description
+   */
+  async aiGenerateTemplate(description, templateType = 'general', context = {}) {
+    try {
+      const response = await api.post('/email/templates/ai/generate', {
+        description,
+        template_type: templateType,
+        context,
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error generating template with AI:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Generate subject line variants for testing
+   */
+  async aiGenerateSubjectVariants(subject, lead = null, count = 5) {
+    try {
+      const response = await api.post('/email/templates/ai/subject-variants', {
+        subject,
+        lead,
+        count,
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error generating subject variants with AI:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Optimize email content using AI suggestions
+   */
+  async aiOptimizeContent(content, subject = '', goals = []) {
+    try {
+      const response = await api.post('/email/templates/ai/optimize', {
+        content,
+        subject,
+        goals,
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error optimizing content with AI:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Suggest personalization variables to add to content
+   */
+  async aiSuggestVariables(content, purpose = '') {
+    try {
+      const response = await api.post('/email/templates/ai/suggest-variables', {
+        content,
+        purpose,
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error suggesting personalization variables with AI:', error);
+      throw error;
+    }
+  }
 }
 
 export default new EmailService();

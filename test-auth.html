@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auth Test - CHLEAR CRM</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 { color: #333; }
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #45a049; }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .output {
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 4px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+        .success { color: #4CAF50; }
+        .error { color: #f44336; }
+        .info { color: #2196F3; }
+        .warning { color: #ff9800; }
+        pre { margin: 5px 0; white-space: pre-wrap; word-wrap: break-word; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 CHLEAR CRM Authentication Test</h1>
+        <p>Test your authentication and API connectivity</p>
+        
+        <div>
+            <button onclick="testBackendHealth()">1. Test Backend Health</button>
+            <button onclick="testSupabaseConnection()">2. Test Supabase Connection</button>
+            <button onclick="testCurrentSession()">3. Check Current Session</button>
+            <button onclick="testTokenRefresh()">4. Test Token Refresh</button>
+            <button onclick="testWhatsAppAPI()">5. Test WhatsApp API</button>
+            <button onclick="clearOutput()">Clear Output</button>
+        </div>
+        
+        <div id="output" class="output"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        const API_URL = 'http://localhost:5000/api';
+        const SUPABASE_URL = 'https://qlivxpsvlymxfnamxvhz.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFsaXZ4cHN2bHlteGZuYW14dmh6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg4NjU1NDUsImV4cCI6MjA3NDQ0MTU0NX0.p8VSaRJ-vS5ePf_2z_s-hQDrAxpS-r8vZSeijPBngIQ';
+
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        function log(message, type = 'info') {
+            const output = document.getElementById('output');
+            const timestamp = new Date().toLocaleTimeString();
+            const pre = document.createElement('pre');
+            pre.className = type;
+            pre.textContent = `[${timestamp}] ${message}`;
+            output.appendChild(pre);
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function clearOutput() {
+            document.getElementById('output').innerHTML = '';
+        }
+
+        async function testBackendHealth() {
+            log('Testing backend health...', 'info');
+            try {
+                const response = await fetch(`${API_URL}/dashboard/badge-counts`);
+                if (response.ok) {
+                    log('✅ Backend is running and accessible', 'success');
+                    const data = await response.json();
+                    log(`Response: ${JSON.stringify(data, null, 2)}`, 'info');
+                } else {
+                    log(`⚠️ Backend returned status: ${response.status}`, 'warning');
+                    const text = await response.text();
+                    log(`Response: ${text}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ Backend connection failed: ${error.message}`, 'error');
+                log('Make sure backend is running on http://localhost:5000', 'warning');
+            }
+        }
+
+        async function testSupabaseConnection() {
+            log('Testing Supabase connection...', 'info');
+            try {
+                const { data, error } = await supabase.auth.getSession();
+                if (error) {
+                    log(`❌ Supabase error: ${error.message}`, 'error');
+                } else if (data.session) {
+                    log('✅ Supabase connection successful', 'success');
+                    log(`Session found for: ${data.session.user.email}`, 'success');
+                } else {
+                    log('⚠️ No active session found', 'warning');
+                    log('Please log in to the CRM first', 'info');
+                }
+            } catch (error) {
+                log(`❌ Supabase connection failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function testCurrentSession() {
+            log('Checking current session...', 'info');
+            try {
+                const { data, error } = await supabase.auth.getSession();
+                if (error) {
+                    log(`❌ Error getting session: ${error.message}`, 'error');
+                    return;
+                }
+
+                if (!data.session) {
+                    log('❌ No active session', 'error');
+                    log('Please log in to the CRM first', 'warning');
+                    return;
+                }
+
+                const session = data.session;
+                const expiresAt = session.expires_at * 1000;
+                const now = Date.now();
+                const expiresIn = expiresAt - now;
+
+                log('✅ Session found', 'success');
+                log(`User: ${session.user.email}`, 'info');
+                log(`Token length: ${session.access_token.length} characters`, 'info');
+                log(`Expires at: ${new Date(expiresAt).toLocaleString()}`, 'info');
+                log(`Expires in: ${Math.round(expiresIn / 1000)} seconds (${Math.round(expiresIn / 60000)} minutes)`, 'info');
+                log(`Has refresh token: ${!!session.refresh_token}`, 'info');
+
+                if (expiresIn < 0) {
+                    log('⚠️ WARNING: Token has expired!', 'warning');
+                } else if (expiresIn < 300000) { // 5 minutes
+                    log('⚠️ WARNING: Token expires soon!', 'warning');
+                } else {
+                    log('✅ Token is valid', 'success');
+                }
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testTokenRefresh() {
+            log('Testing token refresh...', 'info');
+            try {
+                const { data, error } = await supabase.auth.refreshSession();
+                if (error) {
+                    log(`❌ Refresh failed: ${error.message}`, 'error');
+                    log('You may need to log in again', 'warning');
+                } else if (data.session) {
+                    log('✅ Token refresh successful', 'success');
+                    const expiresAt = data.session.expires_at * 1000;
+                    const expiresIn = expiresAt - Date.now();
+                    log(`New token expires in: ${Math.round(expiresIn / 1000)} seconds`, 'success');
+                } else {
+                    log('❌ Refresh returned no session', 'error');
+                }
+            } catch (error) {
+                log(`❌ Refresh error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testWhatsAppAPI() {
+            log('Testing WhatsApp API endpoint...', 'info');
+            try {
+                const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+                if (sessionError || !sessionData.session) {
+                    log('❌ No active session. Please log in first.', 'error');
+                    return;
+                }
+
+                const token = sessionData.session.access_token;
+                log('Sending request to WhatsApp API...', 'info');
+
+                const response = await fetch(`${API_URL}/whatsapp/conversations`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                log(`Response status: ${response.status}`, response.ok ? 'success' : 'error');
+                
+                const data = await response.json();
+                log(`Response: ${JSON.stringify(data, null, 2)}`, response.ok ? 'success' : 'error');
+
+                if (response.status === 401) {
+                    log('⚠️ 401 Unauthorized - Token may be expired', 'warning');
+                    log('Try refreshing the token (button 4)', 'info');
+                } else if (response.ok) {
+                    log('✅ WhatsApp API is working!', 'success');
+                }
+            } catch (error) {
+                log(`❌ API test failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Auto-run basic tests on load
+        window.addEventListener('load', () => {
+            log('=== Authentication Test Tool Loaded ===', 'info');
+            log('Click buttons above to run tests', 'info');
+            log('Make sure you are logged in to the CRM first!', 'warning');
+        });
+    </script>
+</body>
+</html>
+

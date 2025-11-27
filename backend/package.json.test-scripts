@@ -1,0 +1,35 @@
+{
+  "name": "test-scripts-to-add",
+  "description": "Add these scripts to your backend/package.json",
+  "scripts": {
+    "test": "jest --verbose",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:whatsapp": "jest --testPathPattern=whatsapp",
+    "test:services": "jest --testPathPattern=services/__tests__",
+    "test:controllers": "jest --testPathPattern=controllers/__tests__",
+    "test:integration": "jest --testPathPattern=integration",
+    "test:ci": "jest --ci --coverage --maxWorkers=2"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "coverageDirectory": "./coverage",
+    "collectCoverageFrom": [
+      "src/**/*.js",
+      "!src/**/__tests__/**",
+      "!src/**/index.js"
+    ],
+    "testMatch": [
+      "**/__tests__/**/*.test.js"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "branches": 70,
+        "functions": 70,
+        "lines": 70,
+        "statements": 70
+      }
+    }
+  }
+}
+

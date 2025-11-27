@@ -197,7 +197,7 @@ class ActivityService {
       }
 
       // Validate activity type
-      const validTypes = ['call', 'email', 'meeting', 'note', 'task', 'sms', 'stage_change', 'assignment_change'];
+      const validTypes = ['call', 'email', 'meeting', 'note', 'task', 'sms', 'whatsapp', 'stage_change', 'assignment_change'];
       if (!validTypes.includes(activityType)) {
         return { success: false, error: 'Invalid activity type' };
       }
@@ -647,7 +647,7 @@ class ActivityService {
   async createBulkActivities(activitiesData) {
     try {
       const supabase = supabaseAdmin;
-      const validTypes = ['call', 'email', 'meeting', 'note', 'task', 'sms', 'stage_change', 'assignment_change'];
+      const validTypes = ['call', 'email', 'meeting', 'note', 'task', 'sms', 'whatsapp', 'stage_change', 'assignment_change'];
       const activities = [];
 
       for (const activityData of activitiesData) {

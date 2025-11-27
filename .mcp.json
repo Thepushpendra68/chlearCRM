@@ -1,0 +1,22 @@
+{
+  "mcpServers": {
+    "vercel": {
+      "type": "http",
+      "url": "https://mcp.vercel.com",
+      "headers": {
+        "Authorization": "Bearer dMTQG4XgbWk56Az6EWODxO7v"
+      }
+    },
+    "supabase": {
+      "type": "http",
+      "url": "https://mcp.supabase.com/mcp?project_ref=qlivxpsvlymxfnamxvhz",
+      "headers": {
+        "Authorization": "Bearer sbp_37527282e4345056c2c0abc6666dc778cd3c9557"
+      }
+    },
+    "playwright": {
+      "command": "cmd",
+      "args": ["/c", "npx", "@playwright/mcp@latest"]
+    }
+  }
+}
