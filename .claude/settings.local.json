@@ -56,7 +56,9 @@
       "Bash(timeout 5 npm start:*)",
       "Bash(timeout 10 npm:*)",
       "Bash(npm run build)",
-      "Bash(git cherry-pick:*)"
+      "Bash(git cherry-pick:*)",
+      "Bash(git branch:*)",
+      "Bash(git rm:*)"
     ],
     "deny": [],
     "ask": []

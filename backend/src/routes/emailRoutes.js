@@ -2,6 +2,7 @@ const express = require("express");
 const { authenticate, authorize } = require("../middleware/authMiddleware");
 const emailTemplateController = require("../controllers/emailTemplateController");
 const emailSendController = require("../controllers/emailSendController");
+const emailAiController = require("../controllers/emailAiController");
 const automationController = require("../controllers/automationController");
 const emailWebhookController = require("../controllers/emailWebhookController");
 const workflowTemplateController = require("../controllers/workflowTemplateController");
@@ -74,6 +75,36 @@ router.post(
   "/settings/integration",
   authorize(["company_admin", "manager"]),
   emailTemplateController.upsertIntegrationSettings,
+);
+
+// =====================================================
+// EMAIL AI ROUTES
+// =====================================================
+
+// Generate template from description
+router.post(
+  "/templates/ai/generate",
+  authorize(["company_admin", "manager"]),
+  emailAiController.generateTemplate,
+);
+
+// Generate subject line variants
+router.post(
+  "/templates/ai/subject-variants",
+  emailAiController.generateSubjectVariants,
+);
+
+// Optimize template content
+router.post(
+  "/templates/ai/optimize",
+  authorize(["company_admin", "manager"]),
+  emailAiController.optimizeTemplate,
+);
+
+// Generate personalization suggestions
+router.post(
+  "/templates/ai/personalize",
+  emailAiController.generatePersonalizationSuggestions,
 );
 
 // =====================================================

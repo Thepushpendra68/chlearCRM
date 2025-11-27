@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import { Suspense, lazy } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
@@ -6,6 +5,7 @@ import { AuthProvider } from "./context/AuthContext";
 import { LeadProvider } from "./context/LeadContext";
 import { PicklistProvider } from "./context/PicklistContext";
 import { VoiceProvider } from "./context/VoiceContext";
+import { IndustryConfigProvider } from "./context/IndustryConfigContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import RoleProtectedRoute from "./components/RoleProtectedRoute";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -56,49 +56,6 @@ const EmailSequenceBuilder = lazy(() => import("./pages/EmailSequenceBuilder"));
 const EmailAnalytics = lazy(() => import("./pages/EmailAnalytics"));
 const WorkflowLibrary = lazy(() => import("./pages/WorkflowLibrary"));
 const ScoringRules = lazy(() => import("./pages/ScoringRules"));
-const WhatsApp = lazy(() => import("./pages/WhatsApp"));
-const WhatsAppBroadcasts = lazy(() => import("./pages/WhatsAppBroadcasts"));
-const WhatsAppSequences = lazy(() => import("./pages/WhatsAppSequences"));
-const WhatsAppSequenceBuilder = lazy(() => import("./pages/WhatsAppSequenceBuilder"));
-const WhatsAppSequenceEnrollments = lazy(() => import("./pages/WhatsAppSequenceEnrollments"));
-=======
-import { Suspense, lazy } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
-import { Toaster } from 'react-hot-toast'
-import { AuthProvider } from './context/AuthContext'
-import { LeadProvider } from './context/LeadContext'
-import { PicklistProvider } from './context/PicklistContext'
-import ProtectedRoute from './components/ProtectedRoute'
-import RoleProtectedRoute from './components/RoleProtectedRoute'
-import ErrorBoundary from './components/ErrorBoundary'
-const Homepage = lazy(() => import('./pages/Homepage'))
-const Login = lazy(() => import('./pages/Login'))
-const RegisterCompany = lazy(() => import('./pages/RegisterCompany'))
-const Dashboard = lazy(() => import('./pages/Dashboard'))
-const Leads = lazy(() => import('./pages/Leads'))
-const LeadDetail = lazy(() => import('./pages/LeadDetail'))
-const Pipeline = lazy(() => import('./pages/Pipeline'))
-const Activities = lazy(() => import('./pages/Activities'))
-const Assignments = lazy(() => import('./pages/Assignments'))
-const Users = lazy(() => import('./pages/Users'))
-const Reports = lazy(() => import('./pages/Reports'))
-const Tasks = lazy(() => import('./pages/Tasks'))
-const SearchResults = lazy(() => import('./pages/SearchResults'))
-const Profile = lazy(() => import('./pages/Profile'))
-const Settings = lazy(() => import('./pages/Settings'))
-const Layout = lazy(() => import('./components/Layout/Layout'))
-const PlatformLayout = lazy(() => import('./components/Platform/PlatformLayout'))
-const PlatformDashboard = lazy(() => import('./pages/Platform/PlatformDashboard'))
-const Companies = lazy(() => import('./pages/Platform/Companies'))
-const CompanyDetails = lazy(() => import('./pages/Platform/CompanyDetails'))
-const AuditLogs = lazy(() => import('./pages/Platform/AuditLogs'))
-const PlatformUsers = lazy(() => import('./pages/Platform/PlatformUsers'))
-const PlatformAnalytics = lazy(() => import('./pages/Platform/PlatformAnalytics'))
-const PlatformActivity = lazy(() => import('./pages/Platform/PlatformActivity'))
-const APIClients = lazy(() => import('./pages/APIClients'))
-const CustomFields = lazy(() => import('./pages/CustomFields'))
-const PublicLeadForm = lazy(() => import('./pages/PublicLeadForm'))
->>>>>>> fb56af8 (FEATURE: Add public lead capture form with API integration and custom fields)
 
 const RouteLoadingFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -110,10 +67,10 @@ function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-<<<<<<< HEAD
-        <VoiceProvider>
-          <PicklistProvider>
-            <LeadProvider>
+        <IndustryConfigProvider>
+          <VoiceProvider>
+            <PicklistProvider>
+              <LeadProvider>
               <div className="min-h-screen bg-gray-50">
                 <Suspense fallback={<RouteLoadingFallback />}>
                   <Routes>
@@ -133,62 +90,6 @@ function App() {
                       element={<Navigate to="/app/dashboard" replace />}
                     />
                     <Route path="/lead-form" element={<PublicLeadForm />} />
-=======
-        <PicklistProvider>
-        <LeadProvider>
-          <div className="min-h-screen bg-gray-50">
-          <Suspense fallback={<RouteLoadingFallback />}><Routes>
-            {/* Public routes */}
-            <Route path="/" element={<Homepage />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Navigate to="/register-company" replace />} />
-            <Route path="/register-company" element={<RegisterCompany />} />
-            <Route path="/dashboard" element={<Navigate to="/app/dashboard" replace />} />
-            <Route path="/lead-form" element={<PublicLeadForm />} />
-            
-            {/* Protected routes */}
-            <Route path="/app" element={
-              <ProtectedRoute>
-                <Layout />
-              </ProtectedRoute>
-            }>
-              <Route index element={<Navigate to="/app/dashboard" replace />} />
-              <Route path="dashboard" element={<Dashboard />} />
-              <Route path="leads" element={<Leads />} />
-              <Route path="leads/:id" element={<LeadDetail />} />
-              <Route path="pipeline" element={<Pipeline />} />
-              <Route path="activities" element={<Activities />} />
-              <Route path="assignments" element={
-                <RoleProtectedRoute allowedRoles={['manager', 'company_admin', 'super_admin']}>
-                  <Assignments />
-                </RoleProtectedRoute>
-              } />
-              <Route path="users" element={
-                <RoleProtectedRoute allowedRoles={['company_admin', 'super_admin']}>
-                  <Users />
-                </RoleProtectedRoute>
-              } />
-              <Route path="reports" element={
-                <RoleProtectedRoute allowedRoles={['manager', 'company_admin', 'super_admin']}>
-                  <Reports />
-                </RoleProtectedRoute>
-              } />
-              <Route path="tasks" element={<Tasks />} />
-              <Route path="search" element={<SearchResults />} />
-              <Route path="profile" element={<Profile />} />
-              <Route path="settings" element={<Settings />} />
-              <Route path="api-clients" element={
-                <RoleProtectedRoute allowedRoles={['company_admin', 'super_admin']}>
-                  <APIClients />
-                </RoleProtectedRoute>
-              } />
-              <Route path="custom-fields" element={
-                <RoleProtectedRoute allowedRoles={['manager', 'company_admin', 'super_admin']}>
-                  <CustomFields />
-                </RoleProtectedRoute>
-              } />
-            </Route>
->>>>>>> fb56af8 (FEATURE: Add public lead capture form with API integration and custom fields)
 
                     {/* Protected routes */}
                     <Route
@@ -326,26 +227,6 @@ function App() {
                         path="email/workflow-library"
                         element={<WorkflowLibrary />}
                       />
-                      <Route
-                        path="whatsapp"
-                        element={<WhatsApp />}
-                      />
-                      <Route
-                        path="whatsapp/broadcasts"
-                        element={<WhatsAppBroadcasts />}
-                      />
-                      <Route
-                        path="whatsapp/sequences"
-                        element={<WhatsAppSequences />}
-                      />
-                      <Route
-                        path="whatsapp/sequences/:id"
-                        element={<WhatsAppSequenceBuilder />}
-                      />
-                      <Route
-                        path="whatsapp/sequences/:id/enrollments"
-                        element={<WhatsAppSequenceEnrollments />}
-                      />
                     </Route>
 
                     {/* Platform routes - Super Admin only */}
@@ -400,9 +281,10 @@ function App() {
                   }}
                 />
               </div>
-            </LeadProvider>
-          </PicklistProvider>
-        </VoiceProvider>
+              </LeadProvider>
+            </PicklistProvider>
+          </VoiceProvider>
+        </IndustryConfigProvider>
       </AuthProvider>
     </ErrorBoundary>
   );
