@@ -9,10 +9,19 @@
   "functions": {
     "api/**/*.js": {
       "maxDuration": 60,
-      "memory": 1024
+      "memory": 1024,
+      "runtime": "nodejs24.x"
     }
   },
   "github": {
     "silent": false
-  }
+  },
+  "env": {
+    "VERCEL": "1"
+  },
+  "buildCommand": "npm run build",
+  "installCommand": "npm install",
+  "framework": null,
+  "cleanUrls": true,
+  "trailingSlash": false
 }
